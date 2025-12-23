@@ -1,3 +1,9 @@
+# task_name
+Доменная сущность Place
+
+# task_status
+[x]
+
 # task_init_description
 Разработать доменную сущность Place
 Place (место проведения: зал, площадка и тд).
@@ -12,3 +18,11 @@ Place (место проведения: зал, площадка и тд).
 
 # task_short_description
 Создать доменную сущность Place с указанными атрибутами и связями.
+
+# full_description
+
+# План выполнения задачи
+1. Подготовить домен `Place`: модели/enum, миграции для `places` и `place_types`, связи с `users`, `addresses`. (см. `subtasks/step-001.md`)
+2. Добавить сидеры/фабрики для `place_types` и базовых `places` (если нужно), с учётом alias/slug и auditing. (см. `subtasks/step-002.md`)
+3. Подключить в `DatabaseSeeder`, проверить целостность/ограничения, обновить статус в `task.md`. (см. `subtasks/step-003.md`)
+
