@@ -56,7 +56,10 @@ class UserFactory extends Factory
     {
         return $this->afterCreating(function (User $user): void {
             $user->profile()->create(
-                UserProfileFactory::new()->make()->toArray()
+                UserProfileFactory::new()->make()->toArray() + [
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]
             );
         });
     }

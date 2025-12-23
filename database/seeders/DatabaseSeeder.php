@@ -24,12 +24,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $roles = [
-            'admin' => RoleFactory::new()->admin()->create(),
-            'moderator' => RoleFactory::new()->moderator()->create(),
-            'editor' => RoleFactory::new()->editor()->create(),
-        ];
-
         $commonUserState = [
             'password' => Hash::make('123'),
             'status' => UserStatus::Confirmed,
@@ -47,24 +41,53 @@ class DatabaseSeeder extends Seeder
             'name' => 'Moderator',
             'email' => 'moderator@example.com',
             'login' => 'moderator',
+            'created_by' => $admin->id,
         ]));
 
         $editor = User::factory()->withProfile()->create(array_merge($commonUserState, [
             'name' => 'Editor',
             'email' => 'editor@example.com',
             'login' => 'editor',
+            'created_by' => $admin->id,
         ]));
 
         $supereditor = User::factory()->withProfile()->create(array_merge($commonUserState, [
             'name' => 'Supereditor',
             'email' => 'supereditor@example.com',
             'login' => 'supereditor',
+            'created_by' => $admin->id,
         ]));
 
-        $admin->roles()->sync([$roles['admin']->id, $roles['moderator']->id]);
-        $moderator->roles()->sync([$roles['moderator']->id, $roles['editor']->id]);
-        $editor->roles()->sync([$roles['editor']->id]);
-        $supereditor->roles()->sync([$roles['moderator']->id, $roles['editor']->id]);
+        $roles = [
+            'admin' => RoleFactory::new()->admin()->create([
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+            ]),
+            'moderator' => RoleFactory::new()->moderator()->create([
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+            ]),
+            'editor' => RoleFactory::new()->editor()->create([
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+            ]),
+        ];
+
+        $admin->roles()->sync([
+            $roles['admin']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+            $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+        ]);
+        $moderator->roles()->sync([
+            $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+            $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+        ]);
+        $editor->roles()->sync([
+            $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+        ]);
+        $supereditor->roles()->sync([
+            $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+            $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
+        ]);
 
         $placeTypes = collect([
             ['name' => 'Hall', 'alias' => 'hall'],
