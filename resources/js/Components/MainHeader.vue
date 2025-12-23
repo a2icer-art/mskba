@@ -1,4 +1,6 @@
 <script setup>
+import { Link } from '@inertiajs/vue3';
+
 defineProps({
     appName: {
         type: String,
@@ -47,13 +49,13 @@ defineEmits(['open-login']);
         </nav>
 
         <div class="flex items-center gap-3">
-            <a
+            <Link
                 v-if="isAuthenticated"
                 class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                 href="/account"
             >
                 {{ loginLabel || 'login' }}
-            </a>
+            </Link>
             <button
                 v-else
                 class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
