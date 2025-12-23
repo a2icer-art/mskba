@@ -15,11 +15,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
+        $roles = \Database\Factories\RoleFactory::new()->count(3)->create();
+        $user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        $user->profile()->create(
+            \Database\Factories\UserProfileFactory::new()->make()->toArray()
+        );
+
+        $roles->each(function ($role) use ($user): void {
+            \Database\Factories\UserRoleFactory::new()->create([
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+            ]);
+        });
     }
 }
