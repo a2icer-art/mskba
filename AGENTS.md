@@ -202,6 +202,15 @@
 
 ---
 
+## Terminal encoding (PowerShell)
+- Перед любыми операциями с файлами в PowerShell задавать UTF-8:
+  - `$OutputEncoding = [System.Text.Encoding]::UTF8`
+  - `chcp 65001` (если вывод/ввод всё равно ломается)
+- При чтении/записи файлов в PowerShell всегда указывать `-Encoding utf8`.
+- При Python-скриптах всегда использовать `encoding='utf-8'` для read/write.
+
+---
+
 ## Work modes (commands)
 
 Режим указывается в начале запроса пользователя.
