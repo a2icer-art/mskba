@@ -1,14 +1,33 @@
 <script setup>
+import { computed, ref, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import AuthModal from '../Components/AuthModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
 
-defineProps({
+const props = defineProps({
     appName: {
         type: String,
         default: 'Laravel',
     },
 });
+
+const page = usePage();
+const isAuthenticated = computed(() => !!page.props.auth?.user);
+const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const showAuthModal = ref(false);
+
+watch(
+    () => page.props.errors?.login,
+    (value) => {
+        if (value) {
+            showAuthModal.value = true;
+        }
+    },
+    { immediate: true }
+);
+
 </script>
 
 <template>
@@ -17,7 +36,12 @@ defineProps({
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
 
         <div class="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
-            <MainHeader :app-name="appName" />
+            <MainHeader
+                :app-name="appName"
+                :is-authenticated="isAuthenticated"
+                :login-label="loginLabel"
+                @open-login="showAuthModal = true"
+            />
 
             <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
                 <MainSidebar />
@@ -58,5 +82,7 @@ defineProps({
 
             <MainFooter />
         </div>
+
+        <AuthModal :app-name="appName" :is-open="showAuthModal" @close="showAuthModal = false" />
     </main>
 </template>

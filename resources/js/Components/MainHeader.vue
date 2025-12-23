@@ -4,7 +4,17 @@ defineProps({
         type: String,
         required: true,
     },
+    isAuthenticated: {
+        type: Boolean,
+        default: false,
+    },
+    loginLabel: {
+        type: String,
+        default: '',
+    },
 });
+
+defineEmits(['open-login']);
 </script>
 
 <template>
@@ -37,10 +47,19 @@ defineProps({
         </nav>
 
         <div class="flex items-center gap-3">
-            <button class="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400">
-                Войти
-            </button>
-            <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800">
+            <a
+                v-if="isAuthenticated"
+                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                href="/account"
+            >
+                {{ loginLabel || 'login' }}
+            </a>
+            <button
+                v-else
+                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                type="button"
+                @click="$emit('open-login')"
+            >
                 Аккаунт
             </button>
         </div>
