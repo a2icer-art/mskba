@@ -1,0 +1,48 @@
+<script setup>
+defineProps({
+    appName: {
+        type: String,
+        required: true,
+    },
+});
+</script>
+
+<template>
+    <header
+        class="flex flex-col gap-6 rounded-3xl border border-amber-200/80 bg-white/70 px-6 py-5 backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+    >
+        <div class="flex items-center gap-3">
+            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                <span class="text-sm font-semibold tracking-[0.2em]">MSK</span>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Basketball Portal</p>
+                <p class="text-lg font-semibold">{{ appName }}</p>
+            </div>
+        </div>
+
+        <nav class="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-700">
+            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
+                Главная
+            </a>
+            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
+                Игры
+            </a>
+            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
+                Тренировки
+            </a>
+            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
+                Сообщество
+            </a>
+        </nav>
+
+        <div class="flex items-center gap-3">
+            <button class="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400">
+                Войти
+            </button>
+            <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800">
+                Аккаунт
+            </button>
+        </div>
+    </header>
+</template>
