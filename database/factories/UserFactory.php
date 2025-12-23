@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -49,5 +50,14 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    public function withProfile(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->profile()->create(
+                UserProfileFactory::new()->make()->toArray()
+            );
+        });
     }
 }

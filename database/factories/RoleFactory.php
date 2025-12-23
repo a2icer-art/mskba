@@ -25,4 +25,30 @@ class RoleFactory extends Factory
             'commentary' => fake()->optional()->sentence(),
         ];
     }
+
+    public function named(string $name, ?string $alias = null): static
+    {
+        $alias ??= Str::slug($name);
+
+        return $this->state([
+            'name' => $name,
+            'alias' => $alias,
+            'status' => RoleStatus::Active,
+        ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->named('admin');
+    }
+
+    public function moderator(): static
+    {
+        return $this->named('moderator');
+    }
+
+    public function editor(): static
+    {
+        return $this->named('editor');
+    }
 }

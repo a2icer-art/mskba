@@ -2,7 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Users\Enums\UserConfirmedBy;
+use App\Domain\Users\Enums\UserStatus;
 use App\Models\User;
+use Database\Factories\RoleFactory;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -16,30 +19,46 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $roles = \Database\Factories\RoleFactory::new()->count(3)->create();
-        $user = User::factory()->create([
-            'name' => 'Admin User',
+        $roles = [
+            'admin' => RoleFactory::new()->admin()->create(),
+            'moderator' => RoleFactory::new()->moderator()->create(),
+            'editor' => RoleFactory::new()->editor()->create(),
+        ];
+
+        $commonUserState = [
+            'password' => Hash::make('123'),
+            'status' => UserStatus::Confirmed,
+            'confirmed_at' => now(),
+            'confirmed_by' => UserConfirmedBy::Admin,
+        ];
+
+        $admin = User::factory()->withProfile()->create(array_merge($commonUserState, [
+            'name' => 'Admin',
             'email' => 'admin@example.com',
             'login' => 'admin',
-            'password' => Hash::make('Asdqwe12#'),
-        ]);
+        ]));
 
-        User::factory()->create([
-            'name' => 'Regular User',
-            'email' => 'user@example.com',
-            'login' => 'user',
-            'password' => Hash::make('123'),
-        ]);
+        $moderator = User::factory()->withProfile()->create(array_merge($commonUserState, [
+            'name' => 'Moderator',
+            'email' => 'moderator@example.com',
+            'login' => 'moderator',
+        ]));
 
-        $user->profile()->create(
-            \Database\Factories\UserProfileFactory::new()->make()->toArray()
-        );
+        $editor = User::factory()->withProfile()->create(array_merge($commonUserState, [
+            'name' => 'Editor',
+            'email' => 'editor@example.com',
+            'login' => 'editor',
+        ]));
 
-        $roles->each(function ($role) use ($user): void {
-            \Database\Factories\UserRoleFactory::new()->create([
-                'user_id' => $user->id,
-                'role_id' => $role->id,
-            ]);
-        });
+        $supereditor = User::factory()->withProfile()->create(array_merge($commonUserState, [
+            'name' => 'Supereditor',
+            'email' => 'supereditor@example.com',
+            'login' => 'supereditor',
+        ]));
+
+        $admin->roles()->sync([$roles['admin']->id, $roles['moderator']->id]);
+        $moderator->roles()->sync([$roles['moderator']->id, $roles['editor']->id]);
+        $editor->roles()->sync([$roles['editor']->id]);
+        $supereditor->roles()->sync([$roles['moderator']->id, $roles['editor']->id]);
     }
 }
