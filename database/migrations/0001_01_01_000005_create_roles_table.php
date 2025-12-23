@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('alias')->unique();
+            $table->integer('level')->default(10);
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('commentary')->nullable();
             $table->timestamps();
