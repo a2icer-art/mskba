@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Places\Models\Place;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,27 @@ Route::get('/', function () {
         'appName' => config('app.name'),
     ]);
 });
+
+Route::get('/halls', function () {
+    $halls = Place::query()
+        ->with(['placeType:id,name,alias'])
+        ->orderBy('name')
+        ->get(['id', 'name', 'alias', 'place_type_id', 'address', 'created_at'])
+        ->map(fn (Place $place) => [
+            'id' => $place->id,
+            'name' => $place->name,
+            'alias' => $place->alias,
+            'address' => $place->address,
+            'created_at' => $place->created_at?->toISOString(),
+            'type' => $place->placeType?->only(['id', 'name', 'alias']),
+        ])
+        ->values();
+
+    return Inertia::render('Halls', [
+        'appName' => config('app.name'),
+        'halls' => $halls,
+    ]);
+})->name('halls');
 
 Route::get('/login', function () {
     return redirect('/')->withErrors([
