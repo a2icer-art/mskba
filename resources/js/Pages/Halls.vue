@@ -14,6 +14,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    navigation: {
+        type: Object,
+        default: () => ({ title: '?????????', items: [] }),
+    },
 });
 
 const page = usePage();
@@ -30,10 +34,10 @@ const perPage = 6;
 
 const metroOptions = [
     '',
-    'Тверская',
-    'Маяковская',
-    'Пушкинская',
-    'Кузнецкий Мост',
+    '????????',
+    '??????????',
+    '??????????',
+    '????????? ????',
 ];
 
 const typeOptions = computed(() => {
@@ -76,7 +80,7 @@ const sorted = computed(() => {
         const nameA = normalized(a.name);
         const nameB = normalized(b.name);
         const dateA = a.created_at ? Date.parse(a.created_at) : 0;
-        const dateB = a.created_at ? Date.parse(b.created_at) : 0;
+        const dateB = b.created_at ? Date.parse(b.created_at) : 0;
 
         switch (sortBy.value) {
             case 'name_desc':
@@ -112,12 +116,12 @@ const paged = computed(() => {
 
 const grouped = computed(() => {
     if (!groupByType.value) {
-        return [{ name: 'Все площадки', items: paged.value }];
+        return [{ name: '??? ????????', items: paged.value }];
     }
 
     const groups = new Map();
     paged.value.forEach((hall) => {
-        const key = hall.type?.name || 'Без типа';
+        const key = hall.type?.name || '??? ????';
         if (!groups.has(key)) {
             groups.set(key, []);
         }
@@ -126,6 +130,18 @@ const grouped = computed(() => {
 
     return Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
 });
+
+const syncFromQuery = () => {
+    const parts = page.url.split('?');
+    const params = new URLSearchParams(parts[1] || '');
+    typeFilter.value = params.get('type') || '';
+};
+
+syncFromQuery();
+watch(
+    () => page.url,
+    () => syncFromQuery()
+);
 </script>
 
 <template>
@@ -141,24 +157,24 @@ const grouped = computed(() => {
             />
 
             <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
-                <MainSidebar />
+                <MainSidebar :title="navigation.title" :items="navigation.items" />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Площадки</p>
-                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">Список площадок</h1>
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">????????</p>
+                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">?????? ????????</h1>
                             <p class="mt-3 max-w-2xl text-sm text-slate-600">
-                                Выберите тип площадки, адрес или метро, чтобы быстро найти подходящее место.
+                                ???????? ??? ????????, ????? ??? ?????, ????? ?????? ????? ?????????? ?????.
                             </p>
                         </div>
                     </div>
 
                     <div class="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Тип
+                            ???
                             <select v-model="typeFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option value="">Все типы</option>
+                                <option value="">??? ????</option>
                                 <option v-for="type in typeOptions" :key="type.alias" :value="type.alias">
                                     {{ type.name }}
                                 </option>
@@ -166,37 +182,37 @@ const grouped = computed(() => {
                         </label>
 
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес
+                            ?????
                             <input
                                 v-model="addressFilter"
                                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                placeholder="Например, Тверская"
+                                placeholder="????????, ????????"
                                 type="text"
                             />
                         </label>
 
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Метро
+                            ?????
                             <select v-model="metroFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                                 <option v-for="metro in metroOptions" :key="metro" :value="metro">
-                                    {{ metro || 'Любое' }}
+                                    {{ metro || '?????' }}
                                 </option>
                             </select>
                         </label>
 
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Сортировка
+                            ??????????
                             <select v-model="sortBy" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option value="name_asc">Название A-Z</option>
-                                <option value="name_desc">Название Z-A</option>
-                                <option value="created_desc">Дата добавления: новые</option>
-                                <option value="created_asc">Дата добавления: старые</option>
+                                <option value="name_asc">???????? A-Z</option>
+                                <option value="name_desc">???????? Z-A</option>
+                                <option value="created_desc">???? ??????????: ?????</option>
+                                <option value="created_asc">???? ??????????: ??????</option>
                             </select>
                         </label>
 
                         <label class="flex items-center gap-2 text-sm text-slate-600">
                             <input v-model="groupByType" class="h-4 w-4 rounded border-slate-300" type="checkbox" />
-                            Группировать по типу
+                            ???????????? ?? ????
                         </label>
                     </div>
 
@@ -215,7 +231,7 @@ const grouped = computed(() => {
                                     <div>
                                         <h3 class="text-lg font-semibold text-slate-900">{{ hall.name }}</h3>
                                         <p class="mt-1 text-sm text-slate-600">
-                                            {{ hall.type?.name || 'Тип не указан' }}
+                                            {{ hall.type?.name || '??? ?? ??????' }}
                                         </p>
                                         <p v-if="hall.address" class="mt-2 text-sm text-slate-600">
                                             {{ hall.address }}
@@ -230,11 +246,11 @@ const grouped = computed(() => {
                     </div>
 
                     <div v-else class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-600">
-                        По текущим фильтрам площадок не найдено.
+                        ?? ??????? ???????? ???????? ?? ???????.
                     </div>
 
                     <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
-                        <div>Страница {{ pageIndex }} из {{ totalPages }}</div>
+                        <div>???????? {{ pageIndex }} ?? {{ totalPages }}</div>
                         <div class="flex flex-wrap items-center gap-2">
                             <button
                                 class="rounded-full border border-slate-300 px-3 py-1 text-sm transition disabled:opacity-40"
@@ -242,7 +258,7 @@ const grouped = computed(() => {
                                 type="button"
                                 @click="pageIndex = Math.max(1, pageIndex - 1)"
                             >
-                                Назад
+                                ?????
                             </button>
                             <button
                                 v-for="pageNumber in totalPages"
@@ -264,7 +280,7 @@ const grouped = computed(() => {
                                 type="button"
                                 @click="pageIndex = Math.min(totalPages, pageIndex + 1)"
                             >
-                                Вперёд
+                                ??????
                             </button>
                         </div>
                     </div>

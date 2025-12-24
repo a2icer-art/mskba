@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Places\Models\Place;
+use App\Domain\Places\Models\PlaceType;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,15 @@ Route::get('/', function () {
 });
 
 Route::get('/halls', function () {
+    $navItems = PlaceType::query()
+        ->orderBy('name')
+        ->get(['name', 'alias'])
+        ->map(fn (PlaceType $type) => [
+            'label' => $type->name,
+            'href' => '/halls?type=' . $type->alias,
+        ])
+        ->values();
+
     $halls = Place::query()
         ->with(['placeType:id,name,alias'])
         ->orderBy('name')
@@ -30,6 +40,10 @@ Route::get('/halls', function () {
     return Inertia::render('Halls', [
         'appName' => config('app.name'),
         'halls' => $halls,
+        'navigation' => [
+            'title' => 'Навигация',
+            'items' => $navItems,
+        ],
     ]);
 })->name('halls');
 
