@@ -1,0 +1,3 @@
+## Модель ролей участников процесса
+Предлагается ввести отдельный домен Participants с сущностями ParticipantRole и ParticipantRoleAssignment. ParticipantRole хранит список базовых ролей (name, alias, status, sort, auditing, SoftDeletes). ParticipantRoleAssignment связывает user_id, role_id и контекст (context_type/context_id), дает статус привязки и аудит (created_by, confirmed_at/by).
+Допустить глобальные роли (без контекста) для профиля пользователя и контекстные роли для игр, площадок, команд, турниров. Список базовых ролей в сиде: player, coach, referee, venue_admin, media, seller, staff, other (с полем custom_title).
