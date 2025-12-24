@@ -41,7 +41,7 @@ defineEmits(['open-login']);
                 class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300"
                 href="/halls"
             >
-                Залы
+                ????????
             </Link>
             <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
                 Игры
