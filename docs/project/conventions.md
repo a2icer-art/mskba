@@ -10,3 +10,10 @@
 
 - Если сущность использует `alias`, то он формируется как SEF/ЧПУ от `name` (slug).
 - Формат slug: нижний регистр, латиница, разделитель `-` (если нет особых требований).
+
+## Роли участников процесса
+
+- Роли участников процесса отделены от ролей доступа (admin/moderator/editor).
+- Домен: Participants с сущностями ParticipantRole и ParticipantRoleAssignment.
+- Назначения могут быть глобальными (без контекста) или контекстными через polymorphic context_type/context_id.
+- Справочник ролей и назначения используют alias/slug, status, auditing, SoftDeletes.

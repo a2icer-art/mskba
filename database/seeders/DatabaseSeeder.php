@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Domain\Places\Enums\PlaceStatus;
 use App\Domain\Places\Models\Place;
 use App\Domain\Places\Models\PlaceType;
+use App\Domain\Participants\Enums\ParticipantRoleStatus;
+use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use App\Models\User;
@@ -88,6 +90,30 @@ class DatabaseSeeder extends Seeder
             $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
             $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
+
+        $participantRoleNames = [
+            'Player',
+            'Coach',
+            'Referee',
+            'Venue admin',
+            'Media',
+            'Seller',
+            'Staff',
+            'Other',
+        ];
+
+        foreach ($participantRoleNames as $index => $name) {
+            ParticipantRole::query()->create([
+                'name' => $name,
+                'alias' => Str::slug($name),
+                'status' => ParticipantRoleStatus::Confirmed,
+                'sort' => $index + 1,
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+                'confirmed_at' => now(),
+                'confirmed_by' => $admin->id,
+            ]);
+        }
 
         $placeTypes = collect([
             ['name' => 'Hall', 'alias' => 'hall'],
