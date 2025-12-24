@@ -11,17 +11,29 @@ const props = defineProps({
         type: String,
         default: 'Laravel',
     },
+    participantRoles: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const showAuthModal = ref(false);
+const authMode = ref('login');
 
 watch(
-    () => page.props.errors?.login,
-    (value) => {
-        if (value) {
+    () => page.props.errors,
+    (errors) => {
+        if (errors?.email || errors?.participant_role_id) {
+            authMode.value = 'register';
+            showAuthModal.value = true;
+            return;
+        }
+
+        if (errors?.login) {
+            authMode.value = 'login';
             showAuthModal.value = true;
         }
     },
@@ -40,7 +52,7 @@ watch(
                 :app-name="appName"
                 :is-authenticated="isAuthenticated"
                 :login-label="loginLabel"
-                @open-login="showAuthModal = true"
+                @open-login="authMode = 'login'; showAuthModal = true"
             />
 
             <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -83,6 +95,12 @@ watch(
             <MainFooter />
         </div>
 
-        <AuthModal :app-name="appName" :is-open="showAuthModal" @close="showAuthModal = false" />
+        <AuthModal
+            :app-name="appName"
+            :is-open="showAuthModal"
+            :participant-roles="participantRoles"
+            :initial-mode="authMode"
+            @close="showAuthModal = false"
+        />
     </main>
 </template>
