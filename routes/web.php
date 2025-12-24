@@ -3,6 +3,7 @@
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Models\User;
@@ -101,6 +102,7 @@ Route::post('/register', function (Request $request) {
         'email' => $validated['email'],
         'password' => $validated['password'],
         'status' => UserStatus::Unconfirmed,
+        'registered_via' => UserRegisteredVia::Site,
     ]);
 
     if (!empty($validated['participant_role_id'])) {

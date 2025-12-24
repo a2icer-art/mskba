@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Audit\Traits\Auditable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Domain\Users\Enums\UserConfirmedBy;
+use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
 use App\Domain\Users\Models\UserProfile;
@@ -33,6 +34,8 @@ class User extends Authenticatable
         'name',
         'email',
         'login',
+        'registered_via',
+        'registration_details',
         'password',
         'status',
         'confirmed_at',
@@ -66,6 +69,8 @@ class User extends Authenticatable
             'status' => UserStatus::class,
             'confirmed_at' => 'datetime',
             'confirmed_by' => UserConfirmedBy::class,
+            'registered_via' => UserRegisteredVia::class,
+            'registration_details' => 'array',
         ];
     }
 

@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\User;
 use App\Domain\Users\Enums\UserConfirmedBy;
+use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -39,6 +40,8 @@ class UserFactory extends Factory
             'confirmed_at' => $confirmed ? now() : null,
             'confirmed_by' => $confirmed ? fake()->randomElement(UserConfirmedBy::cases()) : null,
             'commentary' => fake()->optional()->sentence(),
+            'registered_via' => UserRegisteredVia::Site,
+            'registration_details' => null,
         ];
     }
 
