@@ -2,7 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Domain\Audit\Traits\Auditable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
@@ -20,7 +21,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, Auditable;
     use SoftDeletes;
 
     /**

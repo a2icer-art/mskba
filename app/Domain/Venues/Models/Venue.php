@@ -2,6 +2,7 @@
 
 namespace App\Domain\Venues\Models;
 
+use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Venue extends Model
 {
     use HasFactory;
+    use Auditable;
     use SoftDeletes;
 
     protected $fillable = [

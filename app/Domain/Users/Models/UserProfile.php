@@ -2,6 +2,7 @@
 
 namespace App\Domain\Users\Models;
 
+use App\Domain\Audit\Traits\Auditable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class UserProfile extends Model
 {
     use HasFactory;
+    use Auditable;
     use SoftDeletes;
 
     protected $fillable = [

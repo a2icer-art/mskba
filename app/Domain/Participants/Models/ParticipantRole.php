@@ -2,6 +2,7 @@
 
 namespace App\Domain\Participants\Models;
 
+use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class ParticipantRole extends Model
 {
     use HasFactory;
+    use Auditable;
     use SoftDeletes;
 
     protected $fillable = [
