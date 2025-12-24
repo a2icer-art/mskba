@@ -5,7 +5,7 @@ import { Link } from '@inertiajs/vue3';
 const props = defineProps({
     title: {
         type: String,
-        default: '?????????',
+        default: 'Навигация',
     },
     items: {
         type: Array,
@@ -13,7 +13,7 @@ const props = defineProps({
     },
     emptyText: {
         type: String,
-        default: '???? ??? ??????? ??? ?????????.',
+        default: 'Пока нет пунктов для навигации.',
     },
 });
 
