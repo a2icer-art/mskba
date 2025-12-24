@@ -1,3 +1,3 @@
 ## Подзадача 2
 
-Добавить фабрики/сидеры для `place_types` и базовых `places` с учётом alias/slug и auditing.
+Добавить фабрики/сидеры для `venue_types` и базовых `venues` с учётом alias/slug и auditing.

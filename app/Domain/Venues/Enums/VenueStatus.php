@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Domain\Places\Enums;
+namespace App\Domain\Venues\Enums;
 
-enum PlaceStatus: string
+enum VenueStatus: string
 {
     case Unconfirmed = 'unconfirmed';
     case Moderation = 'moderation';

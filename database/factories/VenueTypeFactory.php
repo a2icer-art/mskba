@@ -2,17 +2,17 @@
 
 namespace Database\Factories;
 
-use App\Domain\Places\Models\PlaceType;
+use App\Domain\Venues\Models\VenueType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Places\Models\PlaceType>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Venues\Models\VenueType>
  */
-class PlaceTypeFactory extends Factory
+class VenueTypeFactory extends Factory
 {
-    protected $model = PlaceType::class;
+    protected $model = VenueType::class;
 
     public function definition(): array
     {

@@ -2,19 +2,19 @@
 
 namespace Database\Factories;
 
-use App\Domain\Places\Enums\PlaceStatus;
-use App\Domain\Places\Models\Place;
-use App\Domain\Places\Models\PlaceType;
+use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Places\Models\Place>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Domain\Venues\Models\Venue>
  */
-class PlaceFactory extends Factory
+class VenueFactory extends Factory
 {
-    protected $model = Place::class;
+    protected $model = Venue::class;
 
     public function definition(): array
     {
@@ -23,12 +23,12 @@ class PlaceFactory extends Factory
         return [
             'name' => $name,
             'alias' => Str::slug($name),
-            'status' => PlaceStatus::Confirmed,
+            'status' => VenueStatus::Confirmed,
             'created_by' => User::factory(),
             'updated_by' => null,
             'confirmed_at' => now(),
             'confirmed_by' => User::factory(),
-            'place_type_id' => PlaceType::factory(),
+            'venue_type_id' => VenueType::factory(),
             'address' => fake()->optional()->address(),
             'address_id' => null,
             'deleted_by' => null,

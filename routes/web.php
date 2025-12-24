@@ -1,7 +1,7 @@
 <?php
 
-use App\Domain\Places\Models\Place;
-use App\Domain\Places\Models\PlaceType;
+use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueType;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,26 +14,26 @@ Route::get('/', function () {
 });
 
 Route::get('/halls', function () {
-    $navItems = PlaceType::query()
+    $navItems = VenueType::query()
         ->orderBy('name')
         ->get(['name', 'alias'])
-        ->map(fn (PlaceType $type) => [
+        ->map(fn (VenueType $type) => [
             'label' => $type->name,
             'href' => '/halls?type=' . $type->alias,
         ])
         ->values();
 
-    $halls = Place::query()
-        ->with(['placeType:id,name,alias'])
+    $halls = Venue::query()
+        ->with(['venueType:id,name,alias'])
         ->orderBy('name')
-        ->get(['id', 'name', 'alias', 'place_type_id', 'address', 'created_at'])
-        ->map(fn (Place $place) => [
-            'id' => $place->id,
-            'name' => $place->name,
-            'alias' => $place->alias,
-            'address' => $place->address,
-            'created_at' => $place->created_at?->toISOString(),
-            'type' => $place->placeType?->only(['id', 'name', 'alias']),
+        ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
+        ->map(fn (Venue $venue) => [
+            'id' => $venue->id,
+            'name' => $venue->name,
+            'alias' => $venue->alias,
+            'address' => $venue->address,
+            'created_at' => $venue->created_at?->toISOString(),
+            'type' => $venue->venueType?->only(['id', 'name', 'alias']),
         ])
         ->values();
 

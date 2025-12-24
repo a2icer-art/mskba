@@ -2,15 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Places\Enums\PlaceStatus;
-use App\Domain\Places\Models\Place;
-use App\Domain\Places\Models\PlaceType;
+use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueType;
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use App\Models\User;
-use Database\Factories\PlaceTypeFactory;
+use Database\Factories\VenueTypeFactory;
 use Database\Factories\RoleFactory;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -115,28 +115,28 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        $placeTypes = collect([
+        $venueTypes = collect([
             ['name' => 'Hall', 'alias' => 'hall'],
             ['name' => 'Court', 'alias' => 'court'],
             ['name' => 'Outdoor court', 'alias' => 'outdoor'],
         ])->mapWithKeys(function (array $data) use ($admin): array {
-            $placeType = PlaceTypeFactory::new()
+            $venueType = VenueTypeFactory::new()
                 ->named($data['name'], $data['alias'], $admin->id)
                 ->create();
 
-            return [$data['alias'] => $placeType];
+            return [$data['alias'] => $venueType];
         });
 
-        $placeName = 'Main Hall';
-        Place::query()->create([
-            'name' => $placeName,
-            'alias' => Str::slug($placeName),
-            'status' => PlaceStatus::Confirmed,
+        $venueName = 'Main Hall';
+        Venue::query()->create([
+            'name' => $venueName,
+            'alias' => Str::slug($venueName),
+            'status' => VenueStatus::Confirmed,
             'created_by' => $admin->id,
             'updated_by' => $admin->id,
             'confirmed_at' => now(),
             'confirmed_by' => $admin->id,
-            'place_type_id' => $placeTypes['hall']->id,
+            'venue_type_id' => $venueTypes['hall']->id,
             'address' => 'Main street, 1',
             'address_id' => null,
         ]);
