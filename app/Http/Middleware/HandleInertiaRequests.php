@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Participants\Enums\ParticipantRoleStatus;
+use App\Domain\Participants\Models\ParticipantRole;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,6 +42,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only(['id', 'name', 'email', 'login']),
             ],
+            'participantRoles' => ParticipantRole::query()
+                ->where('status', ParticipantRoleStatus::Confirmed)
+                ->orderBy('sort')
+                ->get(['id', 'name', 'alias']),
         ];
     }
 }

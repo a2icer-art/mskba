@@ -1,8 +1,6 @@
 <?php
 
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
-use App\Domain\Participants\Enums\ParticipantRoleStatus;
-use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
@@ -17,10 +15,6 @@ use Illuminate\Validation\Rules\Password;
 Route::get('/', function () {
     return Inertia::render('Home', [
         'appName' => config('app.name'),
-        'participantRoles' => ParticipantRole::query()
-            ->where('status', ParticipantRoleStatus::Confirmed)
-            ->orderBy('sort')
-            ->get(['id', 'name', 'alias']),
     ]);
 });
 
