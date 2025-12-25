@@ -17,10 +17,25 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    participantRoles: {
+        type: Array,
+        default: () => [],
+    },
 });
 
-const tabs = ['Пользователь', 'Профиль'];
-const activeTab = ref(tabs[0]);
+const baseTabs = [
+    { key: 'user', label: 'Пользователь' },
+    { key: 'profile', label: 'Профиль' },
+];
+const tabs = computed(() => [
+    ...baseTabs,
+    ...props.participantRoles.map((role) => ({
+        key: `role-${role.id}`,
+        label: role.label,
+        alias: role.alias,
+    })),
+]);
+const activeTab = ref(baseTabs[0].key);
 const logoutForm = useForm({});
 
 const userItems = computed(() => [
@@ -40,6 +55,13 @@ const profileItems = computed(() => [
     { label: 'Пол', value: props.profile?.gender ?? '—' },
     { label: 'Дата рождения', value: props.profile?.birth_date ?? '—' },
 ]);
+
+const roleItems = (role) => [
+    { label: 'Роль', value: role.label ?? '—' },
+    { label: 'Alias', value: role.alias ?? '—' },
+];
+
+const activeRole = computed(() => props.participantRoles.find((role) => `role-${role.id}` === activeTab.value) ?? null);
 
 const logout = () => {
     logoutForm.post('/logout');
@@ -69,22 +91,22 @@ const sendVerification = () => {
                 <div class="mt-6 flex flex-wrap gap-3">
                     <button
                         v-for="tab in tabs"
-                        :key="tab"
+                        :key="tab.key"
                         class="rounded-full border px-4 py-2 text-sm font-medium transition"
                         :class="
-                            activeTab === tab
+                            activeTab === tab.key
                                 ? 'border-slate-900 bg-slate-900 text-white'
                                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         "
                         type="button"
-                        @click="activeTab = tab"
+                        @click="activeTab = tab.key"
                     >
-                        {{ tab }}
+                        {{ tab.label }}
                     </button>
                 </div>
 
                 <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                    <div v-if="activeTab === 'Пользователь'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
                             <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
@@ -106,8 +128,15 @@ const sendVerification = () => {
                         </div>
                     </div>
 
-                    <div v-if="activeTab === 'Профиль'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-else-if="activeTab === 'profile'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div v-for="item in profileItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                            <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
+                        </div>
+                    </div>
+
+                    <div v-else-if="activeRole" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div v-for="item in roleItems(activeRole)" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
                             <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
                         </div>

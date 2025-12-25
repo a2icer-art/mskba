@@ -4,6 +4,7 @@ use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Support\Facades\Route;
@@ -63,10 +64,22 @@ Route::get('/account', function (Request $request) {
 
     $user->load('profile');
 
+    $participantRoles = $user->participantRoleAssignments()
+        ->with('role:id,name,alias')
+        ->where('status', ParticipantRoleAssignmentStatus::Confirmed)
+        ->get()
+        ->map(fn ($assignment) => [
+            'id' => $assignment->id,
+            'label' => $assignment->custom_title ?: ($assignment->role?->name ?? 'Роль'),
+            'alias' => $assignment->role?->alias,
+        ])
+        ->values();
+
     return Inertia::render('Account', [
         'appName' => config('app.name'),
         'user' => $user->only(['id', 'name', 'email', 'login', 'email_verified_at']),
         'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
+        'participantRoles' => $participantRoles,
     ]);
 })->name('account')->middleware('auth');
 

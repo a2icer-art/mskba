@@ -11,6 +11,7 @@ use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
+use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -104,5 +105,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function participantRoleAssignments(): HasMany
+    {
+        return $this->hasMany(ParticipantRoleAssignment::class);
     }
 }
