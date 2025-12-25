@@ -51,4 +51,9 @@ class RoleFactory extends Factory
     {
         return $this->named('editor');
     }
+
+    public function user(): static
+    {
+        return $this->named('user');
+    }
 }

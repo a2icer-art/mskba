@@ -73,6 +73,10 @@ class DatabaseSeeder extends Seeder
                 'created_by' => $admin->id,
                 'updated_by' => $admin->id,
             ]),
+            'user' => RoleFactory::new()->user()->create([
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+            ]),
         ];
 
         $admin->roles()->sync([

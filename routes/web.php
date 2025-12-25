@@ -1,9 +1,7 @@
 <?php
 
-use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
-use App\Domain\Participants\Models\ParticipantRoleAssignment;
-use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Enums\UserRegisteredVia;
+use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Models\User;
@@ -96,29 +94,13 @@ Route::post('/register', function (Request $request) {
         'participant_role_id' => ['nullable', 'integer', 'exists:participant_roles,id'],
     ]);
 
-    $user = User::query()->create([
-        'name' => $validated['login'],
+    $user = app(RegisterUserService::class)->register([
         'login' => $validated['login'],
         'email' => $validated['email'],
         'password' => $validated['password'],
-        'status' => UserStatus::Unconfirmed,
+        'participant_role_id' => $validated['participant_role_id'] ?? null,
         'registered_via' => UserRegisteredVia::Site,
     ]);
-
-    if (!empty($validated['participant_role_id'])) {
-        ParticipantRoleAssignment::query()->create([
-            'user_id' => $user->id,
-            'participant_role_id' => $validated['participant_role_id'],
-            'context_type' => null,
-            'context_id' => null,
-            'status' => ParticipantRoleAssignmentStatus::Confirmed,
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-            'confirmed_at' => now(),
-            'confirmed_by' => $user->id,
-            'deleted_by' => null,
-        ]);
-    }
 
     Auth::login($user);
 
