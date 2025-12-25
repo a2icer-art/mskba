@@ -27,8 +27,11 @@ const userItems = computed(() => [
     { label: 'ID', value: props.user?.id ?? '—' },
     { label: 'Имя', value: props.user?.name ?? '—' },
     { label: 'Логин', value: props.user?.login ?? '—' },
-    { label: 'Email', value: props.user?.email ?? '—' },
 ]);
+
+const isEmailVerified = computed(() => Boolean(props.user?.email_verified_at));
+const emailValue = computed(() => props.user?.email ?? '—');
+const verificationForm = useForm({});
 
 const profileItems = computed(() => [
     { label: 'Имя', value: props.profile?.first_name ?? '—' },
@@ -40,6 +43,10 @@ const profileItems = computed(() => [
 
 const logout = () => {
     logoutForm.post('/logout');
+};
+
+const sendVerification = () => {
+    verificationForm.post('/email/verification-notification');
 };
 </script>
 
@@ -78,9 +85,24 @@ const logout = () => {
 
                 <div class="mt-6 grid gap-4 sm:grid-cols-2">
                     <div v-if="activeTab === 'Пользователь'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
+                        <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
                             <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
+                        </div>
+                        <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Email</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-medium text-slate-800">{{ emailValue }}</span>
+                                <button
+                                    v-if="!isEmailVerified"
+                                    class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
+                                    type="button"
+                                    :disabled="verificationForm.processing"
+                                    @click="sendVerification"
+                                >
+                                    Подтвердить
+                                </button>
+                            </div>
                         </div>
                     </div>
 

@@ -5,6 +5,7 @@ use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Models\User;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -64,10 +65,26 @@ Route::get('/account', function (Request $request) {
 
     return Inertia::render('Account', [
         'appName' => config('app.name'),
-        'user' => $user->only(['id', 'name', 'email', 'login']),
+        'user' => $user->only(['id', 'name', 'email', 'login', 'email_verified_at']),
         'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
     ]);
 })->name('account')->middleware('auth');
+
+Route::post('/email/verification-notification', function (Request $request) {
+    $user = $request->user();
+
+    if ($user && !$user->hasVerifiedEmail()) {
+        $user->sendEmailVerificationNotification();
+    }
+
+    return back();
+})->name('verification.send')->middleware(['auth', 'throttle:6,1']);
+
+Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+    $request->fulfill();
+
+    return redirect()->route('account');
+})->name('verification.verify')->middleware(['auth', 'signed']);
 
 Route::post('/login', function (Request $request) {
     $credentials = $request->validate([
