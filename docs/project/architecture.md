@@ -17,6 +17,7 @@
   - Дополнительные данные профиля (имя, дата рождения, пол).
 - `UserContact` (app/Domain/Users/Models/UserContact)
   - Контакты пользователя (1:N) с типом (email/phone/telegram/vk/other) и подтверждением (confirmed_at).
+  - Неподтвержденные контакты удаляются физически, подтвержденные — не удаляются.
 - `Role` (app/Domain/Users/Models/Role)
   - Роли доступа (admin/moderator/editor).
 - `UserRole` (app/Domain/Users/Models/UserRole)

@@ -64,6 +64,13 @@ Route::get('/account', function (Request $request) {
     $user = $request->user();
 
     $user->load(['profile', 'contacts']);
+    $contactTypes = [
+        ['value' => ContactType::Email->value, 'label' => 'Электронная почта'],
+        ['value' => ContactType::Phone->value, 'label' => 'Телефон'],
+        ['value' => ContactType::Telegram->value, 'label' => 'Telegram'],
+        ['value' => ContactType::Vk->value, 'label' => 'VK'],
+        ['value' => ContactType::Other->value, 'label' => 'Другое'],
+    ];
 
     $participantRoles = $user->participantRoleAssignments()
         ->with('role:id,name,alias')
@@ -96,38 +103,133 @@ Route::get('/account', function (Request $request) {
                 'confirmed_at' => $contact->confirmed_at?->toISOString(),
             ])
             ->values(),
+        'contacts' => $user->contacts
+            ->sortBy('id')
+            ->map(fn (UserContact $contact) => [
+                'id' => $contact->id,
+                'type' => $contact->type?->value,
+                'value' => $contact->value,
+                'confirmed_at' => $contact->confirmed_at?->toISOString(),
+            ])
+            ->values(),
+        'contactTypes' => $contactTypes,
     ]);
 })->name('account')->middleware('auth');
 
-Route::post('/account/emails', function (Request $request) {
+Route::post('/account/contacts', function (Request $request) {
     $user = $request->user();
+    $typeValues = array_map(fn (ContactType $type) => $type->value, ContactType::cases());
+    $type = $request->input('type');
 
-    $validated = $request->validate([
-        'email' => [
+    $rules = [
+        'type' => ['required', Rule::in($typeValues)],
+        'value' => [
             'required',
-            'email',
+            'string',
             'max:255',
             Rule::unique('user_contacts', 'value')
                 ->where('user_id', $user->id)
-                ->where('type', ContactType::Email->value),
+                ->where('type', $type),
         ],
-    ], [
-        'email.unique' => 'Этот email уже добавлен.',
-    ]);
+    ];
 
-    $email = $validated['email'];
+    if ($type === ContactType::Email->value) {
+        $rules['value'][] = 'email';
+    }
+
+    $validated = $request->validate($rules, [
+        'value.unique' => 'Этот контакт уже добавлен.',
+    ]);
 
     UserContact::query()->create([
         'user_id' => $user->id,
-        'type' => ContactType::Email,
-        'value' => $email,
+        'type' => $validated['type'],
+        'value' => $validated['value'],
         'confirmed_at' => null,
         'created_by' => $user->id,
         'updated_by' => $user->id,
     ]);
 
     return back();
-})->name('account.emails.store')->middleware('auth');
+})->name('account.contacts.store')->middleware('auth');
+
+Route::patch('/account/contacts/{contact}', function (Request $request, UserContact $contact) {
+    $user = $request->user();
+
+    if ($contact->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($contact->confirmed_at !== null) {
+        return back()->withErrors([
+            'contact' => 'Подтвержденный контакт нельзя редактировать.',
+        ]);
+    }
+
+    $rules = [
+        'value' => [
+            'required',
+            'string',
+            'max:255',
+            Rule::unique('user_contacts', 'value')
+                ->where('user_id', $user->id)
+                ->where('type', $contact->type?->value)
+                ->ignore($contact->id),
+        ],
+    ];
+
+    if ($contact->type === ContactType::Email) {
+        $rules['value'][] = 'email';
+    }
+
+    $validated = $request->validate($rules, [
+        'value.unique' => 'Этот контакт уже добавлен.',
+    ]);
+
+    $contact->update([
+        'value' => $validated['value'],
+        'updated_by' => $user->id,
+    ]);
+
+    return back();
+})->name('account.contacts.update')->middleware('auth');
+
+Route::post('/account/contacts/{contact}/confirm', function (Request $request, UserContact $contact) {
+    $user = $request->user();
+
+    if ($contact->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($contact->confirmed_at !== null) {
+        return back();
+    }
+
+    $contact->update([
+        'confirmed_at' => now(),
+        'updated_by' => $user->id,
+    ]);
+
+    return back();
+})->name('account.contacts.confirm')->middleware('auth');
+
+Route::delete('/account/contacts/{contact}', function (Request $request, UserContact $contact) {
+    $user = $request->user();
+
+    if ($contact->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($contact->confirmed_at !== null) {
+        return back()->withErrors([
+            'contact' => 'Подтвержденный контакт нельзя удалить.',
+        ]);
+    }
+
+    $contact->forceDelete();
+
+    return back();
+})->name('account.contacts.destroy')->middleware('auth');
 
 Route::patch('/account/emails/{contact}', function (Request $request, UserContact $contact) {
     $user = $request->user();
@@ -177,11 +279,7 @@ Route::delete('/account/emails/{contact}', function (Request $request, UserConta
         ]);
     }
 
-    $contact->update([
-        'deleted_by' => $user->id,
-    ]);
-
-    $contact->delete();
+    $contact->forceDelete();
 
     return back();
 })->name('account.emails.destroy')->middleware('auth');

@@ -25,6 +25,14 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    contacts: {
+        type: Array,
+        default: () => [],
+    },
+    contactTypes: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const baseTabs = [
@@ -90,21 +98,54 @@ const activeRole = computed(() => props.participantRoles.find((role) => `role-${
 const emails = computed(() =>
     [...props.emails].sort((left, right) => left.id - right.id)
 );
+const otherContactGroups = computed(() => {
+    const grouped = new Map();
 
-const newEmailForm = useForm({
-    email: '',
+    [...props.contacts]
+        .filter((contact) => contact.type && contact.type !== 'email')
+        .sort((left, right) => left.id - right.id)
+        .forEach((contact) => {
+            if (!grouped.has(contact.type)) {
+                grouped.set(contact.type, []);
+            }
+            grouped.get(contact.type).push(contact);
+        });
+
+    return Array.from(grouped.entries()).map(([type, items]) => ({
+        type,
+        label: contactTypeLabels.value[type] ?? type,
+        items,
+    }));
+});
+const contactTypeLabels = computed(() =>
+    props.contactTypes.reduce((result, item) => {
+        result[item.value] = item.label;
+        return result;
+    }, {})
+);
+
+const newContactForm = useForm({
+    type: '',
+    value: '',
 });
 const editEmailForm = useForm({
     email: '',
 });
+const editContactForm = useForm({
+    value: '',
+});
 const actionForm = useForm({});
 const editingEmailId = ref(null);
-const newEmailNotice = ref('');
+const editingContactId = ref(null);
 const emailNotices = ref({});
 const emailErrors = ref({});
+const contactNotices = ref({});
+const contactErrors = ref({});
+const newContactNotice = ref('');
 
-const isEditing = computed(() => editingEmailId.value !== null);
-const canAddEmail = computed(() => !isEditing.value);
+const isEditingAny = computed(() => editingEmailId.value !== null || editingContactId.value !== null);
+const canAddEmail = computed(() => !isEditingAny.value);
+const canAddContact = computed(() => !isEditingAny.value);
 const formatContactDate = (value) => formatDate(value);
 
 const startEmailEdit = (email) => {
@@ -112,6 +153,7 @@ const startEmailEdit = (email) => {
         return;
     }
 
+    editingContactId.value = null;
     editingEmailId.value = email.id;
     editEmailForm.email = email.email;
     editEmailForm.clearErrors();
@@ -119,7 +161,6 @@ const startEmailEdit = (email) => {
         ...emailErrors.value,
         [email.id]: '',
     };
-    newEmailNotice.value = '';
 };
 
 const cancelEmailEdit = () => {
@@ -128,13 +169,35 @@ const cancelEmailEdit = () => {
     editEmailForm.clearErrors();
 };
 
-const addEmail = () => {
-    newEmailNotice.value = '';
-    newEmailForm.post('/account/emails', {
+const startContactEdit = (contact) => {
+    if (contact.confirmed_at) {
+        return;
+    }
+
+    editingEmailId.value = null;
+    editingContactId.value = contact.id;
+    editContactForm.value = contact.value;
+    editContactForm.clearErrors();
+    contactErrors.value = {
+        ...contactErrors.value,
+        [contact.id]: '',
+    };
+    newContactNotice.value = '';
+};
+
+const cancelContactEdit = () => {
+    editingContactId.value = null;
+    editContactForm.reset('value');
+    editContactForm.clearErrors();
+};
+
+const addContact = () => {
+    newContactNotice.value = '';
+    newContactForm.post('/account/contacts', {
         preserveScroll: true,
         onSuccess: () => {
-            newEmailForm.reset('email');
-            newEmailNotice.value = 'Email добавлен.';
+            newContactForm.reset('type', 'value');
+            newContactNotice.value = 'Контакт добавлен.';
         },
     });
 };
@@ -184,6 +247,94 @@ const deleteEmail = (email) => {
                 emailErrors.value = {
                     ...emailErrors.value,
                     [email.id]: errors.email,
+                };
+            }
+        },
+    });
+};
+
+const deleteContact = (contact) => {
+    contactNotices.value = {
+        ...contactNotices.value,
+        [contact.id]: '',
+    };
+    contactErrors.value = {
+        ...contactErrors.value,
+        [contact.id]: '',
+    };
+
+    actionForm.delete(`/account/contacts/${contact.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            contactNotices.value = {
+                ...contactNotices.value,
+                [contact.id]: 'Контакт удален.',
+            };
+        },
+        onError: (errors) => {
+            if (errors.contact) {
+                contactErrors.value = {
+                    ...contactErrors.value,
+                    [contact.id]: errors.contact,
+                };
+            }
+        },
+    });
+};
+
+const updateContact = (contact) => {
+    contactNotices.value = {
+        ...contactNotices.value,
+        [contact.id]: '',
+    };
+    contactErrors.value = {
+        ...contactErrors.value,
+        [contact.id]: '',
+    };
+
+    editContactForm.patch(`/account/contacts/${contact.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            contactNotices.value = {
+                ...contactNotices.value,
+                [contact.id]: 'Контакт обновлен.',
+            };
+            cancelContactEdit();
+        },
+        onError: (errors) => {
+            if (errors.contact) {
+                contactErrors.value = {
+                    ...contactErrors.value,
+                    [contact.id]: errors.contact,
+                };
+            }
+        },
+    });
+};
+
+const confirmContact = (contact) => {
+    contactNotices.value = {
+        ...contactNotices.value,
+        [contact.id]: '',
+    };
+    contactErrors.value = {
+        ...contactErrors.value,
+        [contact.id]: '',
+    };
+
+    actionForm.post(`/account/contacts/${contact.id}/confirm`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            contactNotices.value = {
+                ...contactNotices.value,
+                [contact.id]: 'Контакт подтвержден.',
+            };
+        },
+        onError: (errors) => {
+            if (errors.contact) {
+                contactErrors.value = {
+                    ...contactErrors.value,
+                    [contact.id]: errors.contact,
                 };
             }
         },
@@ -273,8 +424,8 @@ const logout = () => {
                         </div>
                     </div>
 
-                    <div v-else-if="activeTab === 'contacts'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <fieldset class="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <div v-else-if="activeTab === 'contacts'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                        <fieldset v-if="emails.length" class="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                             <legend class="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Электронная почта</legend>
 
                             <div v-for="email in emails" :key="email.id" class="space-y-2">
@@ -323,7 +474,7 @@ const logout = () => {
                                             v-else-if="!email.confirmed_at"
                                             class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400"
                                             type="button"
-                                            :disabled="isEditing"
+                                            :disabled="isEditingAny"
                                             @click="startEmailEdit(email)"
                                         >
                                             Редактировать
@@ -332,7 +483,7 @@ const logout = () => {
                                             v-if="!email.confirmed_at && editingEmailId !== email.id"
                                             class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
                                             type="button"
-                                            :disabled="actionForm.processing || isEditing"
+                                            :disabled="actionForm.processing || isEditingAny"
                                             @click="confirmEmail(email)"
                                         >
                                             Подтвердить
@@ -341,7 +492,7 @@ const logout = () => {
                                             v-if="!email.confirmed_at && editingEmailId !== email.id"
                                             class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
                                             type="button"
-                                            :disabled="actionForm.processing || isEditing"
+                                            :disabled="actionForm.processing || isEditingAny"
                                             @click="deleteEmail(email)"
                                         >
                                             Удалить
@@ -361,37 +512,145 @@ const logout = () => {
                             </div>
 
                             <div class="mt-4 space-y-2 border-t border-slate-100 pt-4">
+                                <p v-if="!canAddEmail" class="text-xs text-slate-500">
+                                    Сначала сохраните или отмените текущую правку контакта.
+                                </p>
+                            </div>
+                        </fieldset>
+
+                        <fieldset
+                            v-for="group in otherContactGroups"
+                            :key="group.type"
+                            class="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-4"
+                        >
+                            <legend class="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ group.label }}</legend>
+
+                            <div v-for="contact in group.items" :key="contact.id" class="space-y-2">
                                 <div class="flex flex-wrap items-center gap-3">
                                     <div class="flex-1">
                                         <input
-                                            v-model="newEmailForm.email"
+                                            v-if="editingContactId === contact.id"
+                                            v-model="editContactForm.value"
                                             class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                                            type="email"
-                                            autocomplete="email"
-                                            placeholder="Добавить email"
-                                            :disabled="!canAddEmail || newEmailForm.processing"
+                                            type="text"
+                                            :disabled="editContactForm.processing"
                                         />
+                                        <div v-else class="flex flex-wrap items-center gap-2">
+                                            <span class="text-sm font-medium text-slate-800">{{ contact.value }}</span>
+                                            <span
+                                                v-if="contact.confirmed_at"
+                                                class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+                                                :title="formatContactDate(contact.confirmed_at)"
+                                            >
+                                                Подтвержден
+                                            </span>
+                                        </div>
                                     </div>
-                                    <button
-                                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                                        type="button"
-                                        :disabled="!newEmailForm.email || newEmailForm.processing || !canAddEmail"
-                                        @click="addEmail"
-                                    >
-                                        Добавить
-                                    </button>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <button
+                                            v-if="editingContactId === contact.id"
+                                            class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400"
+                                            type="button"
+                                            :disabled="editContactForm.processing"
+                                            @click="updateContact(contact)"
+                                        >
+                                            Сохранить
+                                        </button>
+                                        <button
+                                            v-if="editingContactId === contact.id"
+                                            class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:-translate-y-0.5 hover:border-slate-300"
+                                            type="button"
+                                            :disabled="editContactForm.processing"
+                                            @click="cancelContactEdit"
+                                        >
+                                            Отмена
+                                        </button>
+                                        <button
+                                            v-else-if="!contact.confirmed_at"
+                                            class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400"
+                                            type="button"
+                                            :disabled="isEditingAny"
+                                            @click="startContactEdit(contact)"
+                                        >
+                                            Редактировать
+                                        </button>
+                                        <button
+                                            v-if="!contact.confirmed_at && editingContactId !== contact.id"
+                                            class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
+                                            type="button"
+                                            :disabled="actionForm.processing || isEditingAny"
+                                            @click="confirmContact(contact)"
+                                        >
+                                            Подтвердить
+                                        </button>
+                                        <button
+                                            v-if="!contact.confirmed_at && editingContactId !== contact.id"
+                                            class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                            type="button"
+                                            :disabled="actionForm.processing || isEditingAny"
+                                            @click="deleteContact(contact)"
+                                        >
+                                            Удалить
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div v-if="newEmailForm.errors.email" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                                    {{ newEmailForm.errors.email }}
+                                <div v-if="editingContactId === contact.id && editContactForm.errors.value" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                    {{ editContactForm.errors.value }}
                                 </div>
-                                <div v-else-if="newEmailNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                                    {{ newEmailNotice }}
+                                <div v-else-if="contactErrors[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                    {{ contactErrors[contact.id] }}
                                 </div>
-                                <p v-if="!canAddEmail" class="text-xs text-slate-500">
-                                    Сначала сохраните или отмените текущую правку email.
-                                </p>
+                                <div v-else-if="contactNotices[contact.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                    {{ contactNotices[contact.id] }}
+                                </div>
                             </div>
+                        </fieldset>
+
+                        <fieldset class="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <legend class="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Добавить контакт</legend>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="w-full sm:w-40">
+                                    <select
+                                        v-model="newContactForm.type"
+                                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                                        :disabled="!canAddContact || newContactForm.processing"
+                                    >
+                                        <option value="">Тип контакта</option>
+                                        <option v-for="type in contactTypes" :key="type.value" :value="type.value">
+                                            {{ type.label }}
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="flex-1">
+                                    <input
+                                        v-model="newContactForm.value"
+                                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                                        type="text"
+                                        placeholder="Значение контакта"
+                                        :disabled="!canAddContact || newContactForm.processing"
+                                    />
+                                </div>
+                                <button
+                                    class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                    type="button"
+                                    :disabled="!newContactForm.type || !newContactForm.value || newContactForm.processing || !canAddContact"
+                                    @click="addContact"
+                                >
+                                    Добавить
+                                </button>
+                            </div>
+
+                            <div v-if="newContactForm.errors.value || newContactForm.errors.type" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                {{ newContactForm.errors.value || newContactForm.errors.type }}
+                            </div>
+                            <div v-else-if="newContactNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                {{ newContactNotice }}
+                            </div>
+                            <p v-if="!canAddContact" class="text-xs text-slate-500">
+                                Сначала сохраните или отмените текущую правку контакта.
+                            </p>
                         </fieldset>
                     </div>
 
