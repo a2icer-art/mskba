@@ -29,7 +29,7 @@ Route::get('/halls', function () {
         ->get(['name', 'alias'])
         ->map(fn (VenueType $type) => [
             'label' => $type->name,
-            'href' => '/halls/type/' . $type->alias,
+            'href' => '/halls/' . $type->alias,
         ])
         ->values();
 
@@ -58,13 +58,13 @@ Route::get('/halls', function () {
     ]);
 })->name('halls');
 
-Route::get('/halls/type/{type}', function (string $type) {
+Route::get('/halls/{type}', function (string $type) {
     $navItems = VenueType::query()
         ->orderBy('name')
         ->get(['name', 'alias'])
         ->map(fn (VenueType $typeItem) => [
             'label' => $typeItem->name,
-            'href' => '/halls/type/' . $typeItem->alias,
+            'href' => '/halls/' . $typeItem->alias,
         ])
         ->values();
 
