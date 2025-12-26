@@ -107,14 +107,14 @@ Route::post('/login', function (Request $request) {
 Route::post('/register', function (Request $request) {
     $validated = $request->validate([
         'login' => ['required', 'string', 'max:255', 'unique:users,login'],
-        'email' => ['required', 'email', 'max:255', 'unique:user_emails,email'],
+        'email' => ['nullable', 'email', 'max:255', 'unique:user_emails,email'],
         'password' => ['required', Password::min(6)->letters()->numbers()],
         'participant_role_id' => ['nullable', 'integer', 'exists:participant_roles,id'],
     ]);
 
     $user = app(RegisterUserService::class)->register([
         'login' => $validated['login'],
-        'email' => $validated['email'],
+        'email' => $validated['email'] ?? null,
         'password' => $validated['password'],
         'participant_role_id' => $validated['participant_role_id'] ?? null,
         'registered_via' => UserRegisteredVia::Site,

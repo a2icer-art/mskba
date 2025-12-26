@@ -64,7 +64,6 @@ class UserFactory extends Factory
                 'user_id' => $user->id,
                 'email' => fake()->unique()->safeEmail(),
                 'confirmed_at' => $isConfirmed ? now() : null,
-                'confirmed_by' => $isConfirmed ? $user->id : null,
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
             ]);

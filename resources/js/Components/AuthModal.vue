@@ -154,8 +154,9 @@ const submitRegister = () => {
             </form>
 
             <form v-else class="mt-6 space-y-4" @submit.prevent="submitRegister">
+                <p class="text-xs text-slate-500">Поля со * обязательные.</p>
                 <div>
-                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Логин</label>
+                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Логин *</label>
                     <input
                         v-model="registerForm.login"
                         class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
@@ -171,11 +172,10 @@ const submitRegister = () => {
                         class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                         type="email"
                         autocomplete="email"
-                        required
                     />
                 </div>
                 <div>
-                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Пароль</label>
+                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Пароль *</label>
                     <input
                         v-model="registerForm.password"
                         class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"

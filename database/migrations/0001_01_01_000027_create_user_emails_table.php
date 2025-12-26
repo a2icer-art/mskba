@@ -13,7 +13,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users');
             $table->string('email')->unique();
             $table->dateTime('confirmed_at')->nullable();
-            $table->foreignId('confirmed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('created_by')->constrained('users');
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();

@@ -144,7 +144,7 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
-    private function seedUserEmail(User $user, string $email, int $confirmedBy): void
+    private function seedUserEmail(User $user, string $email, int $updatedBy): void
     {
         $userEmail = $user->emails()->first();
 
@@ -152,8 +152,7 @@ class DatabaseSeeder extends Seeder
             $userEmail->update([
                 'email' => $email,
                 'confirmed_at' => now(),
-                'confirmed_by' => $confirmedBy,
-                'updated_by' => $confirmedBy,
+                'updated_by' => $updatedBy,
             ]);
 
             return;
@@ -163,9 +162,8 @@ class DatabaseSeeder extends Seeder
             'user_id' => $user->id,
             'email' => $email,
             'confirmed_at' => now(),
-            'confirmed_by' => $confirmedBy,
-            'created_by' => $confirmedBy,
-            'updated_by' => $confirmedBy,
+            'created_by' => $updatedBy,
+            'updated_by' => $updatedBy,
         ]);
     }
 }

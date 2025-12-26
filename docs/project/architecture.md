@@ -16,7 +16,7 @@
 - `UserProfile` (app/Domain/Users/Models/UserProfile)
   - Дополнительные данные профиля (имя, дата рождения, пол).
 - `UserEmail` (app/Domain/Users/Models/UserEmail)
-  - Email пользователя (1:N), хранит подтверждение (confirmed_at/confirmed_by).
+  - Email пользователя (1:N), хранит подтверждение (confirmed_at).
 - `Role` (app/Domain/Users/Models/Role)
   - Роли доступа (admin/moderator/editor).
 - `UserRole` (app/Domain/Users/Models/UserRole)

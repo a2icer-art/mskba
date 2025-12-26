@@ -19,7 +19,6 @@ class UserEmail extends Model
         'user_id',
         'email',
         'confirmed_at',
-        'confirmed_by',
         'created_by',
         'updated_by',
         'deleted_by',
@@ -45,11 +44,6 @@ class UserEmail extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    public function confirmer(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'confirmed_by');
     }
 
     public function deleter(): BelongsTo

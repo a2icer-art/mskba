@@ -37,14 +37,16 @@ class RegisterUserService
                 'registration_details' => $registrationDetails,
             ]);
 
-            UserEmail::query()->create([
-                'user_id' => $user->id,
-                'email' => $data['email'],
-                'confirmed_at' => null,
-                'confirmed_by' => null,
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]);
+            $email = $data['email'] ?? null;
+            if (!empty($email)) {
+                UserEmail::query()->create([
+                    'user_id' => $user->id,
+                    'email' => $email,
+                    'confirmed_at' => null,
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]);
+            }
 
             UserProfile::query()->create([
                 'user_id' => $user->id,
