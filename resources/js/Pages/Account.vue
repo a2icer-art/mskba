@@ -52,6 +52,12 @@ const tabs = computed(() => [
         alias: role.alias,
     })),
 ]);
+const accountMenuItems = computed(() =>
+    tabs.value.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+    }))
+);
 const activeTab = ref(baseTabs[0].key);
 const page = usePage();
 const logoutForm = useForm({});
@@ -681,36 +687,40 @@ const logout = () => {
         <div class="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
             <MainHeader :app-name="appName" :is-authenticated="true" :login-label="user?.login" />
 
-            <section class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Аккаунт</p>
-                        <h1 class="mt-2 text-3xl font-semibold text-slate-900">Профиль пользователя</h1>
+            <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
+                <aside class="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Разделы</p>
+                    <ul class="space-y-3 text-sm font-medium">
+                        <li v-for="item in accountMenuItems" :key="item.key" class="rounded-2xl transition">
+                            <button
+                                class="w-full rounded-2xl px-4 py-3 text-left transition"
+                                :class="
+                                    activeTab === item.key
+                                        ? 'bg-slate-900 text-white'
+                                        : 'bg-slate-100 text-slate-700 hover:bg-amber-100/70'
+                                "
+                                type="button"
+                                @click="activeTab = item.key"
+                            >
+                                {{ item.label }}
+                            </button>
+                        </li>
+                    </ul>
+                </aside>
+
+                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Аккаунт</p>
+                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">Профиль пользователя</h1>
+                        </div>
                     </div>
-                </div>
 
-                <div class="mt-6 flex flex-wrap gap-3">
-                    <button
-                        v-for="tab in tabs"
-                        :key="tab.key"
-                        class="rounded-full border px-4 py-2 text-sm font-medium transition"
-                        :class="
-                            activeTab === tab.key
-                                ? 'border-slate-900 bg-slate-900 text-white'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                        "
-                        type="button"
-                        @click="activeTab = tab.key"
-                    >
-                        {{ tab.label }}
-                    </button>
-                </div>
-
-                <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                    <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
-                            <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
+                    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                                <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
                         </div>
                     </div>
 
@@ -1037,16 +1047,17 @@ const logout = () => {
                             <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
                         </div>
                     </div>
-                </div>
+                    </div>
 
-                <div class="mt-8 flex items-center justify-end">
-                    <button
-                        class="rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400"
-                        type="button"
-                        @click="logout"
-                    >
-                        Выйти
-                    </button>
+                    <div class="mt-8 flex items-center justify-end">
+                        <button
+                            class="rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400"
+                            type="button"
+                            @click="logout"
+                        >
+                            Выйти
+                        </button>
+                    </div>
                 </div>
             </section>
 
