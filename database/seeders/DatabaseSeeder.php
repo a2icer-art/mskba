@@ -9,6 +9,7 @@ use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Users\Models\UserEmail;
 use App\Models\User;
 use Database\Factories\VenueTypeFactory;
 use Database\Factories\RoleFactory;
@@ -34,27 +35,28 @@ class DatabaseSeeder extends Seeder
         ];
 
         $admin = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'email' => 'admin@example.com',
             'login' => 'admin',
         ]));
 
         $moderator = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'email' => 'moderator@example.com',
             'login' => 'moderator',
             'created_by' => $admin->id,
         ]));
 
         $editor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'email' => 'editor@example.com',
             'login' => 'editor',
             'created_by' => $admin->id,
         ]));
 
         $supereditor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'email' => 'supereditor@example.com',
             'login' => 'supereditor',
             'created_by' => $admin->id,
         ]));
+
+        $this->seedUserEmail($admin, 'admin@example.com', $admin->id);
+        $this->seedUserEmail($moderator, 'moderator@example.com', $admin->id);
+        $this->seedUserEmail($editor, 'editor@example.com', $admin->id);
+        $this->seedUserEmail($supereditor, 'supereditor@example.com', $admin->id);
 
         $roles = [
             'admin' => RoleFactory::new()->admin()->create([
@@ -139,6 +141,31 @@ class DatabaseSeeder extends Seeder
             'venue_type_id' => $venueTypes['hall']->id,
             'address' => 'Main street, 1',
             'address_id' => null,
+        ]);
+    }
+
+    private function seedUserEmail(User $user, string $email, int $confirmedBy): void
+    {
+        $userEmail = $user->emails()->first();
+
+        if ($userEmail) {
+            $userEmail->update([
+                'email' => $email,
+                'confirmed_at' => now(),
+                'confirmed_by' => $confirmedBy,
+                'updated_by' => $confirmedBy,
+            ]);
+
+            return;
+        }
+
+        UserEmail::query()->create([
+            'user_id' => $user->id,
+            'email' => $email,
+            'confirmed_at' => now(),
+            'confirmed_by' => $confirmedBy,
+            'created_by' => $confirmedBy,
+            'updated_by' => $confirmedBy,
         ]);
     }
 }

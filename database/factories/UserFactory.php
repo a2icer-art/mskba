@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Users\Models\UserEmail;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -30,9 +31,7 @@ class UserFactory extends Factory
         $confirmed = fake()->boolean(60);
 
         return [
-            'email' => fake()->unique()->safeEmail(),
             'login' => fake()->unique()->userName(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'status' => $confirmed ? UserStatus::Confirmed : UserStatus::Unconfirmed,
@@ -44,16 +43,6 @@ class UserFactory extends Factory
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
-    public function unverified(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
-    }
-
     public function withProfile(): static
     {
         return $this->afterCreating(function (User $user): void {
@@ -63,6 +52,22 @@ class UserFactory extends Factory
                     'updated_by' => $user->id,
                 ]
             );
+        });
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $isConfirmed = $user->status === UserStatus::Confirmed;
+
+            UserEmail::query()->create([
+                'user_id' => $user->id,
+                'email' => fake()->unique()->safeEmail(),
+                'confirmed_at' => $isConfirmed ? now() : null,
+                'confirmed_by' => $isConfirmed ? $user->id : null,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
         });
     }
 }

@@ -10,6 +10,7 @@ use App\Domain\Users\Enums\RoleStatus;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
+use App\Domain\Users\Models\UserEmail;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Models\User;
@@ -30,11 +31,19 @@ class RegisterUserService
 
             $user = User::query()->create([
                 'login' => $data['login'],
-                'email' => $data['email'],
                 'password' => $data['password'],
                 'status' => UserStatus::Unconfirmed,
                 'registered_via' => $registeredVia,
                 'registration_details' => $registrationDetails,
+            ]);
+
+            UserEmail::query()->create([
+                'user_id' => $user->id,
+                'email' => $data['email'],
+                'confirmed_at' => null,
+                'confirmed_by' => null,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
             ]);
 
             UserProfile::query()->create([

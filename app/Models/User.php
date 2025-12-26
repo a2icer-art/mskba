@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use App\Domain\Audit\Traits\Auditable;
-use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
+use App\Domain\Users\Models\UserEmail;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
@@ -21,11 +20,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, Auditable;
-    use MustVerifyEmailTrait;
     use SoftDeletes;
 
     /**
@@ -34,7 +32,6 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var list<string>
      */
     protected $fillable = [
-        'email',
         'login',
         'registered_via',
         'registration_details',
@@ -66,7 +63,6 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
             'confirmed_at' => 'datetime',
@@ -104,6 +100,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function emails(): HasMany
+    {
+        return $this->hasMany(UserEmail::class);
     }
 
     public function participantRoleAssignments(): HasMany

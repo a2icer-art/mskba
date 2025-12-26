@@ -12,8 +12,11 @@
 - `User` (app/Models/User)
   - Учетная запись пользователя.
   - Связи: profile (1:1), roles (M:N), userRoles (1:N).
+  - Поля `name` и `email` удалены; имя хранится в `UserProfile`, email — в `UserEmail`. (Задача: `docs/tasks/023`)
 - `UserProfile` (app/Domain/Users/Models/UserProfile)
   - Дополнительные данные профиля (имя, дата рождения, пол).
+- `UserEmail` (app/Domain/Users/Models/UserEmail)
+  - Email пользователя (1:N), хранит подтверждение (confirmed_at/confirmed_by).
 - `Role` (app/Domain/Users/Models/Role)
   - Роли доступа (admin/moderator/editor).
 - `UserRole` (app/Domain/Users/Models/UserRole)

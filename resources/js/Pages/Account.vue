@@ -38,14 +38,34 @@ const tabs = computed(() => [
 const activeTab = ref(baseTabs[0].key);
 const logoutForm = useForm({});
 
+const formatDate = (value) => {
+    if (!value) {
+        return '—';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString('ru-RU');
+};
+
+const statusLabelMap = {
+    confirmed: 'Подтвержден',
+    unconfirmed: 'Не подтвержден',
+};
+
 const userItems = computed(() => [
     { label: 'ID', value: props.user?.id ?? '—' },
     { label: 'Логин', value: props.user?.login ?? '—' },
+    { label: 'Пароль', value: '********' },
+    { label: 'Дата регистрации', value: formatDate(props.user?.created_at) },
+    { label: 'Статус', value: statusLabelMap[props.user?.status] ?? '—' },
+    ...(props.user?.status === 'confirmed'
+        ? [{ label: 'Дата подтверждения', value: formatDate(props.user?.confirmed_at) }]
+        : []),
 ]);
-
-const isEmailVerified = computed(() => Boolean(props.user?.email_verified_at));
-const emailValue = computed(() => props.user?.email ?? '—');
-const verificationForm = useForm({});
 
 const profileItems = computed(() => [
     { label: 'Имя', value: props.profile?.first_name ?? '—' },
@@ -66,9 +86,6 @@ const logout = () => {
     logoutForm.post('/logout');
 };
 
-const sendVerification = () => {
-    verificationForm.post('/email/verification-notification');
-};
 </script>
 
 <template>
@@ -109,21 +126,6 @@ const sendVerification = () => {
                         <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
                             <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
-                        </div>
-                        <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Email</span>
-                            <div class="flex items-center gap-3">
-                                <span class="text-sm font-medium text-slate-800">{{ emailValue }}</span>
-                                <button
-                                    v-if="!isEmailVerified"
-                                    class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
-                                    type="button"
-                                    :disabled="verificationForm.processing"
-                                    @click="sendVerification"
-                                >
-                                    Подтвердить
-                                </button>
-                            </div>
                         </div>
                     </div>
 
