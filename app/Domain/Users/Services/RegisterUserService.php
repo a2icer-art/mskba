@@ -29,7 +29,6 @@ class RegisterUserService
             $registrationDetails = $data['registration_details'] ?? null;
 
             $user = User::query()->create([
-                'name' => $data['login'],
                 'login' => $data['login'],
                 'email' => $data['email'],
                 'password' => $data['password'],

@@ -77,7 +77,7 @@ Route::get('/account', function (Request $request) {
 
     return Inertia::render('Account', [
         'appName' => config('app.name'),
-        'user' => $user->only(['id', 'name', 'email', 'login', 'email_verified_at']),
+        'user' => $user->only(['id', 'email', 'login', 'email_verified_at']),
         'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
         'participantRoles' => $participantRoles,
     ]);

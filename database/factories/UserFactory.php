@@ -30,7 +30,6 @@ class UserFactory extends Factory
         $confirmed = fake()->boolean(60);
 
         return [
-            'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'login' => fake()->unique()->userName(),
             'email_verified_at' => now(),

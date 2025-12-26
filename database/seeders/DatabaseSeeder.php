@@ -34,27 +34,23 @@ class DatabaseSeeder extends Seeder
         ];
 
         $admin = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'name' => 'Admin',
             'email' => 'admin@example.com',
             'login' => 'admin',
         ]));
 
         $moderator = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'name' => 'Moderator',
             'email' => 'moderator@example.com',
             'login' => 'moderator',
             'created_by' => $admin->id,
         ]));
 
         $editor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'name' => 'Editor',
             'email' => 'editor@example.com',
             'login' => 'editor',
             'created_by' => $admin->id,
         ]));
 
         $supereditor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'name' => 'Supereditor',
             'email' => 'supereditor@example.com',
             'login' => 'supereditor',
             'created_by' => $admin->id,

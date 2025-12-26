@@ -40,7 +40,6 @@ const logoutForm = useForm({});
 
 const userItems = computed(() => [
     { label: 'ID', value: props.user?.id ?? '—' },
-    { label: 'Имя', value: props.user?.name ?? '—' },
     { label: 'Логин', value: props.user?.login ?? '—' },
 ]);
 
