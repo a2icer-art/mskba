@@ -178,7 +178,11 @@ watch(
             />
 
             <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
-                <MainSidebar :title="navigation.title" :items="navigation.items" />
+                <MainSidebar
+                    :title="navigation.title"
+                    :items="navigation.items"
+                    :active-href="activeType ? `/halls/${activeType}` : ''"
+                />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
