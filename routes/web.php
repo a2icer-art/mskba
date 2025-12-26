@@ -2,6 +2,7 @@
 
 use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserRegisteredVia;
+use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Users\Models\ContactVerification;
 use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Services\ContactVerificationService;
@@ -62,86 +63,109 @@ Route::get('/login', function () {
     ]);
 })->name('login');
 
-Route::get('/account', function (Request $request) {
+$renderAccount = function (Request $request, string $activeTab = 'user') {
+        $user = $request->user();
+
+        $user->load(['profile', 'contacts']);
+        $contactTypes = [
+            ['value' => ContactType::Email->value, 'label' => 'Электронная почта'],
+            ['value' => ContactType::Phone->value, 'label' => 'Телефон'],
+            ['value' => ContactType::Telegram->value, 'label' => 'Telegram'],
+            ['value' => ContactType::Vk->value, 'label' => 'VK'],
+            ['value' => ContactType::Other->value, 'label' => 'Другое'],
+        ];
+
+        $participantRoles = $user->participantRoleAssignments()
+            ->with('role:id,name,alias')
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed)
+            ->get()
+            ->map(fn ($assignment) => [
+                'id' => $assignment->id,
+                'label' => $assignment->custom_title ?: ($assignment->role?->name ?? 'Роль'),
+                'alias' => $assignment->role?->alias,
+            ])
+            ->values();
+
+        $contactVerifications = [];
+        $contactIds = $user->contacts->pluck('id')->all();
+
+        if ($contactIds !== []) {
+            $verifications = ContactVerification::query()
+                ->whereIn('contact_id', $contactIds)
+                ->whereNull('verified_at')
+                ->where('expires_at', '>', now())
+                ->orderByDesc('id')
+                ->get(['contact_id', 'attempts', 'expires_at']);
+
+            foreach ($verifications as $verification) {
+                if (array_key_exists($verification->contact_id, $contactVerifications)) {
+                    continue;
+                }
+
+                $contactVerifications[$verification->contact_id] = [
+                    'attempts' => $verification->attempts,
+                    'max_attempts' => ContactVerificationService::MAX_ATTEMPTS,
+                    'expires_at' => $verification->expires_at?->toISOString(),
+                ];
+            }
+        }
+
+        return Inertia::render('Account', [
+            'appName' => config('app.name'),
+            'activeTab' => $activeTab,
+            'user' => [
+                'id' => $user->id,
+                'login' => $user->login,
+                'status' => $user->status?->value,
+                'created_at' => $user->created_at?->toISOString(),
+                'confirmed_at' => $user->confirmed_at?->toISOString(),
+            ],
+            'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
+            'participantRoles' => $participantRoles,
+            'emails' => $user->contacts
+                ->where('type', ContactType::Email)
+                ->sortBy('id')
+                ->map(fn (UserContact $contact) => [
+                    'id' => $contact->id,
+                    'email' => $contact->value,
+                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                ])
+                ->values(),
+            'contacts' => $user->contacts
+                ->sortBy('id')
+                ->map(fn (UserContact $contact) => [
+                    'id' => $contact->id,
+                    'type' => $contact->type?->value,
+                    'value' => $contact->value,
+                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                ])
+                ->values(),
+            'contactTypes' => $contactTypes,
+            'contactVerifications' => $contactVerifications,
+        ]);
+};
+
+Route::get('/account', function (Request $request) use ($renderAccount) {
+    return $renderAccount($request, 'user');
+})->name('account')->middleware('auth');
+
+Route::get('/account/profile', function (Request $request) use ($renderAccount) {
+    return $renderAccount($request, 'profile');
+})->name('account.profile')->middleware('auth');
+
+Route::get('/account/contacts', function (Request $request) use ($renderAccount) {
+    return $renderAccount($request, 'contacts');
+})->name('account.contacts')->middleware('auth');
+
+Route::get('/account/roles/{assignment}', function (Request $request, ParticipantRoleAssignment $assignment) use ($renderAccount) {
     $user = $request->user();
 
-    $user->load(['profile', 'contacts']);
-    $contactTypes = [
-        ['value' => ContactType::Email->value, 'label' => 'Электронная почта'],
-        ['value' => ContactType::Phone->value, 'label' => 'Телефон'],
-        ['value' => ContactType::Telegram->value, 'label' => 'Telegram'],
-        ['value' => ContactType::Vk->value, 'label' => 'VK'],
-        ['value' => ContactType::Other->value, 'label' => 'Другое'],
-    ];
-
-    $participantRoles = $user->participantRoleAssignments()
-        ->with('role:id,name,alias')
-        ->where('status', ParticipantRoleAssignmentStatus::Confirmed)
-        ->get()
-        ->map(fn ($assignment) => [
-            'id' => $assignment->id,
-            'label' => $assignment->custom_title ?: ($assignment->role?->name ?? 'Роль'),
-            'alias' => $assignment->role?->alias,
-        ])
-        ->values();
-
-    $contactVerifications = [];
-    $contactIds = $user->contacts->pluck('id')->all();
-
-    if ($contactIds !== []) {
-        $verifications = ContactVerification::query()
-            ->whereIn('contact_id', $contactIds)
-            ->whereNull('verified_at')
-            ->where('expires_at', '>', now())
-            ->orderByDesc('id')
-            ->get(['contact_id', 'attempts', 'expires_at']);
-
-        foreach ($verifications as $verification) {
-            if (array_key_exists($verification->contact_id, $contactVerifications)) {
-                continue;
-            }
-
-            $contactVerifications[$verification->contact_id] = [
-                'attempts' => $verification->attempts,
-                'max_attempts' => ContactVerificationService::MAX_ATTEMPTS,
-                'expires_at' => $verification->expires_at?->toISOString(),
-            ];
-        }
+    if ($assignment->user_id !== $user->id || $assignment->status !== ParticipantRoleAssignmentStatus::Confirmed) {
+        abort(404);
     }
 
-    return Inertia::render('Account', [
-        'appName' => config('app.name'),
-        'user' => [
-            'id' => $user->id,
-            'login' => $user->login,
-            'status' => $user->status?->value,
-            'created_at' => $user->created_at?->toISOString(),
-            'confirmed_at' => $user->confirmed_at?->toISOString(),
-        ],
-        'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
-        'participantRoles' => $participantRoles,
-        'emails' => $user->contacts
-            ->where('type', ContactType::Email)
-            ->sortBy('id')
-            ->map(fn (UserContact $contact) => [
-                'id' => $contact->id,
-                'email' => $contact->value,
-                'confirmed_at' => $contact->confirmed_at?->toISOString(),
-            ])
-            ->values(),
-        'contacts' => $user->contacts
-            ->sortBy('id')
-            ->map(fn (UserContact $contact) => [
-                'id' => $contact->id,
-                'type' => $contact->type?->value,
-                'value' => $contact->value,
-                'confirmed_at' => $contact->confirmed_at?->toISOString(),
-            ])
-            ->values(),
-        'contactTypes' => $contactTypes,
-        'contactVerifications' => $contactVerifications,
-    ]);
-})->name('account')->middleware('auth');
+    return $renderAccount($request, 'role-' . $assignment->id);
+})->name('account.roles.show')->middleware('auth');
 
 Route::post('/account/contacts', function (Request $request) {
     $user = $request->user();

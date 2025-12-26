@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 
@@ -37,28 +37,28 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    activeTab: {
+        type: String,
+        default: 'user',
+    },
 });
 
-const baseTabs = [
-    { key: 'user', label: 'Пользователь' },
-    { key: 'profile', label: 'Профиль' },
-    { key: 'contacts', label: 'Контакты' },
-];
-const tabs = computed(() => [
-    ...baseTabs,
-    ...props.participantRoles.map((role) => ({
+const accountMenuItems = computed(() => {
+    const items = [
+        { key: 'user', label: 'Пользователь', href: '/account' },
+        { key: 'profile', label: 'Профиль', href: '/account/profile' },
+        { key: 'contacts', label: 'Контакты', href: '/account/contacts' },
+    ];
+
+    const roleItems = props.participantRoles.map((role) => ({
         key: `role-${role.id}`,
         label: role.label,
-        alias: role.alias,
-    })),
-]);
-const accountMenuItems = computed(() =>
-    tabs.value.map((tab) => ({
-        key: tab.key,
-        label: tab.label,
-    }))
-);
-const activeTab = ref(baseTabs[0].key);
+        href: `/account/roles/${role.id}`,
+    }));
+
+    return [...items, ...roleItems];
+});
+const activeTab = computed(() => props.activeTab || 'user');
 const page = usePage();
 const logoutForm = useForm({});
 
@@ -692,18 +692,17 @@ const logout = () => {
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Разделы</p>
                     <ul class="space-y-3 text-sm font-medium">
                         <li v-for="item in accountMenuItems" :key="item.key" class="rounded-2xl transition">
-                            <button
-                                class="w-full rounded-2xl px-4 py-3 text-left transition"
+                            <Link
+                                class="block w-full rounded-2xl px-4 py-3 text-left transition"
                                 :class="
                                     activeTab === item.key
                                         ? 'bg-slate-900 text-white'
                                         : 'bg-slate-100 text-slate-700 hover:bg-amber-100/70'
                                 "
-                                type="button"
-                                @click="activeTab = item.key"
+                                :href="item.href"
                             >
                                 {{ item.label }}
-                            </button>
+                            </Link>
                         </li>
                     </ul>
                 </aside>
@@ -716,7 +715,7 @@ const logout = () => {
                         </div>
                     </div>
 
-                    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div class="mt-6 grid gap-4">
                         <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
                                 <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
