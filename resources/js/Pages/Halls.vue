@@ -19,6 +19,10 @@ const props = defineProps({
         type: Object,
         default: () => ({ title: 'Навигация', items: [] }),
     },
+    activeType: {
+        type: String,
+        default: '',
+    },
 });
 
 const page = usePage();
@@ -151,16 +155,12 @@ const grouped = computed(() => {
     return Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
 });
 
-const syncFromQuery = () => {
-    const parts = page.url.split('?');
-    const params = new URLSearchParams(parts[1] || '');
-    typeFilter.value = params.get('type') || '';
-};
-
-syncFromQuery();
 watch(
-    () => page.url,
-    () => syncFromQuery()
+    () => props.activeType,
+    (value) => {
+        typeFilter.value = value || '';
+    },
+    { immediate: true }
 );
 </script>
 

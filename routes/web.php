@@ -29,7 +29,7 @@ Route::get('/halls', function () {
         ->get(['name', 'alias'])
         ->map(fn (VenueType $type) => [
             'label' => $type->name,
-            'href' => '/halls?type=' . $type->alias,
+            'href' => '/halls/type/' . $type->alias,
         ])
         ->values();
 
@@ -50,12 +50,48 @@ Route::get('/halls', function () {
     return Inertia::render('Halls', [
         'appName' => config('app.name'),
         'halls' => $halls,
+        'activeType' => null,
         'navigation' => [
             'title' => 'Навигация',
             'items' => $navItems,
         ],
     ]);
 })->name('halls');
+
+Route::get('/halls/type/{type}', function (string $type) {
+    $navItems = VenueType::query()
+        ->orderBy('name')
+        ->get(['name', 'alias'])
+        ->map(fn (VenueType $typeItem) => [
+            'label' => $typeItem->name,
+            'href' => '/halls/type/' . $typeItem->alias,
+        ])
+        ->values();
+
+    $halls = Venue::query()
+        ->with(['venueType:id,name,alias'])
+        ->orderBy('name')
+        ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
+        ->map(fn (Venue $venue) => [
+            'id' => $venue->id,
+            'name' => $venue->name,
+            'alias' => $venue->alias,
+            'address' => $venue->address,
+            'created_at' => $venue->created_at?->toISOString(),
+            'type' => $venue->venueType?->only(['id', 'name', 'alias']),
+        ])
+        ->values();
+
+    return Inertia::render('Halls', [
+        'appName' => config('app.name'),
+        'halls' => $halls,
+        'activeType' => $type,
+        'navigation' => [
+            'title' => 'Навигация',
+            'items' => $navItems,
+        ],
+    ]);
+})->name('halls.type');
 
 Route::get('/login', function () {
     return redirect('/')->withErrors([
