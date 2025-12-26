@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { computed, ref, nextTick, watch } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 
@@ -33,6 +33,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    contactVerifications: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const baseTabs = [
@@ -49,6 +53,7 @@ const tabs = computed(() => [
     })),
 ]);
 const activeTab = ref(baseTabs[0].key);
+const page = usePage();
 const logoutForm = useForm({});
 
 const formatDate = (value) => {
@@ -134,6 +139,10 @@ const editEmailForm = useForm({
 const editContactForm = useForm({
     value: '',
 });
+const requestCodeForm = useForm({});
+const verifyCodeForm = useForm({
+    code: '',
+});
 const actionForm = useForm({});
 const editingEmailId = ref(null);
 const editingContactId = ref(null);
@@ -142,11 +151,174 @@ const emailErrors = ref({});
 const contactNotices = ref({});
 const contactErrors = ref({});
 const newContactNotice = ref('');
+const verificationOpen = ref({});
+const verificationCodes = ref({});
+const verificationPending = ref({});
+const verificationError = ref({});
+const verificationMessages = ref({});
+const verificationCountdowns = ref({});
+const verificationCountdownTimers = new Map();
+const verificationOverrides = ref({});
 
 const isEditingAny = computed(() => editingEmailId.value !== null || editingContactId.value !== null);
 const canAddEmail = computed(() => !isEditingAny.value);
 const canAddContact = computed(() => !isEditingAny.value);
 const formatContactDate = (value) => formatDate(value);
+const confirmButtonLabel = (contactId) => {
+    const hasVerification = verificationOpen.value[contactId] || Boolean(getVerificationState(contactId));
+    if (hasVerification) {
+        return 'Запросить новый код';
+    }
+    return 'Подтвердить';
+};
+const shouldShowVerificationInput = (contactId) => {
+    if (!verificationOpen.value[contactId]) {
+        return false;
+    }
+
+    return true;
+};
+const verificationStateMap = computed(() => props.contactVerifications ?? {});
+const getVerificationState = (contactId) =>
+    verificationOverrides.value[contactId] ?? verificationStateMap.value[contactId] ?? null;
+const hasAttemptsExceeded = (contactId) => {
+    const state = getVerificationState(contactId);
+    if (!state) {
+        return false;
+    }
+    return state.attempts >= state.max_attempts;
+};
+const isVerificationBlocked = (contactId) => {
+    const state = getVerificationState(contactId);
+    if (!state || !state.expires_at) {
+        return false;
+    }
+
+    if (!hasAttemptsExceeded(contactId)) {
+        return false;
+    }
+
+    const expiresAt = new Date(state.expires_at);
+    return expiresAt.getTime() > Date.now();
+};
+const getVerificationWaitSeconds = (contactId) => {
+    const state = getVerificationState(contactId);
+    if (!state || !state.expires_at) {
+        return 0;
+    }
+
+    const expiresAt = new Date(state.expires_at);
+    const diff = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+    return Math.max(0, diff);
+};
+const formatCountdown = (seconds) => {
+    const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    if (totalSeconds <= 0) {
+        return '00:00';
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainder = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+};
+const isVerificationLocked = (contactId) => {
+    if (!hasAttemptsExceeded(contactId)) {
+        return false;
+    }
+
+    return true;
+};
+const exhaustedAttemptsMessage = 'Попытки израсходованы. Запросите новый код.';
+const setVerificationCountdown = (contactId, seconds) => {
+    if (verificationCountdownTimers.has(contactId)) {
+        clearInterval(verificationCountdownTimers.get(contactId));
+        verificationCountdownTimers.delete(contactId);
+    }
+
+    if (seconds <= 0) {
+        verificationCountdowns.value = {
+            ...verificationCountdowns.value,
+            [contactId]: 0,
+        };
+        return;
+    }
+
+    verificationCountdowns.value = {
+        ...verificationCountdowns.value,
+        [contactId]: seconds,
+    };
+
+    const timer = setInterval(() => {
+        const current = verificationCountdowns.value[contactId] ?? 0;
+        if (current <= 1) {
+            clearInterval(timer);
+            verificationCountdownTimers.delete(contactId);
+            verificationCountdowns.value = {
+                ...verificationCountdowns.value,
+                [contactId]: 0,
+            };
+            return;
+        }
+
+        verificationCountdowns.value = {
+            ...verificationCountdowns.value,
+            [contactId]: current - 1,
+        };
+    }, 1000);
+
+    verificationCountdownTimers.set(contactId, timer);
+};
+
+const setVerificationAttempts = (contactId, attempts, maxAttempts) => {
+    const base = verificationStateMap.value[contactId] ?? {};
+    verificationOverrides.value = {
+        ...verificationOverrides.value,
+        [contactId]: {
+            ...base,
+            attempts,
+            max_attempts: maxAttempts ?? base.max_attempts,
+        },
+    };
+    syncVerificationOpen();
+};
+
+const clearVerificationOverride = (contactId) => {
+    if (!verificationOverrides.value[contactId]) {
+        return;
+    }
+    const next = { ...verificationOverrides.value };
+    delete next[contactId];
+    verificationOverrides.value = next;
+    syncVerificationOpen();
+};
+
+const syncVerificationOpen = () => {
+    const next = {};
+
+    props.contacts.forEach((contact) => {
+        if (contact.confirmed_at) {
+            next[contact.id] = false;
+            return;
+        }
+
+        if (getVerificationState(contact.id)) {
+            next[contact.id] = true;
+        }
+    });
+
+    verificationOpen.value = {
+        ...verificationOpen.value,
+        ...next,
+    };
+};
+
+watch(
+    () => props.contactVerifications,
+    () => {
+        syncVerificationOpen();
+    },
+    { immediate: true, deep: true }
+);
 
 const startEmailEdit = (email) => {
     if (email.confirmed_at) {
@@ -200,6 +372,189 @@ const addContact = () => {
             newContactNotice.value = 'Контакт добавлен.';
         },
     });
+};
+
+const requestVerificationCode = (contact, errorMap) => {
+    if (isVerificationBlocked(contact.id)) {
+        setVerificationCountdown(contact.id, getVerificationWaitSeconds(contact.id));
+        errorMap.value = {
+            ...errorMap.value,
+            [contact.id]: 'Слишком много попыток. Подождите.',
+        };
+        return;
+    }
+
+    errorMap.value = {
+        ...errorMap.value,
+        [contact.id]: '',
+    };
+    verificationMessages.value = {
+        ...verificationMessages.value,
+        [contact.id]: '',
+    };
+    verificationError.value = {
+        ...verificationError.value,
+        [contact.id]: false,
+    };
+    verificationPending.value = {
+        ...verificationPending.value,
+        [contact.id]: true,
+    };
+
+    requestCodeForm.post(`/account/contacts/${contact.id}/confirm-request`, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            verificationOpen.value = {
+                ...verificationOpen.value,
+                [contact.id]: true,
+            };
+            verificationCodes.value = {
+                ...verificationCodes.value,
+                [contact.id]: '',
+            };
+            setVerificationCountdown(contact.id, 0);
+            clearVerificationOverride(contact.id);
+        },
+        onError: (errors) => {
+            const message = errors.contact || errors.email;
+            if (message) {
+                errorMap.value = {
+                    ...errorMap.value,
+                    [contact.id]: message,
+                };
+            }
+            const waitSeconds = Number(errors.wait_seconds ?? 0);
+            if (waitSeconds > 0) {
+                setVerificationCountdown(contact.id, waitSeconds);
+            }
+        },
+        onFinish: () => {
+            verificationPending.value = {
+                ...verificationPending.value,
+                [contact.id]: false,
+            };
+        },
+    });
+};
+
+const submitVerificationCode = (contact, errorMap) => {
+    errorMap.value = {
+        ...errorMap.value,
+        [contact.id]: '',
+    };
+    verificationMessages.value = {
+        ...verificationMessages.value,
+        [contact.id]: '',
+    };
+    verificationError.value = {
+        ...verificationError.value,
+        [contact.id]: false,
+    };
+    const code = verificationCodes.value[contact.id];
+
+    if (!code) {
+        errorMap.value = {
+            ...errorMap.value,
+            [contact.id]: 'Введите код.',
+        };
+        verificationMessages.value = {
+            ...verificationMessages.value,
+            [contact.id]: 'Введите код.',
+        };
+        verificationError.value = {
+            ...verificationError.value,
+            [contact.id]: true,
+        };
+        return;
+    }
+
+    verifyCodeForm.code = code;
+    verifyCodeForm.post(`/account/contacts/${contact.id}/confirm-verify`, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            verificationOpen.value = {
+                ...verificationOpen.value,
+                [contact.id]: false,
+            };
+            verificationCodes.value = {
+                ...verificationCodes.value,
+                [contact.id]: '',
+            };
+            verificationMessages.value = {
+                ...verificationMessages.value,
+                [contact.id]: '',
+            };
+            setVerificationCountdown(contact.id, 0);
+            clearVerificationOverride(contact.id);
+        },
+        onError: (errors) => {
+            const message = errors.code || errors.contact;
+            if (message) {
+                errorMap.value = {
+                    ...errorMap.value,
+                    [contact.id]: message,
+                };
+                verificationMessages.value = {
+                    ...verificationMessages.value,
+                    [contact.id]: message,
+                };
+                verificationOpen.value = {
+                    ...verificationOpen.value,
+                    [contact.id]: true,
+                };
+                verificationError.value = {
+                    ...verificationError.value,
+                    [contact.id]: true,
+                };
+            }
+            const attemptsLeft = Number(errors.attempts_left ?? NaN);
+            const maxAttempts = Number(errors.max_attempts ?? NaN);
+            if (!Number.isNaN(attemptsLeft)) {
+                const safeMax = Number.isNaN(maxAttempts) ? getVerificationState(contact.id)?.max_attempts : maxAttempts;
+                if (safeMax) {
+                    setVerificationAttempts(contact.id, Math.max(0, safeMax - attemptsLeft), safeMax);
+                }
+            }
+        },
+        onFinish: () => {
+            nextTick(() => {
+                const fallbackError = page.props?.errors?.code;
+                const formError = verifyCodeForm.errors.code;
+                const message = formError || fallbackError;
+                if (message) {
+                    errorMap.value = {
+                        ...errorMap.value,
+                        [contact.id]: message,
+                    };
+                    verificationMessages.value = {
+                        ...verificationMessages.value,
+                        [contact.id]: message,
+                    };
+                    verificationOpen.value = {
+                        ...verificationOpen.value,
+                        [contact.id]: true,
+                    };
+                    verificationError.value = {
+                        ...verificationError.value,
+                        [contact.id]: true,
+                    };
+                }
+            });
+        },
+    });
+};
+
+const clearVerificationError = (contactId) => {
+    verificationError.value = {
+        ...verificationError.value,
+        [contactId]: false,
+    };
+    verificationMessages.value = {
+        ...verificationMessages.value,
+        [contactId]: '',
+    };
 };
 
 const updateEmail = (email) => {
@@ -306,64 +661,6 @@ const updateContact = (contact) => {
                 contactErrors.value = {
                     ...contactErrors.value,
                     [contact.id]: errors.contact,
-                };
-            }
-        },
-    });
-};
-
-const confirmContact = (contact) => {
-    contactNotices.value = {
-        ...contactNotices.value,
-        [contact.id]: '',
-    };
-    contactErrors.value = {
-        ...contactErrors.value,
-        [contact.id]: '',
-    };
-
-    actionForm.post(`/account/contacts/${contact.id}/confirm`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            contactNotices.value = {
-                ...contactNotices.value,
-                [contact.id]: 'Контакт подтвержден.',
-            };
-        },
-        onError: (errors) => {
-            if (errors.contact) {
-                contactErrors.value = {
-                    ...contactErrors.value,
-                    [contact.id]: errors.contact,
-                };
-            }
-        },
-    });
-};
-
-const confirmEmail = (email) => {
-    emailNotices.value = {
-        ...emailNotices.value,
-        [email.id]: '',
-    };
-    emailErrors.value = {
-        ...emailErrors.value,
-        [email.id]: '',
-    };
-
-    actionForm.post(`/account/emails/${email.id}/confirm`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            emailNotices.value = {
-                ...emailNotices.value,
-                [email.id]: 'Email подтвержден.',
-            };
-        },
-        onError: (errors) => {
-            if (errors.email) {
-                emailErrors.value = {
-                    ...emailErrors.value,
-                    [email.id]: errors.email,
                 };
             }
         },
@@ -483,10 +780,10 @@ const logout = () => {
                                             v-if="!email.confirmed_at && editingEmailId !== email.id"
                                             class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
                                             type="button"
-                                            :disabled="actionForm.processing || isEditingAny"
-                                            @click="confirmEmail(email)"
+                                            :disabled="verificationPending[email.id] || isEditingAny"
+                                            @click="requestVerificationCode(email, emailErrors)"
                                         >
-                                            Подтвердить
+                                            {{ confirmButtonLabel(email.id) }}
                                         </button>
                                         <button
                                             v-if="!email.confirmed_at && editingEmailId !== email.id"
@@ -500,13 +797,53 @@ const logout = () => {
                                     </div>
                                 </div>
 
+                                <div v-if="shouldShowVerificationInput(email.id) && !email.confirmed_at" class="space-y-2">
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <input
+                                            v-model="verificationCodes[email.id]"
+                                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                                            :class="{
+                                                'input-error': verificationError[email.id],
+                                            }"
+                                            type="text"
+                                            placeholder="Введите код"
+                                            :disabled="isVerificationLocked(email.id)"
+                                            @input="clearVerificationError(email.id)"
+                                        />
+                                    </div>
+                                    <div v-if="verificationMessages[email.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ verificationMessages[email.id] }}
+                                    </div>
+                                    <div v-else-if="isVerificationLocked(email.id)" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ exhaustedAttemptsMessage }}
+                                    </div>
+                                    <button
+                                        v-if="!isVerificationLocked(email.id)"
+                                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                        type="button"
+                                        :disabled="verifyCodeForm.processing"
+                                        @click="submitVerificationCode(email, emailErrors)"
+                                    >
+                                        Подтвердить код
+                                    </button>
+                                    <div v-if="emailErrors[email.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ emailErrors[email.id] }}
+                                    </div>
+                                    <div v-else-if="emailNotices[email.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                        {{ emailNotices[email.id] }}
+                                    </div>
+                                </div>
+
                                 <div v-if="editingEmailId === email.id && editEmailForm.errors.email" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                     {{ editEmailForm.errors.email }}
                                 </div>
-                                <div v-else-if="emailErrors[email.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                <div v-else-if="verificationCountdowns[email.id]" class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                    Подождите {{ formatCountdown(verificationCountdowns[email.id]) }}
+                                </div>
+                                <div v-else-if="emailErrors[email.id] && !verificationOpen[email.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                     {{ emailErrors[email.id] }}
                                 </div>
-                                <div v-else-if="emailNotices[email.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                <div v-else-if="emailNotices[email.id] && !verificationOpen[email.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                     {{ emailNotices[email.id] }}
                                 </div>
                             </div>
@@ -578,10 +915,10 @@ const logout = () => {
                                             v-if="!contact.confirmed_at && editingContactId !== contact.id"
                                             class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
                                             type="button"
-                                            :disabled="actionForm.processing || isEditingAny"
-                                            @click="confirmContact(contact)"
+                                            :disabled="verificationPending[contact.id] || isEditingAny"
+                                            @click="requestVerificationCode(contact, contactErrors)"
                                         >
-                                            Подтвердить
+                                            {{ confirmButtonLabel(contact.id) }}
                                         </button>
                                         <button
                                             v-if="!contact.confirmed_at && editingContactId !== contact.id"
@@ -595,13 +932,53 @@ const logout = () => {
                                     </div>
                                 </div>
 
+                                <div v-if="shouldShowVerificationInput(contact.id) && !contact.confirmed_at" class="space-y-2">
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <input
+                                            v-model="verificationCodes[contact.id]"
+                                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                                            :class="{
+                                                'input-error': verificationError[contact.id],
+                                            }"
+                                            type="text"
+                                            placeholder="Введите код"
+                                            :disabled="isVerificationLocked(contact.id)"
+                                            @input="clearVerificationError(contact.id)"
+                                        />
+                                    </div>
+                                    <div v-if="verificationMessages[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ verificationMessages[contact.id] }}
+                                    </div>
+                                    <div v-else-if="isVerificationLocked(contact.id)" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ exhaustedAttemptsMessage }}
+                                    </div>
+                                    <button
+                                        v-if="!isVerificationLocked(contact.id)"
+                                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                        type="button"
+                                        :disabled="verifyCodeForm.processing"
+                                        @click="submitVerificationCode(contact, contactErrors)"
+                                    >
+                                        Подтвердить код
+                                    </button>
+                                    <div v-if="contactErrors[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ contactErrors[contact.id] }}
+                                    </div>
+                                    <div v-else-if="contactNotices[contact.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                        {{ contactNotices[contact.id] }}
+                                    </div>
+                                </div>
+
                                 <div v-if="editingContactId === contact.id && editContactForm.errors.value" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                     {{ editContactForm.errors.value }}
                                 </div>
-                                <div v-else-if="contactErrors[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                <div v-else-if="verificationCountdowns[contact.id]" class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                    Подождите {{ formatCountdown(verificationCountdowns[contact.id]) }}
+                                </div>
+                                <div v-else-if="contactErrors[contact.id] && !verificationOpen[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                     {{ contactErrors[contact.id] }}
                                 </div>
-                                <div v-else-if="contactNotices[contact.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                <div v-else-if="contactNotices[contact.id] && !verificationOpen[contact.id]" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                     {{ contactNotices[contact.id] }}
                                 </div>
                             </div>

@@ -2,7 +2,9 @@
 
 use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserRegisteredVia;
+use App\Domain\Users\Models\ContactVerification;
 use App\Domain\Users\Models\UserContact;
+use App\Domain\Users\Services\ContactVerificationService;
 use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
@@ -83,6 +85,30 @@ Route::get('/account', function (Request $request) {
         ])
         ->values();
 
+    $contactVerifications = [];
+    $contactIds = $user->contacts->pluck('id')->all();
+
+    if ($contactIds !== []) {
+        $verifications = ContactVerification::query()
+            ->whereIn('contact_id', $contactIds)
+            ->whereNull('verified_at')
+            ->where('expires_at', '>', now())
+            ->orderByDesc('id')
+            ->get(['contact_id', 'attempts', 'expires_at']);
+
+        foreach ($verifications as $verification) {
+            if (array_key_exists($verification->contact_id, $contactVerifications)) {
+                continue;
+            }
+
+            $contactVerifications[$verification->contact_id] = [
+                'attempts' => $verification->attempts,
+                'max_attempts' => ContactVerificationService::MAX_ATTEMPTS,
+                'expires_at' => $verification->expires_at?->toISOString(),
+            ];
+        }
+    }
+
     return Inertia::render('Account', [
         'appName' => config('app.name'),
         'user' => [
@@ -113,6 +139,7 @@ Route::get('/account', function (Request $request) {
             ])
             ->values(),
         'contactTypes' => $contactTypes,
+        'contactVerifications' => $contactVerifications,
     ]);
 })->name('account')->middleware('auth');
 
@@ -194,7 +221,7 @@ Route::patch('/account/contacts/{contact}', function (Request $request, UserCont
     return back();
 })->name('account.contacts.update')->middleware('auth');
 
-Route::post('/account/contacts/{contact}/confirm', function (Request $request, UserContact $contact) {
+Route::post('/account/contacts/{contact}/confirm-request', function (Request $request, UserContact $contact) {
     $user = $request->user();
 
     if ($contact->user_id !== $user->id) {
@@ -205,13 +232,30 @@ Route::post('/account/contacts/{contact}/confirm', function (Request $request, U
         return back();
     }
 
-    $contact->update([
-        'confirmed_at' => now(),
-        'updated_by' => $user->id,
-    ]);
+    app(ContactVerificationService::class)->requestCode($user, $contact);
 
     return back();
-})->name('account.contacts.confirm')->middleware('auth');
+})->name('account.contacts.confirm.request')->middleware('auth');
+
+Route::post('/account/contacts/{contact}/confirm-verify', function (Request $request, UserContact $contact) {
+    $user = $request->user();
+
+    if ($contact->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($contact->confirmed_at !== null) {
+        return back();
+    }
+
+    $validated = $request->validate([
+        'code' => ['required', 'string', 'max:20'],
+    ]);
+
+    app(ContactVerificationService::class)->verifyCode($user, $contact, $validated['code']);
+
+    return back();
+})->name('account.contacts.confirm.verify')->middleware('auth');
 
 Route::delete('/account/contacts/{contact}', function (Request $request, UserContact $contact) {
     $user = $request->user();
@@ -284,24 +328,6 @@ Route::delete('/account/emails/{contact}', function (Request $request, UserConta
     return back();
 })->name('account.emails.destroy')->middleware('auth');
 
-Route::post('/account/emails/{contact}/confirm', function (Request $request, UserContact $contact) {
-    $user = $request->user();
-
-    if ($contact->user_id !== $user->id || $contact->type !== ContactType::Email) {
-        abort(404);
-    }
-
-    if ($contact->confirmed_at !== null) {
-        return back();
-    }
-
-    $contact->update([
-        'confirmed_at' => now(),
-        'updated_by' => $user->id,
-    ]);
-
-    return back();
-})->name('account.emails.confirm')->middleware('auth');
 
 Route::post('/login', function (Request $request) {
     $credentials = $request->validate([

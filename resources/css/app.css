@@ -1,5 +1,31 @@
 @import 'tailwindcss';
 
+@layer components {
+    .input-error {
+        border-color: #fda4af !important;
+        background-color: #fff1f2 !important;
+        color: #be123c !important;
+        outline: none !important;
+    }
+
+    .input-error:focus {
+        border-color: #fb7185 !important;
+        outline: none !important;
+    }
+
+    .input-success {
+        border-color: #6ee7b7 !important;
+        background-color: #ecfdf5 !important;
+        color: #047857 !important;
+        outline: none !important;
+    }
+
+    .input-success:focus {
+        border-color: #34d399 !important;
+        outline: none !important;
+    }
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
