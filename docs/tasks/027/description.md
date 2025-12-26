@@ -4,6 +4,9 @@
 # task_short_description
 Спланировать миграцию UserEmail -> UserContact (enum type), обновить код/миграции и документацию.
 
+# task_full_description
+Перейти от `UserEmail` к универсальной сущности `UserContact` с полем `type` (enum) и значением контакта. Мигрировать существующие email в контакты, обновить доменные модели, маршруты, UI страницы аккаунта и документацию.
+
 # task_migration_steps
 1. Добавить enum типов контактов (email/phone/telegram/vk/other).
 2. Создать таблицу `user_contacts` (user_id, type, value, confirmed_at, auditing).

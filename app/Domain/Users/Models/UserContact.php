@@ -3,13 +3,14 @@
 namespace App\Domain\Users\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Users\Enums\ContactType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class UserEmail extends Model
+class UserContact extends Model
 {
     use HasFactory;
     use Auditable;
@@ -17,7 +18,8 @@ class UserEmail extends Model
 
     protected $fillable = [
         'user_id',
-        'email',
+        'type',
+        'value',
         'confirmed_at',
         'created_by',
         'updated_by',
@@ -27,6 +29,7 @@ class UserEmail extends Model
     protected function casts(): array
     {
         return [
+            'type' => ContactType::class,
             'confirmed_at' => 'datetime',
         ];
     }

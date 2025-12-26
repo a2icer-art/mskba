@@ -7,9 +7,10 @@ use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
+use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
-use App\Domain\Users\Models\UserEmail;
+use App\Domain\Users\Models\UserContact;
 use App\Models\User;
 use Database\Factories\VenueTypeFactory;
 use Database\Factories\RoleFactory;
@@ -53,10 +54,10 @@ class DatabaseSeeder extends Seeder
             'created_by' => $admin->id,
         ]));
 
-        $this->seedUserEmail($admin, 'admin@example.com', $admin->id);
-        $this->seedUserEmail($moderator, 'moderator@example.com', $admin->id);
-        $this->seedUserEmail($editor, 'editor@example.com', $admin->id);
-        $this->seedUserEmail($supereditor, 'supereditor@example.com', $admin->id);
+        $this->seedUserContact($admin, 'admin@example.com', $admin->id);
+        $this->seedUserContact($moderator, 'moderator@example.com', $admin->id);
+        $this->seedUserContact($editor, 'editor@example.com', $admin->id);
+        $this->seedUserContact($supereditor, 'supereditor@example.com', $admin->id);
 
         $roles = [
             'admin' => RoleFactory::new()->admin()->create([
@@ -144,13 +145,15 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
-    private function seedUserEmail(User $user, string $email, int $updatedBy): void
+    private function seedUserContact(User $user, string $email, int $updatedBy): void
     {
-        $userEmail = $user->emails()->first();
+        $userContact = $user->contacts()
+            ->where('type', ContactType::Email)
+            ->first();
 
-        if ($userEmail) {
-            $userEmail->update([
-                'email' => $email,
+        if ($userContact) {
+            $userContact->update([
+                'value' => $email,
                 'confirmed_at' => now(),
                 'updated_by' => $updatedBy,
             ]);
@@ -158,9 +161,10 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        UserEmail::query()->create([
+        UserContact::query()->create([
             'user_id' => $user->id,
-            'email' => $email,
+            'type' => ContactType::Email,
+            'value' => $email,
             'confirmed_at' => now(),
             'created_by' => $updatedBy,
             'updated_by' => $updatedBy,

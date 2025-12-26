@@ -10,7 +10,8 @@ use App\Domain\Users\Enums\RoleStatus;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
-use App\Domain\Users\Models\UserEmail;
+use App\Domain\Users\Enums\ContactType;
+use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Models\User;
@@ -39,9 +40,10 @@ class RegisterUserService
 
             $email = $data['email'] ?? null;
             if (!empty($email)) {
-                UserEmail::query()->create([
+                UserContact::query()->create([
                     'user_id' => $user->id,
-                    'email' => $email,
+                    'type' => ContactType::Email,
+                    'value' => $email,
                     'confirmed_at' => null,
                     'created_by' => $user->id,
                     'updated_by' => $user->id,

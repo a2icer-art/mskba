@@ -7,7 +7,7 @@ use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\Role;
-use App\Domain\Users\Models\UserEmail;
+use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
@@ -102,9 +102,9 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'user_roles');
     }
 
-    public function emails(): HasMany
+    public function contacts(): HasMany
     {
-        return $this->hasMany(UserEmail::class);
+        return $this->hasMany(UserContact::class);
     }
 
     public function participantRoleAssignments(): HasMany

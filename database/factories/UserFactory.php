@@ -6,7 +6,8 @@ use App\Models\User;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserRegisteredVia;
 use App\Domain\Users\Enums\UserStatus;
-use App\Domain\Users\Models\UserEmail;
+use App\Domain\Users\Enums\ContactType;
+use App\Domain\Users\Models\UserContact;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -60,9 +61,10 @@ class UserFactory extends Factory
         return $this->afterCreating(function (User $user): void {
             $isConfirmed = $user->status === UserStatus::Confirmed;
 
-            UserEmail::query()->create([
+            UserContact::query()->create([
                 'user_id' => $user->id,
-                'email' => fake()->unique()->safeEmail(),
+                'type' => ContactType::Email,
+                'value' => fake()->unique()->safeEmail(),
                 'confirmed_at' => $isConfirmed ? now() : null,
                 'created_by' => $user->id,
                 'updated_by' => $user->id,

@@ -1,7 +1,8 @@
 <?php
 
+use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserRegisteredVia;
-use App\Domain\Users\Models\UserEmail;
+use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rule;
 
 Route::get('/', function () {
     return Inertia::render('Home', [
@@ -61,7 +63,7 @@ Route::get('/login', function () {
 Route::get('/account', function (Request $request) {
     $user = $request->user();
 
-    $user->load(['profile', 'emails']);
+    $user->load(['profile', 'contacts']);
 
     $participantRoles = $user->participantRoleAssignments()
         ->with('role:id,name,alias')
@@ -85,12 +87,13 @@ Route::get('/account', function (Request $request) {
         ],
         'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
         'participantRoles' => $participantRoles,
-        'emails' => $user->emails
+        'emails' => $user->contacts
+            ->where('type', ContactType::Email)
             ->sortBy('id')
-            ->map(fn (UserEmail $email) => [
-                'id' => $email->id,
-                'email' => $email->email,
-                'confirmed_at' => $email->confirmed_at?->toISOString(),
+            ->map(fn (UserContact $contact) => [
+                'id' => $contact->id,
+                'email' => $contact->value,
+                'confirmed_at' => $contact->confirmed_at?->toISOString(),
             ])
             ->values(),
     ]);
@@ -100,24 +103,24 @@ Route::post('/account/emails', function (Request $request) {
     $user = $request->user();
 
     $validated = $request->validate([
-        'email' => ['required', 'email', 'max:255', 'unique:user_emails,email'],
+        'email' => [
+            'required',
+            'email',
+            'max:255',
+            Rule::unique('user_contacts', 'value')
+                ->where('user_id', $user->id)
+                ->where('type', ContactType::Email->value),
+        ],
+    ], [
+        'email.unique' => 'Этот email уже добавлен.',
     ]);
 
     $email = $validated['email'];
-    $exists = UserEmail::query()
-        ->where('user_id', $user->id)
-        ->where('email', $email)
-        ->exists();
 
-    if ($exists) {
-        return back()->withErrors([
-            'email' => 'Этот email уже добавлен.',
-        ]);
-    }
-
-    UserEmail::query()->create([
+    UserContact::query()->create([
         'user_id' => $user->id,
-        'email' => $email,
+        'type' => ContactType::Email,
+        'value' => $email,
         'confirmed_at' => null,
         'created_by' => $user->id,
         'updated_by' => $user->id,
@@ -126,78 +129,75 @@ Route::post('/account/emails', function (Request $request) {
     return back();
 })->name('account.emails.store')->middleware('auth');
 
-Route::patch('/account/emails/{email}', function (Request $request, UserEmail $email) {
+Route::patch('/account/emails/{contact}', function (Request $request, UserContact $contact) {
     $user = $request->user();
 
-    if ($email->user_id !== $user->id) {
+    if ($contact->user_id !== $user->id || $contact->type !== ContactType::Email) {
         abort(404);
     }
 
-    if ($email->confirmed_at !== null) {
+    if ($contact->confirmed_at !== null) {
         return back()->withErrors([
             'email' => 'Подтвержденный email нельзя редактировать.',
         ]);
     }
 
     $validated = $request->validate([
-        'email' => ['required', 'email', 'max:255', 'unique:user_emails,email,' . $email->id],
+        'email' => [
+            'required',
+            'email',
+            'max:255',
+            Rule::unique('user_contacts', 'value')
+                ->where('user_id', $user->id)
+                ->where('type', ContactType::Email->value)
+                ->ignore($contact->id),
+        ],
+    ], [
+        'email.unique' => 'Этот email уже добавлен.',
     ]);
 
-    $newEmail = $validated['email'];
-    $exists = UserEmail::query()
-        ->where('user_id', $user->id)
-        ->where('email', $newEmail)
-        ->whereKeyNot($email->id)
-        ->exists();
-
-    if ($exists) {
-        return back()->withErrors([
-            'email' => 'Этот email уже добавлен.',
-        ]);
-    }
-
-    $email->update([
-        'email' => $newEmail,
+    $contact->update([
+        'value' => $validated['email'],
         'updated_by' => $user->id,
     ]);
 
     return back();
 })->name('account.emails.update')->middleware('auth');
 
-Route::delete('/account/emails/{email}', function (Request $request, UserEmail $email) {
+Route::delete('/account/emails/{contact}', function (Request $request, UserContact $contact) {
     $user = $request->user();
 
-    if ($email->user_id !== $user->id) {
+    if ($contact->user_id !== $user->id || $contact->type !== ContactType::Email) {
         abort(404);
     }
 
-    if ($email->confirmed_at !== null) {
+    if ($contact->confirmed_at !== null) {
         return back()->withErrors([
             'email' => 'Подтвержденный email нельзя удалить.',
         ]);
     }
 
-    $email->update([
+    $contact->update([
         'deleted_by' => $user->id,
     ]);
 
-    $email->delete();
+    $contact->delete();
 
     return back();
 })->name('account.emails.destroy')->middleware('auth');
 
-Route::post('/account/emails/{email}/confirm', function (Request $request, UserEmail $email) {
+Route::post('/account/emails/{contact}/confirm', function (Request $request, UserContact $contact) {
     $user = $request->user();
 
-    if ($email->user_id !== $user->id) {
+    if ($contact->user_id !== $user->id || $contact->type !== ContactType::Email) {
         abort(404);
     }
 
-    if ($email->confirmed_at !== null) {
+    if ($contact->confirmed_at !== null) {
         return back();
     }
 
-    $email->update([
+    $contact->update([
         'confirmed_at' => now(),
         'updated_by' => $user->id,
     ]);
@@ -225,7 +225,11 @@ Route::post('/login', function (Request $request) {
 Route::post('/register', function (Request $request) {
     $validated = $request->validate([
         'login' => ['required', 'string', 'max:255', 'unique:users,login'],
-        'email' => ['nullable', 'email', 'max:255', 'unique:user_emails,email'],
+        'email' => [
+            'nullable',
+            'email',
+            'max:255',
+        ],
         'password' => ['required', Password::min(6)->letters()->numbers()],
         'participant_role_id' => ['nullable', 'integer', 'exists:participant_roles,id'],
     ]);
