@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Users\Enums\UserRegisteredVia;
+use App\Domain\Users\Models\UserEmail;
 use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
@@ -60,7 +61,7 @@ Route::get('/login', function () {
 Route::get('/account', function (Request $request) {
     $user = $request->user();
 
-    $user->load('profile');
+    $user->load(['profile', 'emails']);
 
     $participantRoles = $user->participantRoleAssignments()
         ->with('role:id,name,alias')
@@ -84,8 +85,125 @@ Route::get('/account', function (Request $request) {
         ],
         'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
         'participantRoles' => $participantRoles,
+        'emails' => $user->emails
+            ->sortBy('id')
+            ->map(fn (UserEmail $email) => [
+                'id' => $email->id,
+                'email' => $email->email,
+                'confirmed_at' => $email->confirmed_at?->toISOString(),
+            ])
+            ->values(),
     ]);
 })->name('account')->middleware('auth');
+
+Route::post('/account/emails', function (Request $request) {
+    $user = $request->user();
+
+    $validated = $request->validate([
+        'email' => ['required', 'email', 'max:255', 'unique:user_emails,email'],
+    ]);
+
+    $email = $validated['email'];
+    $exists = UserEmail::query()
+        ->where('user_id', $user->id)
+        ->where('email', $email)
+        ->exists();
+
+    if ($exists) {
+        return back()->withErrors([
+            'email' => 'Этот email уже добавлен.',
+        ]);
+    }
+
+    UserEmail::query()->create([
+        'user_id' => $user->id,
+        'email' => $email,
+        'confirmed_at' => null,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+
+    return back();
+})->name('account.emails.store')->middleware('auth');
+
+Route::patch('/account/emails/{email}', function (Request $request, UserEmail $email) {
+    $user = $request->user();
+
+    if ($email->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($email->confirmed_at !== null) {
+        return back()->withErrors([
+            'email' => 'Подтвержденный email нельзя редактировать.',
+        ]);
+    }
+
+    $validated = $request->validate([
+        'email' => ['required', 'email', 'max:255', 'unique:user_emails,email,' . $email->id],
+    ]);
+
+    $newEmail = $validated['email'];
+    $exists = UserEmail::query()
+        ->where('user_id', $user->id)
+        ->where('email', $newEmail)
+        ->whereKeyNot($email->id)
+        ->exists();
+
+    if ($exists) {
+        return back()->withErrors([
+            'email' => 'Этот email уже добавлен.',
+        ]);
+    }
+
+    $email->update([
+        'email' => $newEmail,
+        'updated_by' => $user->id,
+    ]);
+
+    return back();
+})->name('account.emails.update')->middleware('auth');
+
+Route::delete('/account/emails/{email}', function (Request $request, UserEmail $email) {
+    $user = $request->user();
+
+    if ($email->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($email->confirmed_at !== null) {
+        return back()->withErrors([
+            'email' => 'Подтвержденный email нельзя удалить.',
+        ]);
+    }
+
+    $email->update([
+        'deleted_by' => $user->id,
+    ]);
+
+    $email->delete();
+
+    return back();
+})->name('account.emails.destroy')->middleware('auth');
+
+Route::post('/account/emails/{email}/confirm', function (Request $request, UserEmail $email) {
+    $user = $request->user();
+
+    if ($email->user_id !== $user->id) {
+        abort(404);
+    }
+
+    if ($email->confirmed_at !== null) {
+        return back();
+    }
+
+    $email->update([
+        'confirmed_at' => now(),
+        'updated_by' => $user->id,
+    ]);
+
+    return back();
+})->name('account.emails.confirm')->middleware('auth');
 
 Route::post('/login', function (Request $request) {
     $credentials = $request->validate([
