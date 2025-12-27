@@ -2,6 +2,8 @@
 
 namespace App\Domain\Users\Services;
 
+use App\Domain\Moderation\Enums\ModerationEntityType;
+use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Models\ContactVerification;
@@ -75,6 +77,7 @@ class AccountPageService
                 ['value' => ContactType::Other->value, 'label' => 'Другое'],
             ],
             'contactVerifications' => $this->getContactVerifications($user),
+            'moderationRequest' => $this->getModerationRequest($user),
             'accountNavigation' => $this->getNavigationItems($user),
         ];
     }
@@ -123,5 +126,25 @@ class AccountPageService
         }
 
         return $contactVerifications;
+    }
+
+    private function getModerationRequest(User $user): ?array
+    {
+        $request = ModerationRequest::query()
+            ->where('entity_type', ModerationEntityType::User->value)
+            ->where('entity_id', $user->id)
+            ->orderByDesc('submitted_at')
+            ->first(['status', 'submitted_at', 'reviewed_at', 'reject_reason']);
+
+        if (!$request) {
+            return null;
+        }
+
+        return [
+            'status' => $request->status?->value,
+            'submitted_at' => $request->submitted_at?->toISOString(),
+            'reviewed_at' => $request->reviewed_at?->toISOString(),
+            'reject_reason' => $request->reject_reason,
+        ];
     }
 }

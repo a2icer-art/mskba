@@ -30,6 +30,20 @@
 - `UserRole` (app/Domain/Users/Models/UserRole)
   - Связь между User и Role, с аудитом и статусами.
 
+## Домен Moderation
+
+- `ModerationRequest` (app/Domain/Moderation/Models/ModerationRequest)
+  - Универсальная заявка на модерацию сущностей (user/venue/event).
+  - Хранит статус (pending/approved/rejected), отправителя, даты отправки и рассмотрения.
+- `ModerationEntityType` / `ModerationStatus` enums
+  - Тип подтверждаемой сущности и статус заявки.
+- Правила модерации
+  - Для каждой сущности есть набор требований (реализовано через контракт `ModerationRulesContract`).
+  - Для пользователя проверяются: подтверждённый контакт, заполненные ФИО, пол и дата рождения.
+- Use Case `SubmitModerationRequest`
+  - Создаёт заявку при отсутствии активной (pending) и при выполнении требований.
+  - Возвращает список невыполненных требований для UI.
+
 ## Домен Venues
 
 - `Venue` (app/Domain/Venues/Models/Venue)

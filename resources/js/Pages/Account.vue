@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, nextTick, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import MainFooter from '../Components/MainFooter.vue';
@@ -38,6 +38,10 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    moderationRequest: {
+        type: Object,
+        default: null,
+    },
     activeTab: {
         type: String,
         default: 'user',
@@ -73,6 +77,11 @@ const activeAccountHref = computed(() => {
     const item = accountMenuItems.value.find((menuItem) => menuItem.key === activeTab.value);
     return item?.href ?? page.url ?? '';
 });
+const moderationRequest = computed(() => props.moderationRequest ?? null);
+const isModerationPending = computed(() => moderationRequest.value?.status === 'pending');
+const isModerationRejected = computed(() => moderationRequest.value?.status === 'rejected');
+const moderationRejectedAt = computed(() => moderationRequest.value?.reviewed_at ?? moderationRequest.value?.submitted_at);
+const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason || 'Заявка отклонена.');
 const hasSidebar = computed(() => accountMenuItems.value.length > 0);
 const logoutForm = useForm({});
 
@@ -95,13 +104,13 @@ const statusLabelMap = {
 };
 
 const userItems = computed(() => [
-    { label: 'ID', value: props.user?.id ?? '—' },
-    { label: 'Логин', value: props.user?.login ?? '—' },
-    { label: 'Пароль', value: '********' },
-    { label: 'Дата регистрации', value: formatDate(props.user?.created_at) },
-    { label: 'Статус', value: statusLabelMap[props.user?.status] ?? '—' },
+    { key: 'id', label: 'ID', value: props.user?.id ?? '—' },
+    { key: 'login', label: 'Логин', value: props.user?.login ?? '—' },
+    { key: 'password', label: 'Пароль', value: '********' },
+    { key: 'created_at', label: 'Дата регистрации', value: formatDate(props.user?.created_at) },
+    { key: 'status', label: 'Статус', value: statusLabelMap[props.user?.status] ?? '—' },
     ...(props.user?.status === 'confirmed'
-        ? [{ label: 'Дата подтверждения', value: formatDate(props.user?.confirmed_at) }]
+        ? [{ key: 'confirmed_at', label: 'Дата подтверждения', value: formatDate(props.user?.confirmed_at) }]
         : []),
 ]);
 
@@ -164,6 +173,7 @@ const verifyCodeForm = useForm({
     code: '',
 });
 const actionForm = useForm({});
+const moderationForm = useForm({});
 const editingEmailId = ref(null);
 const editingContactId = ref(null);
 const emailNotices = ref({});
@@ -171,6 +181,8 @@ const emailErrors = ref({});
 const contactNotices = ref({});
 const contactErrors = ref({});
 const newContactNotice = ref('');
+const moderationNotice = ref('');
+const moderationErrors = ref([]);
 const verificationOpen = ref({});
 const verificationCodes = ref({});
 const verificationPending = ref({});
@@ -687,6 +699,28 @@ const updateContact = (contact) => {
     });
 };
 
+const submitModerationRequest = () => {
+    moderationNotice.value = '';
+    moderationErrors.value = [];
+
+    moderationForm.post('/account/moderation-request', {
+        preserveScroll: true,
+        onSuccess: () => {
+            moderationNotice.value = 'Заявка отправлена на модерацию.';
+        },
+        onError: (errors) => {
+            if (errors.moderation) {
+                moderationErrors.value = errors.moderation.split('\n').filter(Boolean);
+            }
+        },
+        onFinish: () => {
+            if (page.props?.errors?.moderation) {
+                moderationErrors.value = page.props.errors.moderation.split('\n').filter(Boolean);
+            }
+        },
+    });
+};
+
 const logout = () => {
     logoutForm.post('/logout');
 };
@@ -719,11 +753,70 @@ const logout = () => {
 
                     <div class="mt-6 grid gap-4">
                         <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div v-for="item in userItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3">
-                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
-                                <span class="text-sm font-medium text-slate-800">{{ item.value }}</span>
+                            <div v-for="item in userItems" :key="item.key" class="border-b border-slate-100 last:border-b-0">
+                                <div class="flex items-center justify-between py-3">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                                    <div class="flex flex-wrap items-center justify-end gap-2 text-sm font-medium text-slate-800">
+                                        <span>{{ item.value }}</span>
+                                        <template v-if="item.key === 'status'">
+                                            <span
+                                                v-if="user?.status === 'confirmed'"
+                                                class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+                                                :title="formatDate(user?.confirmed_at)"
+                                            >
+                                                Подтвержден
+                                            </span>
+                                            <span
+                                                v-else-if="isModerationPending"
+                                                class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
+                                                :title="formatDate(moderationRequest?.submitted_at)"
+                                            >
+                                                На модерации
+                                            </span>
+                                            <span
+                                                v-else-if="isModerationRejected"
+                                                class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700"
+                                                :title="formatDate(moderationRejectedAt)"
+                                            >
+                                                Отклонено
+                                            </span>
+                                            <button
+                                                v-if="isModerationRejected"
+                                                class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                                type="button"
+                                                :disabled="moderationForm.processing"
+                                                @click="submitModerationRequest"
+                                            >
+                                                Отправить повторно
+                                            </button>
+                                            <button
+                                                v-else-if="!isModerationRejected"
+                                                class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                                type="button"
+                                                :disabled="moderationForm.processing"
+                                                @click="submitModerationRequest"
+                                            >
+                                                Отправить на модерацию
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div v-if="item.key === 'status'" class="pb-3">
+                                    <div v-if="moderationErrors.length" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        <p class="font-semibold">Не выполнены требования:</p>
+                                        <ul class="mt-1 list-disc space-y-1 pl-4">
+                                            <li v-for="(message, index) in moderationErrors" :key="index">{{ message }}</li>
+                                        </ul>
+                                    </div>
+                                    <div v-else-if="isModerationRejected" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ moderationRejectedReason }}
+                                    </div>
+                                    <div v-else-if="moderationNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                        {{ moderationNotice }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
                     <div v-else-if="activeTab === 'profile'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div v-for="item in profileItems" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
@@ -1066,3 +1159,4 @@ const logout = () => {
         </div>
     </main>
 </template>
+

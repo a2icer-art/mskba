@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountContactsController;
+use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\VenuesController;
@@ -19,6 +20,8 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/profile', [AccountController::class, 'profile'])->name('account.profile');
     Route::get('/contacts', [AccountController::class, 'contacts'])->name('account.contacts');
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
+
+    Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
 
     Route::prefix('contacts')->name('account.contacts.')->group(function () {
         Route::post('/', [AccountContactsController::class, 'store'])->name('store');
