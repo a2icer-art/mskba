@@ -1,8 +1,10 @@
-<script setup>
-import { Link } from '@inertiajs/vue3';
+﻿<script setup>
+import { computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import BrandLogo from './BrandLogo.vue';
+import MainHeaderNav from './MainHeaderNav.vue';
 
-defineProps({
+const props = defineProps({
     appName: {
         type: String,
         required: true,
@@ -18,6 +20,12 @@ defineProps({
 });
 
 defineEmits(['open-login']);
+
+const page = usePage();
+const roleAliases = computed(() => page.props.auth?.user?.roles ?? []);
+const canSeeControlPanel = computed(
+    () => props.isAuthenticated && roleAliases.value.some((role) => role === 'admin' || role === 'moderator')
+);
 </script>
 
 <template>
@@ -32,23 +40,7 @@ defineEmits(['open-login']);
             </div>
         </Link>
 
-        <nav class="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-700">
-            <Link
-                class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300"
-                href="/venues"
-            >
-                Площадки
-            </Link>
-            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
-                Матчи
-            </a>
-            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
-                Турниры
-            </a>
-            <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
-                Сообщество
-            </a>
-        </nav>
+        <MainHeaderNav :show-control-panel="canSeeControlPanel" />
 
         <div class="flex items-center gap-3">
             <Link
@@ -69,3 +61,4 @@ defineEmits(['open-login']);
         </div>
     </header>
 </template>
+

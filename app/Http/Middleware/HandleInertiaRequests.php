@@ -37,10 +37,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+        $userRoles = $user ? $user->roles()->pluck('alias')->all() : [];
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user()?->only(['id', 'login']),
+                'user' => $user
+                    ? [
+                        'id' => $user->id,
+                        'login' => $user->login,
+                        'roles' => $userRoles,
+                    ]
+                    : null,
             ],
             'participantRoles' => ParticipantRole::query()
                 ->where('status', ParticipantRoleStatus::Confirmed)
