@@ -7,8 +7,6 @@ use App\Domain\Users\Models\ContactVerification;
 use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Services\ContactVerificationService;
 use App\Domain\Users\Services\RegisterUserService;
-use App\Domain\Venues\Models\Venue;
-use App\Domain\Venues\Models\VenueType;
 use App\Domain\Venues\Services\VenueCatalogService;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use Illuminate\Support\Facades\Route;
@@ -17,7 +15,6 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
 
 Route::get('/', function () {
     return Inertia::render('Home', [

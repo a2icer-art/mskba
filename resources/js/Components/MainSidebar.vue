@@ -15,10 +15,6 @@ const props = defineProps({
         type: String,
         default: '',
     },
-    emptyText: {
-        type: String,
-        default: 'Пока нет пунктов для навигации.',
-    },
 });
 
 const hasItems = computed(() => props.items.length > 0);
