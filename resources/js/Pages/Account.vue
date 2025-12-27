@@ -41,9 +41,17 @@ const props = defineProps({
         type: String,
         default: 'user',
     },
+    accountNavigation: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const accountMenuItems = computed(() => {
+    if (props.accountNavigation.length) {
+        return props.accountNavigation;
+    }
+
     const items = [
         { key: 'user', label: 'Пользователь', href: '/account' },
         { key: 'profile', label: 'Профиль', href: '/account/profile' },

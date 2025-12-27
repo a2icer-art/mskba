@@ -1,0 +1,127 @@
+<?php
+
+namespace App\Domain\Users\Services;
+
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
+use App\Domain\Users\Enums\ContactType;
+use App\Domain\Users\Models\ContactVerification;
+use App\Domain\Users\Models\UserContact;
+use App\Models\User;
+use App\Domain\Users\Services\ContactVerificationService;
+
+class AccountPageService
+{
+    public function getNavigationItems(User $user): array
+    {
+        $roleItems = $this->getParticipantRoles($user);
+
+        $items = [
+            ['key' => 'user', 'label' => 'Пользователь', 'href' => '/account'],
+            ['key' => 'profile', 'label' => 'Профиль', 'href' => '/account/profile'],
+            ['key' => 'contacts', 'label' => 'Контакты', 'href' => '/account/contacts'],
+        ];
+
+        foreach ($roleItems as $role) {
+            $items[] = [
+                'key' => 'role-' . $role['id'],
+                'label' => $role['label'],
+                'href' => '/account/roles/' . $role['id'],
+            ];
+        }
+
+        return $items;
+    }
+
+    public function getProps(User $user, string $activeTab): array
+    {
+        $user->load(['profile', 'contacts']);
+
+        $participantRoles = $this->getParticipantRoles($user);
+
+        return [
+            'activeTab' => $activeTab,
+            'user' => [
+                'id' => $user->id,
+                'login' => $user->login,
+                'status' => $user->status?->value,
+                'created_at' => $user->created_at?->toISOString(),
+                'confirmed_at' => $user->confirmed_at?->toISOString(),
+            ],
+            'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
+            'participantRoles' => $participantRoles,
+            'emails' => $user->contacts
+                ->where('type', ContactType::Email)
+                ->sortBy('id')
+                ->map(fn (UserContact $contact) => [
+                    'id' => $contact->id,
+                    'email' => $contact->value,
+                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                ])
+                ->values(),
+            'contacts' => $user->contacts
+                ->sortBy('id')
+                ->map(fn (UserContact $contact) => [
+                    'id' => $contact->id,
+                    'type' => $contact->type?->value,
+                    'value' => $contact->value,
+                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                ])
+                ->values(),
+            'contactTypes' => [
+                ['value' => ContactType::Email->value, 'label' => 'Электронная почта'],
+                ['value' => ContactType::Phone->value, 'label' => 'Телефон'],
+                ['value' => ContactType::Telegram->value, 'label' => 'Telegram'],
+                ['value' => ContactType::Vk->value, 'label' => 'VK'],
+                ['value' => ContactType::Other->value, 'label' => 'Другое'],
+            ],
+            'contactVerifications' => $this->getContactVerifications($user),
+            'accountNavigation' => $this->getNavigationItems($user),
+        ];
+    }
+
+    private function getParticipantRoles(User $user): array
+    {
+        return $user->participantRoleAssignments()
+            ->with('role:id,name,alias')
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed)
+            ->get()
+            ->map(fn ($assignment) => [
+                'id' => $assignment->id,
+                'label' => $assignment->custom_title ?: ($assignment->role?->name ?? 'Роль'),
+                'alias' => $assignment->role?->alias,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getContactVerifications(User $user): array
+    {
+        $contactVerifications = [];
+        $contactIds = $user->contacts->pluck('id')->all();
+
+        if ($contactIds === []) {
+            return [];
+        }
+
+        $verifications = ContactVerification::query()
+            ->whereIn('contact_id', $contactIds)
+            ->whereNull('verified_at')
+            ->where('expires_at', '>', now())
+            ->orderByDesc('id')
+            ->get(['contact_id', 'attempts', 'expires_at']);
+
+        foreach ($verifications as $verification) {
+            if (array_key_exists($verification->contact_id, $contactVerifications)) {
+                continue;
+            }
+
+            $contactVerifications[$verification->contact_id] = [
+                'attempts' => $verification->attempts,
+                'max_attempts' => ContactVerificationService::MAX_ATTEMPTS,
+                'expires_at' => $verification->expires_at?->toISOString(),
+            ];
+        }
+
+        return $contactVerifications;
+    }
+}
