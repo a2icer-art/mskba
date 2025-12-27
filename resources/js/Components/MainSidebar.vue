@@ -22,7 +22,7 @@ const hasItems = computed(() => props.items.length > 0);
 
 <template>
     <aside v-if="hasItems" class="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ title }}</p>
+        <p v-if="title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ title }}</p>
         <ul class="space-y-3 text-sm font-medium">
             <li
                 v-for="item in items"

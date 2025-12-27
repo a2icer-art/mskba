@@ -9,29 +9,32 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-Route::get('/venues', [VenuesController::class, 'index'])->name('venues');
-Route::get('/venues/{type}', [VenuesController::class, 'type'])->name('venues.type');
-
 Route::get('/login', [AuthController::class, 'login'])->name('login');
-
-Route::get('/account', [AccountController::class, 'index'])->name('account')->middleware('auth');
-Route::get('/account/profile', [AccountController::class, 'profile'])->name('account.profile')->middleware('auth');
-Route::get('/account/contacts', [AccountController::class, 'contacts'])->name('account.contacts')->middleware('auth');
-Route::get('/account/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show')->middleware('auth');
-
-Route::post('/account/contacts', [AccountContactsController::class, 'store'])->name('account.contacts.store')->middleware('auth');
-Route::patch('/account/contacts/{contact}', [AccountContactsController::class, 'update'])->name('account.contacts.update')->middleware('auth');
-Route::post('/account/contacts/{contact}/confirm-request', [AccountContactsController::class, 'requestConfirm'])
-    ->name('account.contacts.confirm.request')
-    ->middleware('auth');
-Route::post('/account/contacts/{contact}/confirm-verify', [AccountContactsController::class, 'verifyConfirm'])
-    ->name('account.contacts.confirm.verify')
-    ->middleware('auth');
-Route::delete('/account/contacts/{contact}', [AccountContactsController::class, 'destroy'])->name('account.contacts.destroy')->middleware('auth');
-Route::patch('/account/emails/{contact}', [AccountContactsController::class, 'updateEmail'])->name('account.emails.update')->middleware('auth');
-Route::delete('/account/emails/{contact}', [AccountContactsController::class, 'destroyEmail'])->name('account.emails.destroy')->middleware('auth');
-
-
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 Route::post('/register', [AuthController::class, 'register'])->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::middleware('auth')->prefix('account')->group(function () {
+    Route::get('/', [AccountController::class, 'index'])->name('account');
+    Route::get('/profile', [AccountController::class, 'profile'])->name('account.profile');
+    Route::get('/contacts', [AccountController::class, 'contacts'])->name('account.contacts');
+    Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
+
+    Route::prefix('contacts')->name('account.contacts.')->group(function () {
+        Route::post('/', [AccountContactsController::class, 'store'])->name('store');
+        Route::patch('/{contact}', [AccountContactsController::class, 'update'])->name('update');
+        Route::post('/{contact}/confirm-request', [AccountContactsController::class, 'requestConfirm'])
+            ->name('confirm.request');
+        Route::post('/{contact}/confirm-verify', [AccountContactsController::class, 'verifyConfirm'])
+            ->name('confirm.verify');
+        Route::delete('/{contact}', [AccountContactsController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::patch('/emails/{contact}', [AccountContactsController::class, 'updateEmail'])->name('account.emails.update');
+    Route::delete('/emails/{contact}', [AccountContactsController::class, 'destroyEmail'])->name('account.emails.destroy');
+});
+
+Route::prefix('venues')->group(function () {
+    Route::get('/', [VenuesController::class, 'index'])->name('venues');
+    Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
+});

@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue';
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { useForm, usePage } from '@inertiajs/vue3';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
+import MainSidebar from '../Components/MainSidebar.vue';
 
 const props = defineProps({
     appName: {
@@ -68,6 +69,11 @@ const accountMenuItems = computed(() => {
 });
 const activeTab = computed(() => props.activeTab || 'user');
 const page = usePage();
+const activeAccountHref = computed(() => {
+    const item = accountMenuItems.value.find((menuItem) => menuItem.key === activeTab.value);
+    return item?.href ?? page.url ?? '';
+});
+const hasSidebar = computed(() => accountMenuItems.value.length > 0);
 const logoutForm = useForm({});
 
 const formatDate = (value) => {
@@ -695,25 +701,13 @@ const logout = () => {
         <div class="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
             <MainHeader :app-name="appName" :is-authenticated="true" :login-label="user?.login" />
 
-            <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
-                <aside class="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Разделы</p>
-                    <ul class="space-y-3 text-sm font-medium">
-                        <li v-for="item in accountMenuItems" :key="item.key" class="rounded-2xl transition">
-                            <Link
-                                class="block w-full rounded-2xl px-4 py-3 text-left transition"
-                                :class="
-                                    activeTab === item.key
-                                        ? 'bg-slate-900 text-white'
-                                        : 'bg-slate-100 text-slate-700 hover:bg-amber-100/70'
-                                "
-                                :href="item.href"
-                            >
-                                {{ item.label }}
-                            </Link>
-                        </li>
-                    </ul>
-                </aside>
+            <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+                <MainSidebar
+                    v-if="hasSidebar"
+                    title=""
+                    :items="accountMenuItems"
+                    :active-href="activeAccountHref"
+                />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
