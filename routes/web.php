@@ -24,20 +24,12 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/halls', function () {
-    return redirect('/venues');
-})->name('halls');
-
-Route::get('/halls/{type}', function (string $type) {
-    return redirect('/venues/' . $type);
-})->name('halls.type');
-
 Route::get('/venues', function () {
     $navItems = VenueType::query()
         ->orderBy('name')
-        ->get(['name', 'alias'])
+        ->get(['name', 'plural_name', 'alias'])
         ->map(fn (VenueType $type) => [
-            'label' => $type->name,
+            'label' => $type->plural_name ?: $type->name,
             'href' => '/venues/' . Str::plural($type->alias),
         ])
         ->values();
@@ -62,7 +54,7 @@ Route::get('/venues', function () {
         'activeType' => null,
         'activeTypeSlug' => null,
         'navigation' => [
-            'title' => 'Навигация',
+            'title' => 'Площадки',
             'items' => $navItems,
         ],
     ]);
@@ -86,9 +78,9 @@ Route::get('/venues/{type}', function (string $type) {
 
     $navItems = VenueType::query()
         ->orderBy('name')
-        ->get(['name', 'alias'])
+        ->get(['name', 'plural_name', 'alias'])
         ->map(fn (VenueType $typeItem) => [
-            'label' => $typeItem->name,
+            'label' => $typeItem->plural_name ?: $typeItem->name,
             'href' => '/venues/' . Str::plural($typeItem->alias),
         ])
         ->values();

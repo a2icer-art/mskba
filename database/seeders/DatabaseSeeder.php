@@ -119,12 +119,12 @@ class DatabaseSeeder extends Seeder
         }
 
         $venueTypes = collect([
-            ['name' => 'Hall', 'alias' => 'hall'],
-            ['name' => 'Court', 'alias' => 'court'],
-            ['name' => 'Outdoor court', 'alias' => 'outdoor'],
+            ['name' => 'Зал', 'plural_name' => 'Залы', 'alias' => 'hall'],
+            ['name' => 'Корт', 'plural_name' => 'Корты', 'alias' => 'court'],
+            ['name' => 'Уличная площадка', 'plural_name' => 'Уличные площадки', 'alias' => 'outdoor'],
         ])->mapWithKeys(function (array $data) use ($admin): array {
             $venueType = VenueTypeFactory::new()
-                ->named($data['name'], $data['alias'], $admin->id)
+                ->named($data['name'], $data['alias'], $data['plural_name'], $admin->id)
                 ->create();
 
             return [$data['alias'] => $venueType];

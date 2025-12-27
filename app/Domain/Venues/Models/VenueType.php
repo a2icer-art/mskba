@@ -17,6 +17,7 @@ class VenueType extends Model
 
     protected $fillable = [
         'name',
+        'plural_name',
         'alias',
         'created_by',
         'updated_by',

@@ -16,10 +16,23 @@ class VenueTypeFactory extends Factory
 
     public function definition(): array
     {
-        $name = fake()->unique()->word();
+        $name = fake()->unique()->randomElement([
+            'Зал',
+            'Корт',
+            'Площадка',
+            'Спортзал',
+        ]);
+        $pluralName = match ($name) {
+            'Зал' => 'Залы',
+            'Корт' => 'Корты',
+            'Площадка' => 'Площадки',
+            'Спортзал' => 'Спортзалы',
+            default => $name . 'ы',
+        };
 
         return [
             'name' => $name,
+            'plural_name' => $pluralName,
             'alias' => Str::slug($name),
             'created_by' => User::factory(),
             'updated_by' => null,
@@ -27,12 +40,13 @@ class VenueTypeFactory extends Factory
         ];
     }
 
-    public function named(string $name, ?string $alias = null, ?int $createdBy = null): static
+    public function named(string $name, ?string $alias = null, ?string $pluralName = null, ?int $createdBy = null): static
     {
         $alias ??= Str::slug($name);
 
         return $this->state([
             'name' => $name,
+            'plural_name' => $pluralName,
             'alias' => $alias,
             'created_by' => $createdBy ?? User::factory(),
         ]);
