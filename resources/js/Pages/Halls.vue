@@ -316,7 +316,7 @@ watch(
                 </div>
             </section>
 
-            <MainFooter />
+            <MainFooter :app-name="appName" />
         </div>
 
         <AuthModal

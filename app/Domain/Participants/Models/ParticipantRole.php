@@ -19,6 +19,7 @@ class ParticipantRole extends Model
 
     protected $fillable = [
         'name',
+        'plural_name',
         'alias',
         'status',
         'sort',

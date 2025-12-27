@@ -1,5 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import BrandLogo from './BrandLogo.vue';
 
 defineProps({
     appName: {
@@ -24,11 +25,9 @@ defineEmits(['open-login']);
         class="flex flex-col gap-6 rounded-3xl border border-amber-200/80 bg-white/70 px-6 py-5 backdrop-blur sm:flex-row sm:items-center sm:justify-between"
     >
         <Link class="flex items-center gap-3" href="/" aria-label="Home">
-            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                <span class="text-sm font-semibold tracking-[0.2em]">MSK</span>
-            </div>
+            <BrandLogo />
             <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Basketball Portal</p>
+                <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Баскетбольный портал</p>
                 <p class="text-lg font-semibold">{{ appName }}</p>
             </div>
         </Link>

@@ -1060,7 +1060,7 @@ const logout = () => {
                 </div>
             </section>
 
-            <MainFooter />
+            <MainFooter :app-name="appName" />
         </div>
     </main>
 </template>

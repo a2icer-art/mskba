@@ -94,21 +94,22 @@ class DatabaseSeeder extends Seeder
             $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
 
-        $participantRoleNames = [
-            'Player',
-            'Coach',
-            'Referee',
-            'Venue admin',
-            'Media',
-            'Seller',
-            'Staff',
-            'Other',
+        $participantRoles = [
+            ['name' => 'Игрок', 'plural_name' => 'Игроки', 'alias' => 'player'],
+            ['name' => 'Тренер', 'plural_name' => 'Тренеры', 'alias' => 'coach'],
+            ['name' => 'Судья', 'plural_name' => 'Судьи', 'alias' => 'referee'],
+            ['name' => 'Администратор площадки', 'plural_name' => 'Администраторы площадок', 'alias' => 'venue-admin'],
+            ['name' => 'Медиа', 'plural_name' => 'Медиа', 'alias' => 'media'],
+            ['name' => 'Продавец', 'plural_name' => 'Продавцы', 'alias' => 'seller'],
+            ['name' => 'Персонал', 'plural_name' => 'Персонал', 'alias' => 'staff'],
+            ['name' => 'Другое', 'plural_name' => 'Другое', 'alias' => 'other'],
         ];
 
-        foreach ($participantRoleNames as $index => $name) {
+        foreach ($participantRoles as $index => $role) {
             ParticipantRole::query()->create([
-                'name' => $name,
-                'alias' => Str::slug($name),
+                'name' => $role['name'],
+                'plural_name' => $role['plural_name'],
+                'alias' => $role['alias'],
                 'status' => ParticipantRoleStatus::Confirmed,
                 'sort' => $index + 1,
                 'created_by' => $admin->id,
