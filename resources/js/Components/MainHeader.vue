@@ -36,7 +36,7 @@ defineEmits(['open-login']);
         <nav class="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-700">
             <Link
                 class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300"
-                href="/halls"
+                href="/venues"
             >
                 Площадки
             </Link>

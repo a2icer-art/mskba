@@ -23,6 +23,10 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    activeTypeSlug: {
+        type: String,
+        default: '',
+    },
 });
 
 const page = usePage();
@@ -181,7 +185,7 @@ watch(
                 <MainSidebar
                     :title="navigation.title"
                     :items="navigation.items"
-                    :active-href="activeType ? `/halls/${activeType}` : ''"
+                    :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">

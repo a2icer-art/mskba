@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 Route::get('/', function () {
     return Inertia::render('Home', [
@@ -24,12 +25,20 @@ Route::get('/', function () {
 });
 
 Route::get('/halls', function () {
+    return redirect('/venues');
+})->name('halls');
+
+Route::get('/halls/{type}', function (string $type) {
+    return redirect('/venues/' . $type);
+})->name('halls.type');
+
+Route::get('/venues', function () {
     $navItems = VenueType::query()
         ->orderBy('name')
         ->get(['name', 'alias'])
         ->map(fn (VenueType $type) => [
             'label' => $type->name,
-            'href' => '/halls/' . $type->alias,
+            'href' => '/venues/' . Str::plural($type->alias),
         ])
         ->values();
 
@@ -51,20 +60,36 @@ Route::get('/halls', function () {
         'appName' => config('app.name'),
         'halls' => $halls,
         'activeType' => null,
+        'activeTypeSlug' => null,
         'navigation' => [
             'title' => 'Навигация',
             'items' => $navItems,
         ],
     ]);
-})->name('halls');
+})->name('venues');
 
-Route::get('/halls/{type}', function (string $type) {
+Route::get('/venues/{type}', function (string $type) {
+    $venueType = VenueType::query()
+        ->where('alias', $type)
+        ->first();
+
+    if (!$venueType) {
+        $singular = Str::singular($type);
+        $venueType = VenueType::query()
+            ->where('alias', $singular)
+            ->first();
+    }
+
+    if (!$venueType) {
+        abort(404);
+    }
+
     $navItems = VenueType::query()
         ->orderBy('name')
         ->get(['name', 'alias'])
         ->map(fn (VenueType $typeItem) => [
             'label' => $typeItem->name,
-            'href' => '/halls/' . $typeItem->alias,
+            'href' => '/venues/' . Str::plural($typeItem->alias),
         ])
         ->values();
 
@@ -85,13 +110,14 @@ Route::get('/halls/{type}', function (string $type) {
     return Inertia::render('Halls', [
         'appName' => config('app.name'),
         'halls' => $halls,
-        'activeType' => $type,
+        'activeType' => $venueType->alias,
+        'activeTypeSlug' => Str::plural($venueType->alias),
         'navigation' => [
             'title' => 'Навигация',
             'items' => $navItems,
         ],
     ]);
-})->name('halls.type');
+})->name('venues.type');
 
 Route::get('/login', function () {
     return redirect('/')->withErrors([
