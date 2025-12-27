@@ -9,6 +9,7 @@ use App\Domain\Users\Services\ContactVerificationService;
 use App\Domain\Users\Services\RegisterUserService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
+use App\Domain\Venues\Services\VenueCatalogService;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -25,34 +26,15 @@ Route::get('/', function () {
 });
 
 Route::get('/venues', function () {
-    $navItems = VenueType::query()
-        ->orderBy('name')
-        ->get(['name', 'plural_name', 'alias'])
-        ->map(fn (VenueType $type) => [
-            'label' => $type->plural_name ?: $type->name,
-            'href' => '/venues/' . Str::plural($type->alias),
-        ])
-        ->values();
-
-    $halls = Venue::query()
-        ->with(['venueType:id,name,alias'])
-        ->orderBy('name')
-        ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
-        ->map(fn (Venue $venue) => [
-            'id' => $venue->id,
-            'name' => $venue->name,
-            'alias' => $venue->alias,
-            'address' => $venue->address,
-            'created_at' => $venue->created_at?->toISOString(),
-            'type' => $venue->venueType?->only(['id', 'name', 'alias']),
-        ])
-        ->values();
+    $catalog = app(VenueCatalogService::class);
+    $navItems = $catalog->getNavigationItems();
+    $catalogData = $catalog->getHallsList();
 
     return Inertia::render('Halls', [
         'appName' => config('app.name'),
-        'halls' => $halls,
-        'activeType' => null,
-        'activeTypeSlug' => null,
+        'halls' => $catalogData['halls'],
+        'activeType' => $catalogData['activeType'],
+        'activeTypeSlug' => $catalogData['activeTypeSlug'],
         'navigation' => [
             'title' => 'Площадки',
             'items' => $navItems,
@@ -61,49 +43,19 @@ Route::get('/venues', function () {
 })->name('venues');
 
 Route::get('/venues/{type}', function (string $type) {
-    $venueType = VenueType::query()
-        ->where('alias', $type)
-        ->first();
+    $catalog = app(VenueCatalogService::class);
+    $navItems = $catalog->getNavigationItems();
+    $catalogData = $catalog->getHallsList($type);
 
-    if (!$venueType) {
-        $singular = Str::singular($type);
-        $venueType = VenueType::query()
-            ->where('alias', $singular)
-            ->first();
-    }
-
-    if (!$venueType) {
+    if (!$catalogData) {
         abort(404);
     }
 
-    $navItems = VenueType::query()
-        ->orderBy('name')
-        ->get(['name', 'plural_name', 'alias'])
-        ->map(fn (VenueType $typeItem) => [
-            'label' => $typeItem->plural_name ?: $typeItem->name,
-            'href' => '/venues/' . Str::plural($typeItem->alias),
-        ])
-        ->values();
-
-    $halls = Venue::query()
-        ->with(['venueType:id,name,alias'])
-        ->orderBy('name')
-        ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
-        ->map(fn (Venue $venue) => [
-            'id' => $venue->id,
-            'name' => $venue->name,
-            'alias' => $venue->alias,
-            'address' => $venue->address,
-            'created_at' => $venue->created_at?->toISOString(),
-            'type' => $venue->venueType?->only(['id', 'name', 'alias']),
-        ])
-        ->values();
-
     return Inertia::render('Halls', [
         'appName' => config('app.name'),
-        'halls' => $halls,
-        'activeType' => $venueType->alias,
-        'activeTypeSlug' => Str::plural($venueType->alias),
+        'halls' => $catalogData['halls'],
+        'activeType' => $catalogData['activeType'],
+        'activeTypeSlug' => $catalogData['activeTypeSlug'],
         'navigation' => [
             'title' => 'Навигация',
             'items' => $navItems,
