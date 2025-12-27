@@ -114,7 +114,12 @@ const submitRegister = () => {
                 </button>
             </div>
 
-            <form v-if="mode === 'login'" class="mt-6 space-y-4" @submit.prevent="submitLogin">
+            <form
+                v-if="mode === 'login'"
+                class="mt-6 space-y-4"
+                :class="{ loading: loginForm.processing }"
+                @submit.prevent="submitLogin"
+            >
                 <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Логин</label>
                     <input
@@ -153,7 +158,12 @@ const submitRegister = () => {
                 </button>
             </form>
 
-            <form v-else class="mt-6 space-y-4" @submit.prevent="submitRegister">
+            <form
+                v-else
+                class="mt-6 space-y-4"
+                :class="{ loading: registerForm.processing }"
+                @submit.prevent="submitRegister"
+            >
                 <p class="text-xs text-slate-500">Поля со * обязательные.</p>
                 <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Логин *</label>

@@ -34,6 +34,7 @@ const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const showAuthModal = ref(false);
 const authMode = ref('login');
+const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
 
 watch(
     () => page.props.errors,
@@ -181,8 +182,9 @@ watch(
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
+            <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
                 <MainSidebar
+                    v-if="hasSidebar"
                     :title="navigation.title"
                     :items="navigation.items"
                     :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"

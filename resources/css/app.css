@@ -32,6 +32,19 @@
     }
 }
 
+@layer base {
+    button {
+        cursor: pointer;
+    }
+}
+
+@layer utilities {
+    .loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';

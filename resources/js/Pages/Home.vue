@@ -22,6 +22,7 @@ const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const showAuthModal = ref(false);
 const authMode = ref('login');
+const hasSidebar = computed(() => false);
 
 watch(
     () => page.props.errors,
@@ -55,8 +56,8 @@ watch(
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <section class="grid gap-6 lg:grid-cols-[240px_1fr]">
-                <MainSidebar />
+            <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+                <MainSidebar v-if="hasSidebar" />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
