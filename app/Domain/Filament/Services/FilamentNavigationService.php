@@ -15,6 +15,10 @@ class FilamentNavigationService
                 'label' => 'Пользователи',
                 'href' => '/filament/users-moderation',
             ];
+            $moderationItems[] = [
+                'label' => 'Площадки',
+                'href' => '/filament/venues-moderation',
+            ];
         }
 
         if ($moderationItems !== []) {
