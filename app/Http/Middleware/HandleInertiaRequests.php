@@ -48,6 +48,7 @@ class HandleInertiaRequests extends Middleware
                     ? [
                         'id' => $user->id,
                         'login' => $user->login,
+                        'status' => $user->status?->value,
                         'roles' => $userRoles,
                         'role_level' => $userRoleLevel,
                     ]

@@ -4,6 +4,7 @@ namespace App\Domain\Venues\Services;
 
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
+use App\Domain\Venues\Enums\VenueStatus;
 use App\Support\DateFormatter;
 use Illuminate\Support\Str;
 
@@ -17,6 +18,20 @@ class VenueCatalogService
             ->map(fn (VenueType $type) => [
                 'label' => $type->plural_name ?: $type->name,
                 'href' => '/venues/' . Str::plural($type->alias),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function getTypeOptions(): array
+    {
+        return VenueType::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'alias'])
+            ->map(fn (VenueType $type) => [
+                'id' => $type->id,
+                'name' => $type->name,
+                'alias' => $type->alias,
             ])
             ->values()
             ->all();
@@ -68,6 +83,7 @@ class VenueCatalogService
     {
         return Venue::query()
             ->with(['venueType:id,name,alias'])
+            ->where('status', VenueStatus::Confirmed->value)
             ->orderBy('name')
             ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
             ->map(fn (Venue $venue) => [

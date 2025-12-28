@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -27,11 +27,16 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    types: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
 const showAuthModal = ref(false);
 const authMode = ref('login');
 const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
@@ -61,6 +66,14 @@ const groupByType = ref(false);
 const pageIndex = ref(1);
 const perPage = 6;
 
+const createOpen = ref(false);
+const createNotice = ref('');
+const createForm = useForm({
+    name: '',
+    address: '',
+    venue_type_id: '',
+});
+
 const metroOptions = [
     '',
     'Тверская',
@@ -77,6 +90,16 @@ const typeOptions = computed(() => {
         }
     });
     return Array.from(map.entries()).map(([alias, name]) => ({ alias, name }));
+});
+
+const availableTypes = computed(() => props.types ?? []);
+const activeTypeOption = computed(() => availableTypes.value.find((type) => type.alias === props.activeType) ?? null);
+const addButtonLabel = computed(() => {
+    if (!activeTypeOption.value) {
+        return 'Добавить площадку';
+    }
+
+    return `Добавить ${activeTypeOption.value.name?.toLowerCase()}`;
 });
 
 const normalized = (value) => (value ?? '').toString().toLowerCase();
@@ -164,9 +187,38 @@ watch(
     () => props.activeType,
     (value) => {
         typeFilter.value = value || '';
+        if (activeTypeOption.value) {
+            createForm.venue_type_id = activeTypeOption.value.id;
+        }
     },
     { immediate: true }
 );
+
+const openCreate = () => {
+    createNotice.value = '';
+    createForm.clearErrors();
+    createForm.name = '';
+    createForm.address = '';
+    createForm.venue_type_id = activeTypeOption.value?.id ?? '';
+    createOpen.value = true;
+};
+
+const closeCreate = () => {
+    createOpen.value = false;
+    createForm.reset('name', 'address', 'venue_type_id');
+    createForm.clearErrors();
+};
+
+const submitCreate = () => {
+    createNotice.value = '';
+    createForm.post('/venues', {
+        preserveScroll: true,
+        onSuccess: () => {
+            createNotice.value = 'Площадка создана.';
+            closeCreate();
+        },
+    });
+};
 </script>
 
 <template>
@@ -199,6 +251,14 @@ watch(
                                 Выберите тип площадки, адрес или метро, чтобы быстро найти подходящее место.
                             </p>
                         </div>
+                        <button
+                            v-if="isUserConfirmed"
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="button"
+                            @click="openCreate"
+                        >
+                            {{ addButtonLabel }}
+                        </button>
                     </div>
 
                     <div class="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -328,6 +388,84 @@ watch(
             :initial-mode="authMode"
             @close="showAuthModal = false"
         />
+
+        <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-slate-900">Новая площадка</h2>
+                <p class="mt-2 text-sm text-slate-600">Заполните обязательные поля для создания площадки.</p>
+
+                <div class="mt-4 flex flex-col gap-3">
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Тип
+                        <select
+                            v-model="createForm.venue_type_id"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            :disabled="Boolean(activeTypeOption)"
+                        >
+                            <option value="">Выберите тип</option>
+                            <option v-for="type in availableTypes" :key="type.id" :value="type.id">
+                                {{ type.name }}
+                            </option>
+                        </select>
+                        <input v-if="activeTypeOption" type="hidden" :value="activeTypeOption.id" />
+                    </label>
+                    <div v-if="createForm.errors.venue_type_id" class="text-xs text-rose-700">
+                        {{ createForm.errors.venue_type_id }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Название
+                        <input
+                            v-model="createForm.name"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                            placeholder="Например, Арена 11"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.name" class="text-xs text-rose-700">
+                        {{ createForm.errors.name }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Адрес
+                        <input
+                            v-model="createForm.address"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                            placeholder="Адрес площадки"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.address" class="text-xs text-rose-700">
+                        {{ createForm.errors.address }}
+                    </div>
+                </div>
+
+                <div v-if="createForm.errors.venue" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                    {{ createForm.errors.venue }}
+                </div>
+                <div v-else-if="createNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {{ createNotice }}
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="createForm.processing"
+                        @click="closeCreate"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        type="button"
+                        :disabled="createForm.processing"
+                        @click="submitCreate"
+                    >
+                        Создать
+                    </button>
+                </div>
+            </div>
+        </div>
     </main>
 </template>
-

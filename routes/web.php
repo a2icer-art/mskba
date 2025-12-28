@@ -42,6 +42,11 @@ Route::middleware('auth')->prefix('account')->group(function () {
 
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
+    Route::get('/view/{venue}', [VenuesController::class, 'show'])->name('venues.show');
+    Route::post('/', [VenuesController::class, 'store'])->middleware('auth')->name('venues.store');
+    Route::post('/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
+        ->middleware('auth')
+        ->name('venues.moderation.request');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
 
