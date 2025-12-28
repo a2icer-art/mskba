@@ -5,6 +5,7 @@ namespace App\Domain\Moderation\Models;
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
+use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -51,5 +52,10 @@ class ModerationRequest extends Model
     public function entityUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'entity_id');
+    }
+
+    public function entityVenue(): BelongsTo
+    {
+        return $this->belongsTo(Venue::class, 'entity_id');
     }
 }

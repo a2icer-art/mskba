@@ -6,6 +6,7 @@ use App\Domain\Moderation\Contracts\ModerationRulesContract;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Rules\EmptyModerationRules;
 use App\Domain\Moderation\Rules\UserModerationRules;
+use App\Domain\Moderation\Rules\VenueModerationRules;
 
 class ModerationRulesFactory
 {
@@ -13,6 +14,7 @@ class ModerationRulesFactory
     {
         return match ($entityType) {
             ModerationEntityType::User => app(UserModerationRules::class),
+            ModerationEntityType::Venue => app(VenueModerationRules::class),
             default => app(EmptyModerationRules::class),
         };
     }

@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FilamentController;
 use App\Http\Controllers\FilamentUsersModerationController;
+use App\Http\Controllers\FilamentVenuesModerationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Support\Facades\Route;
@@ -56,4 +57,10 @@ Route::middleware('auth')->prefix('filament')->group(function () {
         ->name('filament.users.moderation.block');
     Route::post('/users-moderation/{moderationRequest}/unblock', [FilamentUsersModerationController::class, 'unblock'])
         ->name('filament.users.moderation.unblock');
+    Route::get('/venues-moderation', [FilamentVenuesModerationController::class, 'index'])
+        ->name('filament.venues.moderation');
+    Route::post('/venues-moderation/{moderationRequest}/approve', [FilamentVenuesModerationController::class, 'approve'])
+        ->name('filament.venues.moderation.approve');
+    Route::post('/venues-moderation/{moderationRequest}/reject', [FilamentVenuesModerationController::class, 'reject'])
+        ->name('filament.venues.moderation.reject');
 });
