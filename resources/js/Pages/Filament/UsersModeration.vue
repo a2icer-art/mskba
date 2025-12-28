@@ -57,6 +57,8 @@ const approveOpen = ref(false);
 const approveTarget = ref(null);
 const blockOpen = ref(false);
 const blockTarget = ref(null);
+const viewOpen = ref(false);
+const viewTarget = ref(null);
 const page = usePage();
 
 const statusLabelMap = {
@@ -181,6 +183,16 @@ const submitBlock = () => {
 
     blockUser(blockTarget.value);
     closeBlock();
+};
+
+const openView = (requestItem) => {
+    viewTarget.value = requestItem;
+    viewOpen.value = true;
+};
+
+const closeView = () => {
+    viewOpen.value = false;
+    viewTarget.value = null;
 };
 
 const openApprove = (requestItem) => {
@@ -316,7 +328,15 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         </div>
 
                         <div v-for="requestItem in requests.data" :key="requestItem.id" class="grid grid-cols-[120px_140px_200px_70px_140px_140px_100px_140px_180px_160px_160px_160px] gap-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700 whitespace-nowrap">
-                            <div>{{ requestItem.user?.login || '—' }}</div>
+                            <div>
+                                <button
+                                    class="text-left text-sm font-medium text-slate-800 transition hover:text-slate-700"
+                                    type="button"
+                                    @click="openView(requestItem)"
+                                >
+                                    {{ requestItem.user?.login || '—' }}
+                                </button>
+                            </div>
                             <div>
                                 <span
                                     class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600"
@@ -350,7 +370,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                                     Отклонить
                                 </button>
                                 <button
-                                    v-if="requestItem.user?.status === 'confirmed'"
+                                    v-if="requestItem.status === 'approved' && requestItem.user?.status === 'confirmed'"
                                     class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
                                     type="button"
                                     :disabled="blockForm.processing"
@@ -359,7 +379,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                                     Заблокировать
                                 </button>
                                 <button
-                                    v-if="requestItem.user?.status === 'blocked'"
+                                    v-if="requestItem.status === 'approved' && requestItem.user?.status === 'blocked'"
                                     class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
                                     type="button"
                                     :disabled="unblockForm.processing"
@@ -545,6 +565,57 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                 </div>
             </div>
         </div>
+
+        <div v-if="viewOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-slate-900">Данные пользователя</h2>
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                        <span class="font-semibold">{{ viewTarget?.user?.login || '—' }}</span>
+                    </div>
+                    <div class="mt-3 grid gap-2 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
+                            <span>{{ viewTarget?.profile?.last_name || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
+                            <span>{{ viewTarget?.profile?.first_name || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
+                            <span>{{ viewTarget?.profile?.gender || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
+                            <span>{{ viewTarget?.profile?.birth_date || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
+                            <span class="flex items-center gap-2">
+                                {{ viewTarget?.contact?.value || '—' }}
+                                <span
+                                    v-if="viewTarget?.contact?.confirmed_at"
+                                    class="text-emerald-600"
+                                    :title="formatDate(viewTarget?.contact?.confirmed_at)"
+                                >
+                                    ✓
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeView"
+                    >
+                        Закрыть
+                    </button>
+                </div>
+            </div>
+        </div>
     </main>
 </template>
-

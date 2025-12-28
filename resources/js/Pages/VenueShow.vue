@@ -57,7 +57,7 @@ const submitModerationRequest = () => {
     moderationNotice.value = '';
     moderationErrors.value = [];
 
-    moderationForm.post(`/venues/${props.venue?.id}/moderation-request`, {
+    moderationForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/moderation-request`, {
         preserveScroll: true,
         onSuccess: () => {
             moderationNotice.value = 'Заявка отправлена на модерацию.';
@@ -116,6 +116,12 @@ const submitModerationRequest = () => {
                                     Подтверждено
                                 </span>
                                 <span
+                                    v-else-if="venue?.status === 'blocked'"
+                                    class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700"
+                                >
+                                    Заблокировано
+                                </span>
+                                <span
                                     v-else-if="isModerationPending"
                                     class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
                                     :title="formatDate(moderationRequest?.submitted_at)"
@@ -130,7 +136,7 @@ const submitModerationRequest = () => {
                                     Отклонено
                                 </span>
                                 <button
-                                    v-if="isModerationRejected && canResubmitModeration && venue?.status !== 'confirmed'"
+                                    v-if="isModerationRejected && canResubmitModeration && venue?.status === 'unconfirmed'"
                                     class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                     type="button"
                                     :disabled="moderationForm.processing"
@@ -139,7 +145,7 @@ const submitModerationRequest = () => {
                                     Отправить повторно
                                 </button>
                                 <button
-                                    v-else-if="!isModerationPending && !isModerationRejected && venue?.status !== 'confirmed'"
+                                    v-else-if="!isModerationPending && !isModerationRejected && venue?.status === 'unconfirmed'"
                                     class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                     type="button"
                                     :disabled="moderationForm.processing"
@@ -161,6 +167,9 @@ const submitModerationRequest = () => {
                             </div>
                             <div v-else-if="isModerationRejected" class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                                 Причина отклонения пока не указана. Повторная отправка станет доступна после комментария модератора.
+                            </div>
+                            <div v-else-if="venue?.status === 'blocked'" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                {{ venue?.block_reason || 'Причина блокировки не определена.' }}
                             </div>
                             <div v-else-if="moderationNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                 {{ moderationNotice }}

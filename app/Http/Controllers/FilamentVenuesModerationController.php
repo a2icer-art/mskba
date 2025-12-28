@@ -202,6 +202,74 @@ class FilamentVenuesModerationController extends Controller
         return back();
     }
 
+    public function block(Request $request, ModerationRequest $moderationRequest)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::Venue) {
+            abort(404);
+        }
+
+        $venue = $moderationRequest->entityVenue;
+        if (!$venue) {
+            return back()->withErrors(['moderation' => 'Площадка не найдена.']);
+        }
+
+        if ($venue->status?->value !== VenueStatus::Confirmed->value) {
+            return back()->withErrors(['moderation' => 'Блокировать можно только подтвержденную площадку.']);
+        }
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $venue->update([
+            'status' => VenueStatus::Blocked,
+            'blocked_at' => now(),
+            'blocked_by' => $request->user()?->id,
+            'block_reason' => $data['reason'] ?? null,
+        ]);
+
+        return back();
+    }
+
+    public function unblock(Request $request, ModerationRequest $moderationRequest)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::Venue) {
+            abort(404);
+        }
+
+        $venue = $moderationRequest->entityVenue;
+        if (!$venue) {
+            return back()->withErrors(['moderation' => 'Площадка не найдена.']);
+        }
+
+        if ($venue->status?->value !== VenueStatus::Blocked->value) {
+            return back()->withErrors(['moderation' => 'Площадка не заблокирована.']);
+        }
+
+        $venue->update([
+            'status' => VenueStatus::Confirmed,
+            'blocked_at' => null,
+            'blocked_by' => null,
+            'block_reason' => null,
+        ]);
+
+        return back();
+    }
+
     private function getRoleLevel(Request $request): int
     {
         $user = $request->user();

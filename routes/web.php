@@ -42,9 +42,9 @@ Route::middleware('auth')->prefix('account')->group(function () {
 
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
-    Route::get('/view/{venue}', [VenuesController::class, 'show'])->name('venues.show');
+    Route::get('/{type}/{venue}', [VenuesController::class, 'show'])->name('venues.show');
     Route::post('/', [VenuesController::class, 'store'])->middleware('auth')->name('venues.store');
-    Route::post('/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
+    Route::post('/{type}/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
         ->middleware('auth')
         ->name('venues.moderation.request');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
@@ -68,4 +68,8 @@ Route::middleware('auth')->prefix('filament')->group(function () {
         ->name('filament.venues.moderation.approve');
     Route::post('/venues-moderation/{moderationRequest}/reject', [FilamentVenuesModerationController::class, 'reject'])
         ->name('filament.venues.moderation.reject');
+    Route::post('/venues-moderation/{moderationRequest}/block', [FilamentVenuesModerationController::class, 'block'])
+        ->name('filament.venues.moderation.block');
+    Route::post('/venues-moderation/{moderationRequest}/unblock', [FilamentVenuesModerationController::class, 'unblock'])
+        ->name('filament.venues.moderation.unblock');
 });

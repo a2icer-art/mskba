@@ -7,4 +7,5 @@ enum VenueStatus: string
     case Unconfirmed = 'unconfirmed';
     case Moderation = 'moderation';
     case Confirmed = 'confirmed';
+    case Blocked = 'blocked';
 }

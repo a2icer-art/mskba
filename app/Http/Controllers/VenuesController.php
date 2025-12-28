@@ -18,10 +18,13 @@ class VenuesController extends Controller
 {
     public function index()
     {
+        $user = request()->user();
+        $roleLevel = $user ? (int) $user->roles()->max('level') : 0;
+
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
         $types = $catalog->getTypeOptions();
-        $catalogData = $catalog->getHallsList();
+        $catalogData = $catalog->getHallsList(null, $user?->id, $roleLevel);
 
         return Inertia::render('Halls', [
             'appName' => config('app.name'),
@@ -38,10 +41,13 @@ class VenuesController extends Controller
 
     public function type(string $type)
     {
+        $user = request()->user();
+        $roleLevel = $user ? (int) $user->roles()->max('level') : 0;
+
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
         $types = $catalog->getTypeOptions();
-        $catalogData = $catalog->getHallsList($type);
+        $catalogData = $catalog->getHallsList($type, $user?->id, $roleLevel);
 
         if (!$catalogData) {
             abort(404);
@@ -60,7 +66,7 @@ class VenuesController extends Controller
         ]);
     }
 
-    public function show(Venue $venue)
+    public function show(string $type, Venue $venue)
     {
         $venue->load(['venueType:id,name,alias', 'creator:id,login']);
 
@@ -83,6 +89,7 @@ class VenuesController extends Controller
                 'address' => $venue->address,
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'confirmed_at' => DateFormatter::dateTime($venue->confirmed_at),
+                'block_reason' => $venue->block_reason,
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
                 'creator' => $venue->creator?->only(['id', 'login']),
             ],
@@ -98,7 +105,7 @@ class VenuesController extends Controller
                 'title' => 'Площадки',
                 'items' => $navItems,
             ],
-            'activeTypeSlug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : '',
+            'activeTypeSlug' => $type,
         ]);
     }
 
@@ -115,21 +122,24 @@ class VenuesController extends Controller
             'venue_type_id' => ['required', 'integer', 'exists:venue_types,id'],
         ]);
 
-        $alias = $this->generateAlias($data['name']);
-
         $venue = Venue::query()->create([
             'name' => $data['name'],
-            'alias' => $alias,
+            'alias' => $this->generateUniqueAlias($data['name']),
             'status' => VenueStatus::Unconfirmed,
             'created_by' => $user->id,
             'venue_type_id' => $data['venue_type_id'],
             'address' => $data['address'],
         ]);
 
-        return redirect()->route('venues.show', $venue);
+        $typeSlug = $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : '';
+
+        return redirect()->route('venues.show', [
+            'type' => $typeSlug,
+            'venue' => $venue,
+        ]);
     }
 
-    public function submitModerationRequest(Request $request, Venue $venue, SubmitModerationRequest $useCase)
+    public function submitModerationRequest(Request $request, string $type, Venue $venue, SubmitModerationRequest $useCase)
     {
         $user = $request->user();
         if (!$user || $user->status !== UserStatus::Confirmed) {
@@ -151,14 +161,20 @@ class VenuesController extends Controller
         return back();
     }
 
-    private function generateAlias(string $name): string
+    private function generateAliasBase(string $name): string
     {
         $base = Str::slug($name);
-        $alias = $base ?: 'venue';
-        $counter = 1;
+        return $base ?: 'venue';
+    }
+
+    private function generateUniqueAlias(string $name): string
+    {
+        $base = $this->generateAliasBase($name);
+        $alias = $base;
+        $counter = 2;
 
         while (Venue::query()->where('alias', $alias)->exists()) {
-            $alias = $base ? $base . '-' . $counter : 'venue-' . $counter;
+            $alias = $base . '-' . $counter;
             $counter++;
         }
 

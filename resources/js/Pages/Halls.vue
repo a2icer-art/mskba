@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -59,6 +59,7 @@ watch(
 );
 
 const typeFilter = ref('');
+const statusFilter = ref('');
 const addressFilter = ref('');
 const metroFilter = ref('');
 const sortBy = ref('name_asc');
@@ -92,6 +93,14 @@ const typeOptions = computed(() => {
     return Array.from(map.entries()).map(([alias, name]) => ({ alias, name }));
 });
 
+const statusOptions = [
+    { value: '', label: 'Все статусы' },
+    { value: 'confirmed', label: 'Подтвержденные' },
+    { value: 'moderation', label: 'На модерации' },
+    { value: 'unconfirmed', label: 'Неподтвержденные' },
+    { value: 'blocked', label: 'Заблокированные' },
+];
+
 const availableTypes = computed(() => props.types ?? []);
 const activeTypeOption = computed(() => availableTypes.value.find((type) => type.alias === props.activeType) ?? null);
 const addButtonLabel = computed(() => {
@@ -110,6 +119,10 @@ const filtered = computed(() => {
 
     return props.halls.filter((hall) => {
         if (typeFilter.value && hall.type?.alias !== typeFilter.value) {
+            return false;
+        }
+
+        if (statusFilter.value && hall.status !== statusFilter.value) {
             return false;
         }
 
@@ -151,7 +164,7 @@ const sorted = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / perPage)));
 
-watch([typeFilter, addressFilter, metroFilter, sortBy, groupByType], () => {
+watch([typeFilter, statusFilter, addressFilter, metroFilter, sortBy, groupByType], () => {
     pageIndex.value = 1;
 });
 
@@ -273,6 +286,15 @@ const submitCreate = () => {
                         </label>
 
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Статус
+                            <select v-model="statusFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                <option v-for="status in statusOptions" :key="status.value" :value="status.value">
+                                    {{ status.label }}
+                                </option>
+                            </select>
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                             Адрес
                             <input
                                 v-model="addressFilter"
@@ -320,7 +342,16 @@ const submitCreate = () => {
                             >
                                 <div class="flex flex-wrap items-start justify-between gap-4">
                                     <div>
-                                        <h3 class="text-lg font-semibold text-slate-900">{{ hall.name }}</h3>
+                                        <h3 class="text-lg font-semibold text-slate-900">
+                                            <Link
+                                                v-if="hall.type_slug"
+                                                class="transition hover:text-slate-700"
+                                                :href="`/venues/${hall.type_slug}/${hall.alias}`"
+                                            >
+                                                {{ hall.name }}
+                                            </Link>
+                                            <span v-else>{{ hall.name }}</span>
+                                        </h3>
                                         <p class="mt-1 text-sm text-slate-600">
                                             {{ hall.type?.name || 'Тип не указан' }}
                                         </p>
@@ -328,9 +359,27 @@ const submitCreate = () => {
                                             {{ hall.address }}
                                         </p>
                                     </div>
-                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-medium uppercase text-slate-500">
-                                        {{ hall.alias }}
+                                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
+                                        <span
+                                            class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5"
+                                            :class="{
+                                                'border-emerald-200 bg-emerald-50 text-emerald-700': hall.status === 'confirmed',
+                                                'border-amber-200 bg-amber-50 text-amber-800': hall.status === 'moderation',
+                                                'border-rose-200 bg-rose-50 text-rose-700': hall.status === 'unconfirmed',
+                                                'border-rose-300 bg-rose-50 text-rose-700': hall.status === 'blocked',
+                                            }"
+                                        >
+                                        {{
+                                            hall.status === 'confirmed'
+                                                ? 'Подтвержден'
+                                                : hall.status === 'moderation'
+                                                    ? 'На модерации'
+                                                    : hall.status === 'blocked'
+                                                        ? 'Заблокирован'
+                                                        : 'Не подтвержден'
+                                        }}
                                     </span>
+                                    </div>
                                 </div>
                             </article>
                         </div>

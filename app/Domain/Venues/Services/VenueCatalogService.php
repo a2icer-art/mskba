@@ -37,11 +37,11 @@ class VenueCatalogService
             ->all();
     }
 
-    public function getHallsList(?string $typeSlug = null): ?array
+    public function getHallsList(?string $typeSlug = null, ?int $userId = null, int $roleLevel = 0): ?array
     {
         if (!$typeSlug) {
             return [
-                'halls' => $this->getHalls(),
+                'halls' => $this->getHalls($userId, $roleLevel),
                 'activeType' => null,
                 'activeTypeSlug' => null,
             ];
@@ -53,7 +53,7 @@ class VenueCatalogService
         }
 
         return [
-            'halls' => $this->getHalls(),
+            'halls' => $this->getHalls($userId, $roleLevel),
             'activeType' => $venueType->alias,
             'activeTypeSlug' => Str::plural($venueType->alias),
         ];
@@ -79,20 +79,32 @@ class VenueCatalogService
             ->first();
     }
 
-    private function getHalls(): array
+    private function getHalls(?int $userId, int $roleLevel): array
     {
-        return Venue::query()
+        $query = Venue::query()
             ->with(['venueType:id,name,alias'])
-            ->where('status', VenueStatus::Confirmed->value)
-            ->orderBy('name')
-            ->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at'])
+            ->orderBy('name');
+
+        if ($roleLevel <= 20) {
+            $query->where(function ($builder) use ($userId) {
+                $builder->where('status', VenueStatus::Confirmed->value);
+
+                if ($userId) {
+                    $builder->orWhere('created_by', $userId);
+                }
+            });
+        }
+
+        return $query->get(['id', 'name', 'alias', 'venue_type_id', 'address', 'created_at', 'status', 'created_by'])
             ->map(fn (Venue $venue) => [
                 'id' => $venue->id,
                 'name' => $venue->name,
                 'alias' => $venue->alias,
+                'status' => $venue->status?->value,
                 'address' => $venue->address,
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
+                'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,
             ])
             ->values()
             ->all();

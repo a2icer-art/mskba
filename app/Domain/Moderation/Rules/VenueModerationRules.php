@@ -33,6 +33,10 @@ class VenueModerationRules implements ModerationRulesContract
             $missing[] = 'Не указан адрес площадки.';
         }
 
+        if ($entity->status?->value === 'blocked') {
+            $missing[] = 'Площадка заблокирована.';
+        }
+
         return $missing;
     }
 }

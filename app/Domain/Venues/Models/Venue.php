@@ -27,6 +27,9 @@ class Venue extends Model
         'venue_type_id',
         'address',
         'address_id',
+        'blocked_at',
+        'blocked_by',
+        'block_reason',
         'deleted_by',
     ];
 
@@ -35,6 +38,7 @@ class Venue extends Model
         return [
             'status' => VenueStatus::class,
             'confirmed_at' => 'datetime',
+            'blocked_at' => 'datetime',
         ];
     }
 
@@ -61,5 +65,15 @@ class Venue extends Model
     public function deleter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    public function blocker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'blocked_by');
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'alias';
     }
 }
