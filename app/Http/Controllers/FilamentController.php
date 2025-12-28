@@ -14,7 +14,7 @@ class FilamentController extends Controller
         $this->ensureAccess($roleLevel, 10);
 
         $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuItems($roleLevel);
+        $items = $navigation->getMenuGroups($roleLevel);
 
         return Inertia::render('Filament/Index', [
             'appName' => config('app.name'),

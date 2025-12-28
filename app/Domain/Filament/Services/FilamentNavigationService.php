@@ -4,15 +4,44 @@ namespace App\Domain\Filament\Services;
 
 class FilamentNavigationService
 {
+    public function getMenuGroups(int $roleLevel): array
+    {
+        $groups = [];
+        $moderationItems = [];
+        $contentItems = [];
+
+        if ($roleLevel > 20) {
+            $moderationItems[] = [
+                'label' => 'Пользователи',
+                'href' => '/filament/users-moderation',
+            ];
+        }
+
+        if ($moderationItems !== []) {
+            $groups[] = [
+                'title' => 'Модерация',
+                'items' => $moderationItems,
+            ];
+        }
+
+        if ($contentItems !== []) {
+            $groups[] = [
+                'title' => 'Контент',
+                'items' => $contentItems,
+            ];
+        }
+
+        return $groups;
+    }
+
     public function getMenuItems(int $roleLevel): array
     {
         $items = [];
 
-        if ($roleLevel > 20) {
-            $items[] = [
-                'label' => 'Модерация пользователей',
-                'href' => '/filament/users-moderation',
-            ];
+        foreach ($this->getMenuGroups($roleLevel) as $group) {
+            foreach ($group['items'] as $item) {
+                $items[] = $item;
+            }
         }
 
         return $items;

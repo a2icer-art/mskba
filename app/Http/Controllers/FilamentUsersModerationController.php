@@ -23,7 +23,7 @@ class FilamentUsersModerationController extends Controller
         }
 
         $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuItems($roleLevel);
+        $items = $navigation->getMenuGroups($roleLevel);
 
         $status = $request->string('status')->toString();
         $sort = $request->string('sort', 'submitted_at_desc')->toString();
