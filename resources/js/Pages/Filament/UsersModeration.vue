@@ -434,6 +434,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 
         <div v-if="rejectOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: rejectForm.processing }" @submit.prevent="submitReject">
                 <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
                 <p class="mt-2 text-sm text-slate-600">
                     Вы можете указать причину отклонения. Она будет показана пользователю.
@@ -457,18 +458,19 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                     </button>
                     <button
                         class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="button"
+                        type="submit"
                         :disabled="rejectForm.processing"
-                        @click="submitReject"
                     >
                         Отклонить
                     </button>
                 </div>
+                </form>
             </div>
         </div>
 
         <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
                 <h2 class="text-lg font-semibold text-slate-900">Подтвердить пользователя</h2>
                 <p class="mt-2 text-sm text-slate-600">
                     Пользователь будет подтвержден, а заявка переведена в статус "Подтверждено".
@@ -521,18 +523,19 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                     </button>
                     <button
                         class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                        type="button"
+                        type="submit"
                         :disabled="approveForm.processing"
-                        @click="submitApprove"
                     >
                         Подтвердить
                     </button>
                 </div>
+                </form>
             </div>
         </div>
 
         <div v-if="blockOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: blockForm.processing }" @submit.prevent="submitBlock">
                 <h2 class="text-lg font-semibold text-slate-900">Заблокировать пользователя</h2>
                 <p class="mt-2 text-sm text-slate-600">
                     Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с пользователем.
@@ -556,13 +559,13 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                     </button>
                     <button
                         class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="button"
+                        type="submit"
                         :disabled="blockForm.processing"
-                        @click="submitBlock"
                     >
                         Заблокировать
                     </button>
                 </div>
+                </form>
             </div>
         </div>
 

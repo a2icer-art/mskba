@@ -9,8 +9,10 @@ use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueCatalogService;
+use App\Domain\Venues\Services\VenueUpdateService;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -68,10 +70,16 @@ class VenuesController extends Controller
 
     public function show(string $type, Venue $venue)
     {
+        $user = request()->user();
         $venue->load(['venueType:id,name,alias', 'creator:id,login']);
 
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
+        $types = $catalog->getTypeOptions();
+
+        $updateService = app(VenueUpdateService::class);
+        $isOwner = $user && $venue->created_by === $user->id;
+        $editableFields = $isOwner ? $updateService->getEditableFields($venue) : [];
 
         $latestRequest = ModerationRequest::query()
             ->where('entity_type', ModerationEntityType::Venue->value)
@@ -87,6 +95,8 @@ class VenuesController extends Controller
                 'alias' => $venue->alias,
                 'status' => $venue->status?->value,
                 'address' => $venue->address,
+                'venue_type_id' => $venue->venue_type_id,
+                'commentary' => $venue->commentary,
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'confirmed_at' => DateFormatter::dateTime($venue->confirmed_at),
                 'block_reason' => $venue->block_reason,
@@ -106,6 +116,9 @@ class VenuesController extends Controller
                 'items' => $navItems,
             ],
             'activeTypeSlug' => $type,
+            'types' => $types,
+            'editableFields' => $editableFields,
+            'canEdit' => (bool) $isOwner,
         ]);
     }
 
@@ -157,6 +170,25 @@ class VenuesController extends Controller
         $venue->update([
             'status' => VenueStatus::Moderation,
         ]);
+
+        return back();
+    }
+
+    public function update(Request $request, string $type, Venue $venue, VenueUpdateService $service)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return back()->withErrors(['venue' => 'Необходимо авторизоваться для редактирования.']);
+        }
+
+        $fields = $service->getEditableFields($venue);
+        if ($fields === []) {
+            return back()->withErrors(['venue' => 'Редактирование недоступно для подтвержденной площадки.']);
+        }
+
+        $rules = Arr::only($service->getValidationRules($venue), $fields);
+        $data = validator($request->only($fields), $rules)->validate();
+        $service->updateVenue($user, $venue, $data);
 
         return back();
     }

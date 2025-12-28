@@ -3,6 +3,7 @@
 namespace App\Domain\Moderation\Rules;
 
 use App\Domain\Moderation\Contracts\ModerationRulesContract;
+use App\Domain\Moderation\Requirements\VenueModerationRequirements;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -21,16 +22,18 @@ class VenueModerationRules implements ModerationRulesContract
             $missing[] = 'Запрос может отправить только владелец площадки.';
         }
 
-        if (!$entity->name) {
-            $missing[] = 'Не указано название площадки.';
-        }
+        $labels = [
+            'name' => 'Не указано название площадки.',
+            'venue_type_id' => 'Не указан тип площадки.',
+            'address' => 'Не указан адрес площадки.',
+        ];
 
-        if (!$entity->venue_type_id) {
-            $missing[] = 'Не указан тип площадки.';
-        }
+        foreach (VenueModerationRequirements::REQUIRED_FIELDS as $field) {
+            if ($entity->{$field}) {
+                continue;
+            }
 
-        if (!$entity->address) {
-            $missing[] = 'Не указан адрес площадки.';
+            $missing[] = $labels[$field] ?? 'Не заполнено обязательное поле площадки.';
         }
 
         if ($entity->status?->value === 'blocked') {

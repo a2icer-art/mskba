@@ -266,6 +266,15 @@ const formatCountdown = (seconds) => {
     const remainder = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 };
+const isContactsProcessing = computed(
+    () =>
+        newContactForm.processing ||
+        editEmailForm.processing ||
+        editContactForm.processing ||
+        requestCodeForm.processing ||
+        verifyCodeForm.processing ||
+        actionForm.processing
+);
 const isVerificationLocked = (contactId) => {
     if (!hasAttemptsExceeded(contactId)) {
         return false;
@@ -843,7 +852,11 @@ const logout = () => {
                     </div>
 
                     <div class="mt-6 grid gap-4">
-                        <div v-if="activeTab === 'user'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div
+                            v-if="activeTab === 'user'"
+                            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            :class="{ loading: moderationForm.processing }"
+                        >
                             <div v-for="item in userItems" :key="item.key" class="border-b border-slate-100 last:border-b-0">
                                 <div class="flex items-center justify-between py-3">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
@@ -928,7 +941,11 @@ const logout = () => {
                         </div>
                     </div>
 
-                    <div v-else-if="activeTab === 'contacts'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                    <div
+                        v-else-if="activeTab === 'contacts'"
+                        class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4"
+                        :class="{ loading: isContactsProcessing }"
+                    >
                         <fieldset v-if="emails.length" class="space-y-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
                             <legend class="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Электронная почта</legend>
 
@@ -1263,12 +1280,13 @@ const logout = () => {
 
         <div v-if="profileEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: profileForm.processing }" @submit.prevent="submitProfileUpdate">
                 <h2 class="text-lg font-semibold text-slate-900">Редактирование профиля</h2>
                 <p class="mt-2 text-sm text-slate-600">
                     Заполните доступные поля профиля и сохраните изменения.
                 </p>
                 <p v-if="isProfileConfirmed" class="mt-2 text-xs text-slate-500">
-                    Подтвержденным пользователям доступно редактирование только необязательных полей.
+                    Часть полей недоступна для редактирования так как запись уже подтверждена.
                 </p>
 
                 <div class="mt-4 flex flex-col gap-3">
@@ -1355,19 +1373,19 @@ const logout = () => {
                     </button>
                     <button
                         class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="button"
+                        type="submit"
                         :disabled="profileForm.processing"
-                        @click="submitProfileUpdate"
                     >
                         Сохранить профиль
                     </button>
                 </div>
-
+                </form>
             </div>
         </div>
 
         <div v-if="passwordEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: passwordForm.processing }" @submit.prevent="submitPasswordUpdate">
                 <h2 class="text-lg font-semibold text-slate-900">Изменить пароль</h2>
                 <p class="mt-2 text-sm text-slate-600">Укажите новый пароль для вашей учетной записи.</p>
                 <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
@@ -1398,13 +1416,13 @@ const logout = () => {
                     </button>
                     <button
                         class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="button"
+                        type="submit"
                         :disabled="passwordForm.processing"
-                        @click="submitPasswordUpdate"
                     >
                         Сохранить пароль
                     </button>
                 </div>
+                </form>
             </div>
         </div>
     </main>

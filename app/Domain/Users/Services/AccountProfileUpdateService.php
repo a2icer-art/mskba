@@ -60,6 +60,11 @@ class AccountProfileUpdateService
         ];
     }
 
+    public function getEditableFields(User $user): array
+    {
+        return $this->getAllowedProfileFields($user);
+    }
+
     private function ensureProfileAllowed(User $user, array $data): void
     {
         if ($user->status !== UserStatus::Confirmed) {

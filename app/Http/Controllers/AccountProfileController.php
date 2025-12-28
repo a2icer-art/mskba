@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Users\Services\AccountProfileUpdateService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rules\Password;
 
 class AccountProfileController extends Controller
@@ -12,9 +13,9 @@ class AccountProfileController extends Controller
     {
         $user = $request->user();
 
-        $validated = $request->validate(
-            $service->getProfileValidationRules($user)
-        );
+        $fields = $service->getEditableFields($user);
+        $rules = Arr::only($service->getProfileValidationRules($user), $fields);
+        $validated = validator($request->only($fields), $rules)->validate();
 
         $service->updateProfile($user, $validated);
 

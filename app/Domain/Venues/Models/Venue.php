@@ -27,6 +27,7 @@ class Venue extends Model
         'venue_type_id',
         'address',
         'address_id',
+        'commentary',
         'blocked_at',
         'blocked_by',
         'block_reason',

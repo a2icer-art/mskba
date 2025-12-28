@@ -440,6 +440,7 @@ const submitCreate = () => {
 
         <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: createForm.processing }" @submit.prevent="submitCreate">
                 <h2 class="text-lg font-semibold text-slate-900">Новая площадка</h2>
                 <p class="mt-2 text-sm text-slate-600">Заполните обязательные поля для создания площадки.</p>
 
@@ -507,13 +508,13 @@ const submitCreate = () => {
                     </button>
                     <button
                         class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="button"
+                        type="submit"
                         :disabled="createForm.processing"
-                        @click="submitCreate"
                     >
                         Создать
                     </button>
                 </div>
+                </form>
             </div>
         </div>
     </main>

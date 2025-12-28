@@ -47,6 +47,7 @@ Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
     Route::get('/{type}/{venue}', [VenuesController::class, 'show'])->name('venues.show');
     Route::post('/', [VenuesController::class, 'store'])->middleware('auth')->name('venues.store');
+    Route::patch('/{type}/{venue}', [VenuesController::class, 'update'])->middleware('auth')->name('venues.update');
     Route::post('/{type}/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
         ->middleware('auth')
         ->name('venues.moderation.request');
