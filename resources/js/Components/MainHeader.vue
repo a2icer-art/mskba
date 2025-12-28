@@ -22,9 +22,9 @@ const props = defineProps({
 defineEmits(['open-login']);
 
 const page = usePage();
-const roleAliases = computed(() => page.props.auth?.user?.roles ?? []);
+const roleLevel = computed(() => Number(page.props.auth?.user?.role_level ?? 0));
 const canSeeControlPanel = computed(
-    () => props.isAuthenticated && roleAliases.value.some((role) => role === 'admin' || role === 'moderator')
+    () => props.isAuthenticated && roleLevel.value > 10
 );
 </script>
 
@@ -61,4 +61,3 @@ const canSeeControlPanel = computed(
         </div>
     </header>
 </template>
-

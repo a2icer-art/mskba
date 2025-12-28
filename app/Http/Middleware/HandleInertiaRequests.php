@@ -39,6 +39,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $userRoles = $user ? $user->roles()->pluck('alias')->all() : [];
+        $userRoleLevel = $user ? (int) $user->roles()->max('level') : 0;
 
         return [
             ...parent::share($request),
@@ -48,6 +49,7 @@ class HandleInertiaRequests extends Middleware
                         'id' => $user->id,
                         'login' => $user->login,
                         'roles' => $userRoles,
+                        'role_level' => $userRoleLevel,
                     ]
                     : null,
             ],
