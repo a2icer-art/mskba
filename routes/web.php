@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
@@ -25,6 +26,8 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
+    Route::patch('/profile', [AccountProfileController::class, 'update'])->name('account.profile.update');
+    Route::patch('/password', [AccountProfileController::class, 'updatePassword'])->name('account.password.update');
 
     Route::prefix('contacts')->name('account.contacts.')->group(function () {
         Route::post('/', [AccountContactsController::class, 'store'])->name('store');

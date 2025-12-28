@@ -84,6 +84,7 @@ const moderationRejectedAt = computed(() => moderationRequest.value?.reviewed_at
 const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason ?? '');
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
 const canResubmitModeration = computed(() => hasModerationRejectReason.value);
+const isProfileConfirmed = computed(() => props.user?.status === 'confirmed');
 const hasSidebar = computed(() => accountMenuItems.value.length > 0);
 const logoutForm = useForm({});
 
@@ -172,6 +173,16 @@ const verifyCodeForm = useForm({
 });
 const actionForm = useForm({});
 const moderationForm = useForm({});
+const profileForm = useForm({
+    first_name: '',
+    last_name: '',
+    middle_name: '',
+    gender: '',
+    birth_date: '',
+});
+const passwordForm = useForm({
+    password: '',
+});
 const editingEmailId = ref(null);
 const editingContactId = ref(null);
 const emailNotices = ref({});
@@ -181,6 +192,10 @@ const contactErrors = ref({});
 const newContactNotice = ref('');
 const moderationNotice = ref('');
 const moderationErrors = ref([]);
+const profileNotice = ref('');
+const passwordNotice = ref('');
+const profileEditOpen = ref(false);
+const passwordEditOpen = ref(false);
 const verificationOpen = ref({});
 const verificationCodes = ref({});
 const verificationPending = ref({});
@@ -719,6 +734,68 @@ const submitModerationRequest = () => {
     });
 };
 
+const openProfileEdit = () => {
+    profileNotice.value = '';
+    passwordNotice.value = '';
+    profileForm.clearErrors();
+    passwordForm.clearErrors();
+
+    profileForm.first_name = props.profile?.first_name ?? '';
+    profileForm.last_name = props.profile?.last_name ?? '';
+    profileForm.middle_name = props.profile?.middle_name ?? '';
+    profileForm.gender = props.profile?.gender ?? '';
+    profileForm.birth_date = props.profile?.birth_date ?? '';
+
+    profileEditOpen.value = true;
+};
+
+const closeProfileEdit = () => {
+    profileEditOpen.value = false;
+    profileForm.reset('first_name', 'last_name', 'middle_name', 'gender', 'birth_date');
+    profileForm.clearErrors();
+};
+
+const submitProfileUpdate = () => {
+    profileNotice.value = '';
+    profileForm.transform((data) => {
+        if (isProfileConfirmed.value) {
+            return {
+                middle_name: data.middle_name,
+            };
+        }
+
+        return data;
+    }).patch('/account/profile', {
+        preserveScroll: true,
+        onSuccess: () => {
+            profileNotice.value = 'Профиль обновлен.';
+        },
+    });
+};
+
+const openPasswordEdit = () => {
+    passwordNotice.value = '';
+    passwordForm.clearErrors();
+    passwordEditOpen.value = true;
+};
+
+const closePasswordEdit = () => {
+    passwordEditOpen.value = false;
+    passwordForm.reset('password');
+    passwordForm.clearErrors();
+};
+
+const submitPasswordUpdate = () => {
+    passwordNotice.value = '';
+    passwordForm.patch('/account/password', {
+        preserveScroll: true,
+        onSuccess: () => {
+            passwordNotice.value = 'Пароль обновлен.';
+            passwordForm.reset('password');
+        },
+    });
+};
+
 const logout = () => {
     logoutForm.post('/logout');
 };
@@ -747,6 +824,22 @@ const logout = () => {
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Аккаунт</p>
                             <h1 class="mt-2 text-3xl font-semibold text-slate-900">Профиль пользователя</h1>
                         </div>
+                        <button
+                            v-if="activeTab === 'profile'"
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="button"
+                            @click="openProfileEdit"
+                        >
+                            Редактировать
+                        </button>
+                        <button
+                            v-else-if="activeTab === 'user'"
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="button"
+                            @click="openPasswordEdit"
+                        >
+                            Изменить пароль
+                        </button>
                     </div>
 
                     <div class="mt-6 grid gap-4">
@@ -1167,6 +1260,152 @@ const logout = () => {
 
             <MainFooter :app-name="appName" />
         </div>
+
+        <div v-if="profileEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-slate-900">Редактирование профиля</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                    Заполните доступные поля профиля и сохраните изменения.
+                </p>
+                <p v-if="isProfileConfirmed" class="mt-2 text-xs text-slate-500">
+                    Подтвержденным пользователям доступно редактирование только необязательных полей.
+                </p>
+
+                <div class="mt-4 flex flex-col gap-3">
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Имя
+                        <input
+                            v-model="profileForm.first_name"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                            type="text"
+                            :disabled="isProfileConfirmed"
+                        />
+                    </label>
+                    <div v-if="profileForm.errors.first_name" class="text-xs text-rose-700">
+                        {{ profileForm.errors.first_name }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Фамилия
+                        <input
+                            v-model="profileForm.last_name"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                            type="text"
+                            :disabled="isProfileConfirmed"
+                        />
+                    </label>
+                    <div v-if="profileForm.errors.last_name" class="text-xs text-rose-700">
+                        {{ profileForm.errors.last_name }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Отчество
+                        <input
+                            v-model="profileForm.middle_name"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                        />
+                    </label>
+                    <div v-if="profileForm.errors.middle_name" class="text-xs text-rose-700">
+                        {{ profileForm.errors.middle_name }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Пол
+                        <select
+                            v-model="profileForm.gender"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                            :disabled="isProfileConfirmed"
+                        >
+                            <option value="">Не определен</option>
+                            <option value="male">Мужской</option>
+                            <option value="female">Женский</option>
+                        </select>
+                    </label>
+                    <div v-if="profileForm.errors.gender" class="text-xs text-rose-700">
+                        {{ profileForm.errors.gender }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Дата рождения
+                        <input
+                            v-model="profileForm.birth_date"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                            type="date"
+                            :disabled="isProfileConfirmed"
+                        />
+                    </label>
+                    <div v-if="profileForm.errors.birth_date" class="text-xs text-rose-700">
+                        {{ profileForm.errors.birth_date }}
+                    </div>
+                </div>
+
+                <div v-if="profileNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {{ profileNotice }}
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="profileForm.processing"
+                        @click="closeProfileEdit"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        type="button"
+                        :disabled="profileForm.processing"
+                        @click="submitProfileUpdate"
+                    >
+                        Сохранить профиль
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div v-if="passwordEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-slate-900">Изменить пароль</h2>
+                <p class="mt-2 text-sm text-slate-600">Укажите новый пароль для вашей учетной записи.</p>
+                <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    Новый пароль
+                    <input
+                        v-model="passwordForm.password"
+                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        type="password"
+                        autocomplete="new-password"
+                    />
+                </label>
+                <div v-if="passwordForm.errors.password" class="text-xs text-rose-700">
+                    {{ passwordForm.errors.password }}
+                </div>
+
+                <div v-if="passwordNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {{ passwordNotice }}
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="passwordForm.processing"
+                        @click="closePasswordEdit"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        type="button"
+                        :disabled="passwordForm.processing"
+                        @click="submitPasswordUpdate"
+                    >
+                        Сохранить пароль
+                    </button>
+                </div>
+            </div>
+        </div>
     </main>
 </template>
-
