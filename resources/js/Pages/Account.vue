@@ -81,7 +81,9 @@ const moderationRequest = computed(() => props.moderationRequest ?? null);
 const isModerationPending = computed(() => moderationRequest.value?.status === 'pending');
 const isModerationRejected = computed(() => moderationRequest.value?.status === 'rejected');
 const moderationRejectedAt = computed(() => moderationRequest.value?.reviewed_at ?? moderationRequest.value?.submitted_at);
-const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason || 'Заявка отклонена.');
+const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason ?? '');
+const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
+const canResubmitModeration = computed(() => hasModerationRejectReason.value);
 const hasSidebar = computed(() => accountMenuItems.value.length > 0);
 const logoutForm = useForm({});
 
@@ -757,7 +759,7 @@ const logout = () => {
                                 <div class="flex items-center justify-between py-3">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
                                     <div class="flex flex-wrap items-center justify-end gap-2 text-sm font-medium text-slate-800">
-                                        <span>{{ item.value }}</span>
+                                        <span v-if="item.key !== 'status'">{{ item.value }}</span>
                                         <template v-if="item.key === 'status'">
                                             <span
                                                 v-if="user?.status === 'confirmed'"
@@ -774,14 +776,14 @@ const logout = () => {
                                                 На модерации
                                             </span>
                                             <span
-                                                v-else-if="isModerationRejected"
+                                                v-else-if="isModerationRejected && !hasModerationRejectReason"
                                                 class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700"
                                                 :title="formatDate(moderationRejectedAt)"
                                             >
                                                 Отклонено
                                             </span>
                                             <button
-                                                v-if="isModerationRejected"
+                                                v-if="isModerationRejected && canResubmitModeration"
                                                 class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                                 type="button"
                                                 :disabled="moderationForm.processing"
@@ -790,7 +792,7 @@ const logout = () => {
                                                 Отправить повторно
                                             </button>
                                             <button
-                                                v-else-if="!isModerationRejected"
+                                                v-else-if="!isModerationPending && !isModerationRejected"
                                                 class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                                 type="button"
                                                 :disabled="moderationForm.processing"
@@ -808,8 +810,11 @@ const logout = () => {
                                             <li v-for="(message, index) in moderationErrors" :key="index">{{ message }}</li>
                                         </ul>
                                     </div>
-                                    <div v-else-if="isModerationRejected" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                    <div v-else-if="isModerationRejected && hasModerationRejectReason" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                         {{ moderationRejectedReason }}
+                                    </div>
+                                    <div v-else-if="isModerationRejected" class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                        Причина отклонения пока не указана. Повторная отправка станет доступна после комментария модератора.
                                     </div>
                                     <div v-else-if="moderationNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                         {{ moderationNotice }}
@@ -1159,4 +1164,3 @@ const logout = () => {
         </div>
     </main>
 </template>
-
