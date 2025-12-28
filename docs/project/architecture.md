@@ -14,6 +14,7 @@
   - Учетная запись пользователя.
   - Связи: profile (1:1), roles (M:N), userRoles (1:N).
   - Поля `name` и `email` удалены; имя хранится в `UserProfile`, email — в `UserContact`. (Задача: `docs/tasks/023`)
+  - Статусы: unconfirmed/confirmed/blocked; блокировка хранит причину и метаданные (blocked_at/blocked_by/block_reason).
 - `UserProfile` (app/Domain/Users/Models/UserProfile)
   - Дополнительные данные профиля (имя, дата рождения, пол).
 - `UserContact` (app/Domain/Users/Models/UserContact)
@@ -62,6 +63,11 @@
   - Фабрика создания профильной сущности по роли участника.
 - `ParticipantRoleAssignment` (app/Domain/Participants/Models/ParticipantRoleAssignment)
   - Назначение роли пользователю с опциональным контекстом (polymorphic).
+
+## Домен Filament
+
+- `FilamentNavigationService` (app/Domain/Filament/Services/FilamentNavigationService)
+  - Формирует меню разделов панели управления на основе уровня роли.
 
 ## Связи между доменами
 

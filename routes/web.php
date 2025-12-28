@@ -4,6 +4,8 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\FilamentController;
+use App\Http\Controllers\FilamentUsersModerationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Support\Facades\Route;
@@ -40,4 +42,18 @@ Route::middleware('auth')->prefix('account')->group(function () {
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
+});
+
+Route::middleware('auth')->prefix('filament')->group(function () {
+    Route::get('/', [FilamentController::class, 'index'])->name('filament');
+    Route::get('/users-moderation', [FilamentUsersModerationController::class, 'index'])
+        ->name('filament.users.moderation');
+    Route::post('/users-moderation/{moderationRequest}/approve', [FilamentUsersModerationController::class, 'approve'])
+        ->name('filament.users.moderation.approve');
+    Route::post('/users-moderation/{moderationRequest}/reject', [FilamentUsersModerationController::class, 'reject'])
+        ->name('filament.users.moderation.reject');
+    Route::post('/users-moderation/{moderationRequest}/block', [FilamentUsersModerationController::class, 'block'])
+        ->name('filament.users.moderation.block');
+    Route::post('/users-moderation/{moderationRequest}/unblock', [FilamentUsersModerationController::class, 'unblock'])
+        ->name('filament.users.moderation.unblock');
 });

@@ -40,6 +40,9 @@ class User extends Authenticatable
         'confirmed_at',
         'confirmed_by',
         'commentary',
+        'blocked_at',
+        'blocked_by',
+        'block_reason',
         'created_by',
         'updated_by',
         'deleted_by',
@@ -69,6 +72,7 @@ class User extends Authenticatable
             'confirmed_by' => UserConfirmedBy::class,
             'registered_via' => UserRegisteredVia::class,
             'registration_details' => 'array',
+            'blocked_at' => 'datetime',
         ];
     }
 

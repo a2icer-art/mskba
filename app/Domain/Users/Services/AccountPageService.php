@@ -10,6 +10,7 @@ use App\Domain\Users\Models\ContactVerification;
 use App\Domain\Users\Models\UserContact;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
+use App\Support\DateFormatter;
 
 class AccountPageService
 {
@@ -46,10 +47,19 @@ class AccountPageService
                 'id' => $user->id,
                 'login' => $user->login,
                 'status' => $user->status?->value,
-                'created_at' => $user->created_at?->toISOString(),
-                'confirmed_at' => $user->confirmed_at?->toISOString(),
+                'created_at' => DateFormatter::dateTime($user->created_at),
+                'confirmed_at' => DateFormatter::dateTime($user->confirmed_at),
+                'block_reason' => $user->block_reason,
             ],
-            'profile' => $user->profile?->only(['first_name', 'last_name', 'middle_name', 'gender', 'birth_date']),
+            'profile' => $user->profile
+                ? [
+                    'first_name' => $user->profile->first_name,
+                    'last_name' => $user->profile->last_name,
+                    'middle_name' => $user->profile->middle_name,
+                    'gender' => $user->profile->gender,
+                    'birth_date' => DateFormatter::date($user->profile->birth_date),
+                ]
+                : null,
             'participantRoles' => $participantRoles,
             'emails' => $user->contacts
                 ->where('type', ContactType::Email)
@@ -57,7 +67,7 @@ class AccountPageService
                 ->map(fn (UserContact $contact) => [
                     'id' => $contact->id,
                     'email' => $contact->value,
-                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                    'confirmed_at' => DateFormatter::dateTime($contact->confirmed_at),
                 ])
                 ->values(),
             'contacts' => $user->contacts
@@ -66,7 +76,7 @@ class AccountPageService
                     'id' => $contact->id,
                     'type' => $contact->type?->value,
                     'value' => $contact->value,
-                    'confirmed_at' => $contact->confirmed_at?->toISOString(),
+                    'confirmed_at' => DateFormatter::dateTime($contact->confirmed_at),
                 ])
                 ->values(),
             'contactTypes' => [
@@ -121,7 +131,7 @@ class AccountPageService
             $contactVerifications[$verification->contact_id] = [
                 'attempts' => $verification->attempts,
                 'max_attempts' => ContactVerificationService::MAX_ATTEMPTS,
-                'expires_at' => $verification->expires_at?->toISOString(),
+                'expires_at' => DateFormatter::dateTime($verification->expires_at),
             ];
         }
 
@@ -142,8 +152,8 @@ class AccountPageService
 
         return [
             'status' => $request->status?->value,
-            'submitted_at' => $request->submitted_at?->toISOString(),
-            'reviewed_at' => $request->reviewed_at?->toISOString(),
+            'submitted_at' => DateFormatter::dateTime($request->submitted_at),
+            'reviewed_at' => DateFormatter::dateTime($request->reviewed_at),
             'reject_reason' => $request->reject_reason,
         ];
     }

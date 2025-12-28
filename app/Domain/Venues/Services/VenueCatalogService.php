@@ -4,6 +4,7 @@ namespace App\Domain\Venues\Services;
 
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
+use App\Support\DateFormatter;
 use Illuminate\Support\Str;
 
 class VenueCatalogService
@@ -74,7 +75,7 @@ class VenueCatalogService
                 'name' => $venue->name,
                 'alias' => $venue->alias,
                 'address' => $venue->address,
-                'created_at' => $venue->created_at?->toISOString(),
+                'created_at' => DateFormatter::dateTime($venue->created_at),
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
             ])
             ->values()

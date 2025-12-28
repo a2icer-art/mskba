@@ -47,4 +47,9 @@ class ModerationRequest extends Model
     {
         return $this->belongsTo(User::class, 'reviewed_by');
     }
+
+    public function entityUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'entity_id');
+    }
 }

@@ -43,6 +43,10 @@
         opacity: 0.7;
         pointer-events: none;
     }
+
+    .page-content-wrapper {
+        overflow: auto;
+    }
 }
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';

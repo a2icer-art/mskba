@@ -100,17 +100,13 @@ const formatDate = (value) => {
     return date.toLocaleString('ru-RU');
 };
 
-const statusLabelMap = {
-    confirmed: 'Подтвержден',
-    unconfirmed: 'Не подтвержден',
-};
 
 const userItems = computed(() => [
     { key: 'id', label: 'ID', value: props.user?.id ?? '—' },
     { key: 'login', label: 'Логин', value: props.user?.login ?? '—' },
     { key: 'password', label: 'Пароль', value: '********' },
     { key: 'created_at', label: 'Дата регистрации', value: formatDate(props.user?.created_at) },
-    { key: 'status', label: 'Статус', value: statusLabelMap[props.user?.status] ?? '—' },
+    { key: 'status', label: 'Статус', value: '' },
     ...(props.user?.status === 'confirmed'
         ? [{ key: 'confirmed_at', label: 'Дата подтверждения', value: formatDate(props.user?.confirmed_at) }]
         : []),
@@ -740,12 +736,12 @@ const logout = () => {
             <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
-                    title=""
+                    title="Аккаунт"
                     :items="accountMenuItems"
                     :active-href="activeAccountHref"
                 />
 
-                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Аккаунт</p>
@@ -769,6 +765,12 @@ const logout = () => {
                                                 Подтвержден
                                             </span>
                                             <span
+                                                v-else-if="user?.status === 'blocked'"
+                                                class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700"
+                                            >
+                                                Заблокирован
+                                            </span>
+                                            <span
                                                 v-else-if="isModerationPending"
                                                 class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
                                                 :title="formatDate(moderationRequest?.submitted_at)"
@@ -783,7 +785,7 @@ const logout = () => {
                                                 Отклонено
                                             </span>
                                             <button
-                                                v-if="isModerationRejected && canResubmitModeration"
+                                                v-if="isModerationRejected && canResubmitModeration && user?.status === 'unconfirmed'"
                                                 class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                                 type="button"
                                                 :disabled="moderationForm.processing"
@@ -792,7 +794,7 @@ const logout = () => {
                                                 Отправить повторно
                                             </button>
                                             <button
-                                                v-else-if="!isModerationPending && !isModerationRejected"
+                                                v-else-if="!isModerationPending && !isModerationRejected && user?.status === 'unconfirmed'"
                                                 class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                                 type="button"
                                                 :disabled="moderationForm.processing"
@@ -815,6 +817,9 @@ const logout = () => {
                                     </div>
                                     <div v-else-if="isModerationRejected" class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                                         Причина отклонения пока не указана. Повторная отправка станет доступна после комментария модератора.
+                                    </div>
+                                    <div v-else-if="user?.status === 'blocked'" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ user?.block_reason || 'Причина блокировки не определена.' }}
                                     </div>
                                     <div v-else-if="moderationNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                         {{ moderationNotice }}
@@ -1164,3 +1169,4 @@ const logout = () => {
         </div>
     </main>
 </template>
+

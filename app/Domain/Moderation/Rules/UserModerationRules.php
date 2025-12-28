@@ -25,6 +25,10 @@ class UserModerationRules implements ModerationRulesContract
             $missing[] = 'Пользователь уже подтвержден.';
         }
 
+        if ($entity->status === UserStatus::Blocked) {
+            $missing[] = 'Пользователь заблокирован.';
+        }
+
         if (!$entity->contacts()->whereNotNull('confirmed_at')->exists()) {
             $missing[] = 'Нет подтвержденных контактов.';
         }

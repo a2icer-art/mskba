@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
@@ -190,7 +190,7 @@ watch(
                     :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
                 />
 
-                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Площадки</p>
@@ -330,3 +330,4 @@ watch(
         />
     </main>
 </template>
+
