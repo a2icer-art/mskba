@@ -3,6 +3,7 @@
 namespace App\Domain\Moderation\Rules;
 
 use App\Domain\Moderation\Contracts\ModerationRulesContract;
+use App\Domain\Moderation\Requirements\UserModerationRequirements;
 use App\Domain\Users\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -39,17 +40,19 @@ class UserModerationRules implements ModerationRulesContract
             return $missing;
         }
 
-        if (!$profile->last_name) {
-            $missing[] = 'Не заполнена фамилия.';
-        }
-        if (!$profile->first_name) {
-            $missing[] = 'Не заполнено имя.';
-        }
-        if (!$profile->gender) {
-            $missing[] = 'Не выбран пол.';
-        }
-        if (!$profile->birth_date) {
-            $missing[] = 'Не указана дата рождения.';
+        $labels = [
+            'last_name' => 'Не заполнена фамилия.',
+            'first_name' => 'Не заполнено имя.',
+            'gender' => 'Не выбран пол.',
+            'birth_date' => 'Не указана дата рождения.',
+        ];
+
+        foreach (UserModerationRequirements::REQUIRED_PROFILE_FIELDS as $field) {
+            if ($profile->{$field}) {
+                continue;
+            }
+
+            $missing[] = $labels[$field] ?? 'Не заполнено обязательное поле профиля.';
         }
 
         return $missing;

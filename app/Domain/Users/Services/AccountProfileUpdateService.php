@@ -4,14 +4,13 @@ namespace App\Domain\Users\Services;
 
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\UserProfile;
+use App\Domain\Moderation\Requirements\UserModerationRequirements;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class AccountProfileUpdateService
 {
-    private const REQUIRED_FIELDS = ['first_name', 'last_name', 'gender', 'birth_date'];
-
     public function updateProfile(User $user, array $data): UserProfile
     {
         $this->ensureProfileAllowed($user, $data);
@@ -67,7 +66,7 @@ class AccountProfileUpdateService
             return;
         }
 
-        $restricted = array_diff(self::REQUIRED_FIELDS, $this->getAllowedProfileFields($user));
+        $restricted = array_diff(UserModerationRequirements::REQUIRED_PROFILE_FIELDS, $this->getAllowedProfileFields($user));
         $attempted = array_intersect($restricted, array_keys($data));
 
         if ($attempted === []) {
