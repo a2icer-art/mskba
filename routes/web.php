@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FilamentController;
+use App\Http\Controllers\FilamentLogsController;
 use App\Http\Controllers\FilamentUsersModerationController;
 use App\Http\Controllers\FilamentVenuesModerationController;
 use App\Http\Controllers\HomeController;
@@ -76,4 +77,6 @@ Route::middleware('auth')->prefix('filament')->group(function () {
         ->name('filament.venues.moderation.block');
     Route::post('/venues-moderation/{moderationRequest}/unblock', [FilamentVenuesModerationController::class, 'unblock'])
         ->name('filament.venues.moderation.unblock');
+    Route::get('/logs', [FilamentLogsController::class, 'index'])->name('filament.logs');
+    Route::get('/logs/{entity}', [FilamentLogsController::class, 'show'])->name('filament.logs.show');
 });

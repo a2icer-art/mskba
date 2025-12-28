@@ -2,8 +2,15 @@
 
 namespace App\Domain\Filament\Services;
 
+use App\Domain\Filament\Services\FilamentLogsService;
+
 class FilamentNavigationService
 {
+    public function __construct(
+        private readonly FilamentLogsService $logsService
+    ) {
+    }
+
     public function getMenuGroups(int $roleLevel): array
     {
         $groups = [];
@@ -18,6 +25,11 @@ class FilamentNavigationService
             $moderationItems[] = [
                 'label' => 'Площадки',
                 'href' => '/filament/venues-moderation',
+            ];
+
+            $moderationItems[] = [
+                'label' => 'Логи',
+                'href' => '/filament/logs',
             ];
         }
 
