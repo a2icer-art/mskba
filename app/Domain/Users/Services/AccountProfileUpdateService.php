@@ -42,13 +42,14 @@ class AccountProfileUpdateService
     public function getProfileValidationRules(User $user): array
     {
         if ($user->status === UserStatus::Confirmed) {
-            return [
-                'middle_name' => ['nullable', 'string', 'max:255'],
-                'first_name' => ['prohibited'],
-                'last_name' => ['prohibited'],
-                'gender' => ['prohibited'],
-                'birth_date' => ['prohibited'],
-            ];
+            $rules = [];
+            foreach (UserModerationRequirements::requiredProfileFields() as $field) {
+                $rules[$field] = ['prohibited'];
+            }
+            foreach (UserModerationRequirements::optionalProfileFields() as $field) {
+                $rules[$field] = ['nullable', 'string', 'max:255'];
+            }
+            return $rules;
         }
 
         return [
@@ -71,7 +72,7 @@ class AccountProfileUpdateService
             return;
         }
 
-        $restricted = array_diff(UserModerationRequirements::REQUIRED_PROFILE_FIELDS, $this->getAllowedProfileFields($user));
+        $restricted = array_diff(UserModerationRequirements::requiredProfileFields(), $this->getAllowedProfileFields($user));
         $attempted = array_intersect($restricted, array_keys($data));
 
         if ($attempted === []) {
@@ -88,10 +89,6 @@ class AccountProfileUpdateService
 
     private function getAllowedProfileFields(User $user): array
     {
-        if ($user->status === UserStatus::Confirmed) {
-            return ['middle_name'];
-        }
-
-        return ['first_name', 'last_name', 'middle_name', 'gender', 'birth_date'];
+        return UserModerationRequirements::editableProfileFields($user->status === UserStatus::Confirmed);
     }
 }

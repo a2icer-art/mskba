@@ -29,9 +29,17 @@ class VenueFactory extends Factory
             'confirmed_at' => now(),
             'confirmed_by' => User::factory(),
             'venue_type_id' => VenueType::factory(),
-            'address' => fake()->optional()->address(),
-            'address_id' => null,
             'deleted_by' => null,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Venue $venue) {
+            \Database\Factories\AddressFactory::new()->create([
+                'venue_id' => $venue->id,
+                'created_by' => $venue->created_by,
+            ]);
+        });
     }
 }

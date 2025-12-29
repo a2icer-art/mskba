@@ -22,18 +22,34 @@ class VenueModerationRules implements ModerationRulesContract
             $missing[] = 'Запрос может отправить только владелец площадки.';
         }
 
-        $labels = [
+        $venueLabels = [
             'name' => 'Не указано название площадки.',
             'venue_type_id' => 'Не указан тип площадки.',
-            'address' => 'Не указан адрес площадки.',
         ];
-
-        foreach (VenueModerationRequirements::REQUIRED_FIELDS as $field) {
+        foreach (VenueModerationRequirements::requiredVenueFields() as $field) {
             if ($entity->{$field}) {
                 continue;
             }
 
-            $missing[] = $labels[$field] ?? 'Не заполнено обязательное поле площадки.';
+            $missing[] = $venueLabels[$field] ?? 'Не заполнено обязательное поле площадки.';
+        }
+
+        $address = $entity->latestAddress;
+        if (!$address) {
+            $missing[] = 'Не указан адрес площадки.';
+        } else {
+            $addressLabels = [
+                'city' => 'Не указан город.',
+                'street' => 'Не указана улица.',
+                'building' => 'Не указан дом.',
+            ];
+            foreach (VenueModerationRequirements::requiredAddressFields() as $field) {
+                if ($address->{$field}) {
+                    continue;
+                }
+
+                $missing[] = $addressLabels[$field] ?? 'Не заполнено обязательное поле адреса.';
+            }
         }
 
         if ($entity->status?->value === 'blocked') {

@@ -8,6 +8,7 @@ use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Models\ContactVerification;
 use App\Domain\Users\Models\UserContact;
+use App\Domain\Users\Resources\UserProfileViewResource;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
 use App\Support\DateFormatter;
@@ -51,15 +52,7 @@ class AccountPageService
                 'confirmed_at' => DateFormatter::dateTime($user->confirmed_at),
                 'block_reason' => $user->block_reason,
             ],
-            'profile' => $user->profile
-                ? [
-                    'first_name' => $user->profile->first_name,
-                    'last_name' => $user->profile->last_name,
-                    'middle_name' => $user->profile->middle_name,
-                    'gender' => $user->profile->gender,
-                    'birth_date' => DateFormatter::date($user->profile->birth_date),
-                ]
-                : null,
+            'profile' => UserProfileViewResource::make($user->profile),
             'participantRoles' => $participantRoles,
             'emails' => $user->contacts
                 ->where('type', ContactType::Email)

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
+import AuthModal from '../Components/AuthModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -41,6 +42,8 @@ const props = defineProps({
 });
 
 const page = usePage();
+const showAuthModal = ref(false);
+const authMode = ref('login');
 const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
 const moderationForm = useForm({});
 const moderationNotice = ref('');
@@ -49,15 +52,58 @@ const editOpen = ref(false);
 const editNotice = ref('');
 const editForm = useForm({
     name: '',
-    address: '',
     venue_type_id: '',
     commentary: '',
+    city: '',
+    metro_id: '',
+    street: '',
+    building: '',
+    str_address: '',
 });
 
 const availableTypes = computed(() => props.types ?? []);
 const editableFields = computed(() => props.editableFields ?? []);
 const canEdit = computed(() => props.canEdit);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
+const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
+const nonEditableItems = computed(() => {
+    const addressFields = ['city', 'metro_id', 'street', 'building', 'str_address'];
+    const labels = {
+        venue_type_id: 'Тип',
+        name: 'Название',
+        commentary: 'Комментарий',
+    };
+    const values = {
+        venue_type_id: props.venue?.type?.name ?? '-',
+        name: props.venue?.name ?? '-',
+        commentary: props.venue?.commentary ?? '-',
+    };
+
+    const items = Object.keys(labels)
+        .filter((field) => !editableFields.value.includes(field))
+        .map((field) => ({
+            key: field,
+            label: labels[field],
+            value: values[field] ?? '-',
+        }));
+
+    const hasNonEditableAddress = addressFields.some((field) => !editableFields.value.includes(field));
+    if (hasNonEditableAddress) {
+        const addressParts = [
+            props.venue?.address?.city,
+            props.venue?.address?.street,
+            props.venue?.address?.building,
+        ].filter(Boolean);
+        const addressValue = addressParts.join(', ') || '-';
+        items.push({
+            key: 'address',
+            label: 'Адрес',
+            value: addressValue,
+        });
+    }
+
+    return items;
+});
 
 const moderationRequest = computed(() => props.moderationRequest ?? null);
 const isModerationPending = computed(() => moderationRequest.value?.status === 'pending');
@@ -66,6 +112,23 @@ const moderationRejectedAt = computed(() => moderationRequest.value?.reviewed_at
 const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason ?? '');
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
 const canResubmitModeration = computed(() => hasModerationRejectReason.value);
+
+watch(
+    () => page.props.errors,
+    (errors) => {
+        if (errors?.email || errors?.participant_role_id) {
+            authMode.value = 'register';
+            showAuthModal.value = true;
+            return;
+        }
+
+        if (errors?.login) {
+            authMode.value = 'login';
+            showAuthModal.value = true;
+        }
+    },
+    { immediate: true }
+);
 
 const formatDate = (value) => {
     if (!value) {
@@ -82,15 +145,19 @@ const openEdit = () => {
     editNotice.value = '';
     editForm.clearErrors();
     editForm.name = props.venue?.name ?? '';
-    editForm.address = props.venue?.address ?? '';
     editForm.venue_type_id = props.venue?.venue_type_id ?? props.venue?.type?.id ?? '';
     editForm.commentary = props.venue?.commentary ?? '';
+    editForm.city = props.venue?.address?.city ?? '';
+    editForm.metro_id = props.venue?.address?.metro_id ?? '';
+    editForm.street = props.venue?.address?.street ?? '';
+    editForm.building = props.venue?.address?.building ?? '';
+    editForm.str_address = props.venue?.address?.str_address ?? '';
     editOpen.value = true;
 };
 
 const closeEdit = () => {
     editOpen.value = false;
-    editForm.reset('name', 'address', 'venue_type_id', 'commentary');
+    editForm.reset('name', 'venue_type_id', 'commentary', 'city', 'metro_id', 'street', 'building', 'str_address');
     editForm.clearErrors();
 };
 
@@ -115,6 +182,11 @@ const submitEdit = () => {
 const submitModerationRequest = () => {
     moderationNotice.value = '';
     moderationErrors.value = [];
+
+    if (!canEdit.value) {
+        moderationErrors.value = ['Отправить на модерацию может только создатель площадки.'];
+        return;
+    }
 
     moderationForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/moderation-request`, {
         preserveScroll: true,
@@ -145,6 +217,7 @@ const submitModerationRequest = () => {
                 :app-name="appName"
                 :is-authenticated="Boolean($page.props.auth?.user)"
                 :login-label="$page.props.auth?.user?.login"
+                @open-login="authMode = 'login'; showAuthModal = true"
             />
 
             <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
@@ -251,7 +324,7 @@ const submitModerationRequest = () => {
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span class="text-sm font-medium text-slate-800">{{ venue?.address || '—' }}</span>
+                            <span class="text-sm font-medium text-slate-800">{{ venue?.address?.display || '—' }}</span>
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
@@ -272,72 +345,155 @@ const submitModerationRequest = () => {
             <MainFooter :app-name="appName" />
         </div>
 
-        <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeEdit">
+            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <button
+                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closeEdit"
+                >
+                    x
+                </button>
                 <form :class="{ loading: editForm.processing }" @submit.prevent="submitEdit">
                 <h2 class="text-lg font-semibold text-slate-900">Редактировать площадку</h2>
                 <p class="mt-2 text-sm text-slate-600">Заполните доступные поля площадки.</p>
-                <p v-if="isVenueConfirmed" class="mt-2 text-xs text-slate-500">
-                    Часть полей недоступна для редактирования так как запись уже подтверждена.
-                </p>
+                <div
+                    v-if="isVenueConfirmed || isVenueOnModeration"
+                    class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                >
+                    <p class="font-semibold text-slate-700">
+                        {{ isVenueConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
+                    </p>
+                    <div v-if="nonEditableItems.length" class="mt-2 space-y-2">
+                        <div v-for="item in nonEditableItems" :key="item.key" class="flex items-center justify-between gap-3">
+                            <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                            <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
+                        </div>
+                    </div>
+                </div>
 
-                <div class="mt-4 flex flex-col gap-3">
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Тип
-                        <select
-                            v-model="editForm.venue_type_id"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            :disabled="!editableFields.includes('venue_type_id')"
-                        >
-                            <option value="">Выберите тип</option>
-                            <option v-for="type in availableTypes" :key="type.id" :value="type.id">
-                                {{ type.name }}
-                            </option>
-                        </select>
-                    </label>
-                    <div v-if="editForm.errors.venue_type_id" class="text-xs text-rose-700">
-                        {{ editForm.errors.venue_type_id }}
+                <div class="mt-4 flex flex-col gap-3" v-if="editableFields.length">
+                    <div v-if="editableFields.includes('venue_type_id')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Тип
+                            <select
+                                v-model="editForm.venue_type_id"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            >
+                                <option value="">Выберите тип</option>
+                                <option v-for="type in availableTypes" :key="type.id" :value="type.id">
+                                    {{ type.name }}
+                                </option>
+                            </select>
+                        </label>
+                        <div v-if="editForm.errors.venue_type_id" class="text-xs text-rose-700">
+                            {{ editForm.errors.venue_type_id }}
+                        </div>
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Название
-                        <input
-                            v-model="editForm.name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Например, Арена 11"
-                            :disabled="!editableFields.includes('name')"
-                        />
-                    </label>
-                    <div v-if="editForm.errors.name" class="text-xs text-rose-700">
-                        {{ editForm.errors.name }}
+                    <div v-if="editableFields.includes('name')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Название
+                            <input
+                                v-model="editForm.name"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Например, Арена 11"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.name" class="text-xs text-rose-700">
+                            {{ editForm.errors.name }}
+                        </div>
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Адрес
-                        <input
-                            v-model="editForm.address"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Адрес площадки"
-                            :disabled="!editableFields.includes('address')"
-                        />
-                    </label>
-                    <div v-if="editForm.errors.address" class="text-xs text-rose-700">
-                        {{ editForm.errors.address }}
+                    <div v-if="editableFields.includes('city')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Город
+                            <input
+                                v-model="editForm.city"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Город"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.city" class="text-xs text-rose-700">
+                            {{ editForm.errors.city }}
+                        </div>
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Комментарий
-                        <textarea
-                            v-model="editForm.commentary"
-                            class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            placeholder="Дополнительная информация"
-                            :disabled="!editableFields.includes('commentary')"
-                        ></textarea>
-                    </label>
-                    <div v-if="editForm.errors.commentary" class="text-xs text-rose-700">
-                        {{ editForm.errors.commentary }}
+                    <div v-if="editableFields.includes('metro_id')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Метро (ID)
+                            <input
+                                v-model="editForm.metro_id"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="number"
+                                placeholder="ID метро"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.metro_id" class="text-xs text-rose-700">
+                            {{ editForm.errors.metro_id }}
+                        </div>
+                    </div>
+
+                    <div v-if="editableFields.includes('street')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Улица
+                            <input
+                                v-model="editForm.street"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Улица"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.street" class="text-xs text-rose-700">
+                            {{ editForm.errors.street }}
+                        </div>
+                    </div>
+
+                    <div v-if="editableFields.includes('building')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Дом
+                            <input
+                                v-model="editForm.building"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Дом"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.building" class="text-xs text-rose-700">
+                            {{ editForm.errors.building }}
+                        </div>
+                    </div>
+
+                    <div v-if="editableFields.includes('str_address')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Адрес строкой
+                            <input
+                                v-model="editForm.str_address"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Полный адрес (опционально)"
+                            />
+                        </label>
+                        <div v-if="editForm.errors.str_address" class="text-xs text-rose-700">
+                            {{ editForm.errors.str_address }}
+                        </div>
+                    </div>
+
+                    <div v-if="editableFields.includes('commentary')">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Комментарий
+                            <textarea
+                                v-model="editForm.commentary"
+                                class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                placeholder="Дополнительная информация"
+                            ></textarea>
+                        </label>
+                        <div v-if="editForm.errors.commentary" class="text-xs text-rose-700">
+                            {{ editForm.errors.commentary }}
+                        </div>
                     </div>
                 </div>
 
@@ -368,5 +524,13 @@ const submitModerationRequest = () => {
                 </form>
             </div>
         </div>
+
+        <AuthModal
+            :app-name="appName"
+            :is-open="showAuthModal"
+            :participant-roles="page.props.participantRoles || []"
+            :initial-mode="authMode"
+            @close="showAuthModal = false"
+        />
     </main>
 </template>

@@ -71,8 +71,12 @@ const createOpen = ref(false);
 const createNotice = ref('');
 const createForm = useForm({
     name: '',
-    address: '',
     venue_type_id: '',
+    city: '',
+    metro_id: '',
+    street: '',
+    building: '',
+    str_address: '',
 });
 
 const metroOptions = [
@@ -211,14 +215,18 @@ const openCreate = () => {
     createNotice.value = '';
     createForm.clearErrors();
     createForm.name = '';
-    createForm.address = '';
     createForm.venue_type_id = activeTypeOption.value?.id ?? '';
+    createForm.city = '';
+    createForm.metro_id = '';
+    createForm.street = '';
+    createForm.building = '';
+    createForm.str_address = '';
     createOpen.value = true;
 };
 
 const closeCreate = () => {
     createOpen.value = false;
-    createForm.reset('name', 'address', 'venue_type_id');
+    createForm.reset('name', 'venue_type_id', 'city', 'metro_id', 'street', 'building', 'str_address');
     createForm.clearErrors();
 };
 
@@ -438,8 +446,16 @@ const submitCreate = () => {
             @close="showAuthModal = false"
         />
 
-        <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeCreate">
+            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <button
+                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closeCreate"
+                >
+                    x
+                </button>
                 <form :class="{ loading: createForm.processing }" @submit.prevent="submitCreate">
                 <h2 class="text-lg font-semibold text-slate-900">Новая площадка</h2>
                 <p class="mt-2 text-sm text-slate-600">Заполните обязательные поля для создания площадки.</p>
@@ -477,16 +493,68 @@ const submitCreate = () => {
                     </div>
 
                     <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Адрес
+                        Город
                         <input
-                            v-model="createForm.address"
+                            v-model="createForm.city"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                             type="text"
-                            placeholder="Адрес площадки"
+                            placeholder="Город"
                         />
                     </label>
-                    <div v-if="createForm.errors.address" class="text-xs text-rose-700">
-                        {{ createForm.errors.address }}
+                    <div v-if="createForm.errors.city" class="text-xs text-rose-700">
+                        {{ createForm.errors.city }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Метро (ID)
+                        <input
+                            v-model="createForm.metro_id"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="number"
+                            placeholder="ID метро"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.metro_id" class="text-xs text-rose-700">
+                        {{ createForm.errors.metro_id }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Улица
+                        <input
+                            v-model="createForm.street"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                            placeholder="Улица"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.street" class="text-xs text-rose-700">
+                        {{ createForm.errors.street }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Дом
+                        <input
+                            v-model="createForm.building"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                            placeholder="Дом"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.building" class="text-xs text-rose-700">
+                        {{ createForm.errors.building }}
+                    </div>
+
+                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                        Адрес строкой
+                        <input
+                            v-model="createForm.str_address"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            type="text"
+                            placeholder="Полный адрес (опционально)"
+                        />
+                    </label>
+                    <div v-if="createForm.errors.str_address" class="text-xs text-rose-700">
+                        {{ createForm.errors.str_address }}
                     </div>
                 </div>
 

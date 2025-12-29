@@ -39,6 +39,7 @@ class FilamentVenuesModerationController extends Controller
             ->with([
                 'entityVenue.venueType:id,name,alias',
                 'entityVenue.creator:id,login',
+                'entityVenue.latestAddress',
                 'reviewer:id,login',
             ]);
 
@@ -76,7 +77,7 @@ class FilamentVenuesModerationController extends Controller
                             'id' => $venue->id,
                             'name' => $venue->name,
                             'status' => $venue->status?->value,
-                            'address' => $venue->address,
+                            'address' => $venue->latestAddress?->display_address,
                             'created_at' => DateFormatter::dateTime($venue->created_at),
                         ]
                         : null,

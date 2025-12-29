@@ -71,7 +71,7 @@ class VenuesController extends Controller
     public function show(string $type, Venue $venue)
     {
         $user = request()->user();
-        $venue->load(['venueType:id,name,alias', 'creator:id,login']);
+        $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress']);
 
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
@@ -87,6 +87,8 @@ class VenuesController extends Controller
             ->orderByDesc('submitted_at')
             ->first(['status', 'submitted_at', 'reviewed_at', 'reject_reason']);
 
+        $address = $venue->latestAddress;
+
         return Inertia::render('VenueShow', [
             'appName' => config('app.name'),
             'venue' => [
@@ -94,7 +96,16 @@ class VenuesController extends Controller
                 'name' => $venue->name,
                 'alias' => $venue->alias,
                 'status' => $venue->status?->value,
-                'address' => $venue->address,
+                        'address' => $address
+                    ? [
+                        'city' => $address->city,
+                        'metro_id' => $address->metro_id,
+                        'street' => $address->street,
+                        'building' => $address->building,
+                        'str_address' => $address->str_address,
+                        'display' => $address->display_address,
+                    ]
+                    : null,
                 'venue_type_id' => $venue->venue_type_id,
                 'commentary' => $venue->commentary,
                 'created_at' => DateFormatter::dateTime($venue->created_at),
@@ -131,8 +142,12 @@ class VenuesController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'address' => ['required', 'string', 'max:255'],
             'venue_type_id' => ['required', 'integer', 'exists:venue_types,id'],
+            'city' => ['required', 'string', 'max:255'],
+            'metro_id' => ['nullable', 'integer', 'min:1'],
+            'street' => ['required', 'string', 'max:255'],
+            'building' => ['required', 'string', 'max:255'],
+            'str_address' => ['nullable', 'string', 'max:255'],
         ]);
 
         $venue = Venue::query()->create([
@@ -141,7 +156,16 @@ class VenuesController extends Controller
             'status' => VenueStatus::Unconfirmed,
             'created_by' => $user->id,
             'venue_type_id' => $data['venue_type_id'],
-            'address' => $data['address'],
+        ]);
+
+        $venue->addresses()->create([
+            'city' => $data['city'],
+            'metro_id' => $data['metro_id'] ?? null,
+            'street' => $data['street'],
+            'building' => $data['building'],
+            'str_address' => $data['str_address'] ?? null,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
         ]);
 
         $typeSlug = $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : '';
@@ -183,7 +207,7 @@ class VenuesController extends Controller
 
         $fields = $service->getEditableFields($venue);
         if ($fields === []) {
-            return back()->withErrors(['venue' => 'Редактирование недоступно для подтвержденной площадки.']);
+            return back()->withErrors(['venue' => 'Редактирование недоступно для этой площадки.']);
         }
 
         $rules = Arr::only($service->getValidationRules($venue), $fields);

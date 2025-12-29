@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
+use App\Domain\Addresses\Models\Address;
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Users\Enums\ContactType;
@@ -141,9 +142,22 @@ class DatabaseSeeder extends Seeder
             'confirmed_at' => now(),
             'confirmed_by' => $admin->id,
             'venue_type_id' => $venueTypes['hall']->id,
-            'address' => 'Main street, 1',
-            'address_id' => null,
         ]);
+
+        $venue = Venue::query()->where('alias', Str::slug($venueName))->first();
+
+        if ($venue) {
+            Address::query()->create([
+                'venue_id' => $venue->id,
+                'city' => 'Москва',
+                'metro_id' => null,
+                'street' => 'Main street',
+                'building' => '1',
+                'str_address' => 'Main street, 1',
+                'created_by' => $admin->id,
+                'updated_by' => $admin->id,
+            ]);
+        }
     }
 
     private function seedUserContact(User $user, string $email, int $updatedBy): void

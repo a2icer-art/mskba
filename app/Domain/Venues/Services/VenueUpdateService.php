@@ -18,9 +18,37 @@ class VenueUpdateService
 
         $allowed = $this->getAllowedFields($venue);
 
-        $venue->fill(Arr::only($data, $allowed));
+        $venueFields = Arr::only($data, array_intersect($allowed, [
+            'name',
+            'venue_type_id',
+            'commentary',
+        ]));
+
+        $addressFields = Arr::only($data, array_intersect($allowed, [
+            'city',
+            'metro_id',
+            'street',
+            'building',
+            'str_address',
+        ]));
+
+        $venue->fill($venueFields);
         $venue->updated_by = $actor->id;
         $venue->save();
+
+        if ($addressFields !== []) {
+            $address = $venue->latestAddress;
+            if (!$address) {
+                $venue->addresses()->create(array_merge($addressFields, [
+                    'created_by' => $actor->id,
+                    'updated_by' => $actor->id,
+                ]));
+            } else {
+                $address->fill($addressFields);
+                $address->updated_by = $actor->id;
+                $address->save();
+            }
+        }
 
         return $venue;
     }
@@ -29,13 +57,20 @@ class VenueUpdateService
     {
         $rules = [
             'name' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
             'venue_type_id' => ['nullable', 'integer', 'exists:venue_types,id'],
             'commentary' => ['nullable', 'string'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'metro_id' => ['nullable', 'integer', 'min:1'],
+            'street' => ['nullable', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'str_address' => ['nullable', 'string', 'max:255'],
         ];
 
-        if ($venue->status === VenueStatus::Confirmed) {
-            foreach (VenueModerationRequirements::REQUIRED_FIELDS as $field) {
+        if ($this->isRestrictedStatus($venue)) {
+            foreach (array_merge(
+                VenueModerationRequirements::requiredVenueFields(),
+                VenueModerationRequirements::requiredAddressFields()
+            ) as $field) {
                 $rules[$field] = ['prohibited'];
             }
         }
@@ -45,7 +80,7 @@ class VenueUpdateService
 
     public function getEditableFields(Venue $venue): array
     {
-        return VenueModerationRequirements::editableFields($venue->status === VenueStatus::Confirmed);
+        return VenueModerationRequirements::editableFields($this->isRestrictedStatus($venue));
     }
 
     private function ensureOwner(User $actor, Venue $venue): void
@@ -59,11 +94,15 @@ class VenueUpdateService
 
     private function ensureFieldsAllowed(Venue $venue, array $data): void
     {
-        if ($venue->status !== VenueStatus::Confirmed) {
+        if (!$this->isRestrictedStatus($venue)) {
             return;
         }
 
-        $restricted = array_diff(VenueModerationRequirements::REQUIRED_FIELDS, $this->getAllowedFields($venue));
+        $required = array_merge(
+            VenueModerationRequirements::requiredVenueFields(),
+            VenueModerationRequirements::requiredAddressFields()
+        );
+        $restricted = array_diff($required, $this->getAllowedFields($venue));
         $attempted = array_intersect($restricted, array_keys($data));
 
         if ($attempted === []) {
@@ -81,5 +120,10 @@ class VenueUpdateService
     private function getAllowedFields(Venue $venue): array
     {
         return $this->getEditableFields($venue);
+    }
+
+    private function isRestrictedStatus(Venue $venue): bool
+    {
+        return in_array($venue->status, [VenueStatus::Confirmed, VenueStatus::Moderation], true);
     }
 }

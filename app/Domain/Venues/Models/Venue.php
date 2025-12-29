@@ -3,11 +3,14 @@
 namespace App\Domain\Venues\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Addresses\Models\Address;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Venue extends Model
@@ -25,8 +28,6 @@ class Venue extends Model
         'confirmed_at',
         'confirmed_by',
         'venue_type_id',
-        'address',
-        'address_id',
         'commentary',
         'blocked_at',
         'blocked_by',
@@ -46,6 +47,16 @@ class Venue extends Model
     public function venueType(): BelongsTo
     {
         return $this->belongsTo(VenueType::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(Address::class);
+    }
+
+    public function latestAddress(): HasOne
+    {
+        return $this->hasOne(Address::class)->latestOfMany();
     }
 
     public function creator(): BelongsTo

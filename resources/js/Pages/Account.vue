@@ -85,12 +85,36 @@ const moderationRejectedReason = computed(() => moderationRequest.value?.reject_
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
 const canResubmitModeration = computed(() => hasModerationRejectReason.value);
 const isProfileConfirmed = computed(() => props.user?.status === 'confirmed');
+const nonEditableProfileItems = computed(() => {
+    if (!isProfileConfirmed.value) {
+        return [];
+    }
+
+    const labels = {
+        first_name: 'Имя',
+        last_name: 'Фамилия',
+        gender: 'Пол',
+        birth_date: 'Дата рождения',
+    };
+    const values = {
+        first_name: props.profile?.first_name ?? '-',
+        last_name: props.profile?.last_name ?? '-',
+        gender: props.profile?.gender_label ?? '-',
+        birth_date: props.profile?.birth_date_display ?? '-',
+    };
+
+    return Object.keys(labels).map((field) => ({
+        key: field,
+        label: labels[field],
+        value: values[field],
+    }));
+});
 const hasSidebar = computed(() => accountMenuItems.value.length > 0);
 const logoutForm = useForm({});
 
 const formatDate = (value) => {
     if (!value) {
-        return '—';
+        return '-';
     }
 
     const date = new Date(value);
@@ -114,11 +138,11 @@ const userItems = computed(() => [
 ]);
 
 const profileItems = computed(() => [
-    { label: 'Имя', value: props.profile?.first_name ?? '—' },
-    { label: 'Фамилия', value: props.profile?.last_name ?? '—' },
-    { label: 'Отчество', value: props.profile?.middle_name ?? '—' },
-    { label: 'Пол', value: props.profile?.gender ?? '—' },
-    { label: 'Дата рождения', value: props.profile?.birth_date ?? '—' },
+    { label: 'Имя', value: props.profile?.first_name ?? '-' },
+    { label: 'Фамилия', value: props.profile?.last_name ?? '-' },
+    { label: 'Отчество', value: props.profile?.middle_name ?? '-' },
+    { label: 'Пол', value: props.profile?.gender_label ?? '-' },
+    { label: 'Дата рождения', value: props.profile?.birth_date_display ?? '-' },
 ]);
 
 const roleItems = (role) => [
@@ -1278,41 +1302,56 @@ const logout = () => {
             <MainFooter :app-name="appName" />
         </div>
 
-        <div v-if="profileEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div v-if="profileEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeProfileEdit">
+            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <button
+                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closeProfileEdit"
+                >
+                    x
+                </button>
                 <form :class="{ loading: profileForm.processing }" @submit.prevent="submitProfileUpdate">
                 <h2 class="text-lg font-semibold text-slate-900">Редактирование профиля</h2>
                 <p class="mt-2 text-sm text-slate-600">
                     Заполните доступные поля профиля и сохраните изменения.
                 </p>
-                <p v-if="isProfileConfirmed" class="mt-2 text-xs text-slate-500">
-                    Часть полей недоступна для редактирования так как запись уже подтверждена.
-                </p>
+                <div
+                    v-if="isProfileConfirmed"
+                    class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                >
+                    <p class="font-semibold text-slate-700">Подтвержденная информация</p>
+                    <div v-if="nonEditableProfileItems.length" class="mt-2 space-y-2">
+                        <div v-for="item in nonEditableProfileItems" :key="item.key" class="flex items-center justify-between gap-3">
+                            <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                            <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="mt-4 flex flex-col gap-3">
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Имя
                         <input
                             v-model="profileForm.first_name"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
                             type="text"
-                            :disabled="isProfileConfirmed"
                         />
                     </label>
-                    <div v-if="profileForm.errors.first_name" class="text-xs text-rose-700">
+                    <div v-if="!isProfileConfirmed && profileForm.errors.first_name" class="text-xs text-rose-700">
                         {{ profileForm.errors.first_name }}
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Фамилия
                         <input
                             v-model="profileForm.last_name"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
                             type="text"
-                            :disabled="isProfileConfirmed"
                         />
                     </label>
-                    <div v-if="profileForm.errors.last_name" class="text-xs text-rose-700">
+                    <div v-if="!isProfileConfirmed && profileForm.errors.last_name" class="text-xs text-rose-700">
                         {{ profileForm.errors.last_name }}
                     </div>
 
@@ -1328,32 +1367,30 @@ const logout = () => {
                         {{ profileForm.errors.middle_name }}
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Пол
                         <select
                             v-model="profileForm.gender"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
-                            :disabled="isProfileConfirmed"
                         >
                             <option value="">Не определен</option>
                             <option value="male">Мужской</option>
                             <option value="female">Женский</option>
                         </select>
                     </label>
-                    <div v-if="profileForm.errors.gender" class="text-xs text-rose-700">
+                    <div v-if="!isProfileConfirmed && profileForm.errors.gender" class="text-xs text-rose-700">
                         {{ profileForm.errors.gender }}
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Дата рождения
                         <input
                             v-model="profileForm.birth_date"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
                             type="date"
-                            :disabled="isProfileConfirmed"
                         />
                     </label>
-                    <div v-if="profileForm.errors.birth_date" class="text-xs text-rose-700">
+                    <div v-if="!isProfileConfirmed && profileForm.errors.birth_date" class="text-xs text-rose-700">
                         {{ profileForm.errors.birth_date }}
                     </div>
                 </div>
@@ -1376,15 +1413,23 @@ const logout = () => {
                         type="submit"
                         :disabled="profileForm.processing"
                     >
-                        Сохранить профиль
+                        Сохранить
                     </button>
                 </div>
                 </form>
             </div>
         </div>
 
-        <div v-if="passwordEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div v-if="passwordEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closePasswordEdit">
+            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <button
+                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closePasswordEdit"
+                >
+                    x
+                </button>
                 <form :class="{ loading: passwordForm.processing }" @submit.prevent="submitPasswordUpdate">
                 <h2 class="text-lg font-semibold text-slate-900">Изменить пароль</h2>
                 <p class="mt-2 text-sm text-slate-600">Укажите новый пароль для вашей учетной записи.</p>
@@ -1419,7 +1464,7 @@ const logout = () => {
                         type="submit"
                         :disabled="passwordForm.processing"
                     >
-                        Сохранить пароль
+                        Сохранить
                     </button>
                 </div>
                 </form>
