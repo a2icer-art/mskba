@@ -3,6 +3,9 @@
 namespace App\Domain\Users\Services;
 
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Moderation\Enums\ModerationEntityType;
+use App\Domain\Moderation\Enums\ModerationStatus;
+use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Moderation\Requirements\UserModerationRequirements;
 use App\Models\User;
@@ -41,7 +44,7 @@ class AccountProfileUpdateService
 
     public function getProfileValidationRules(User $user): array
     {
-        if ($user->status === UserStatus::Confirmed) {
+        if ($this->isRestrictedStatus($user)) {
             $rules = [];
             foreach (UserModerationRequirements::requiredProfileFields() as $field) {
                 $rules[$field] = ['prohibited'];
@@ -68,7 +71,7 @@ class AccountProfileUpdateService
 
     private function ensureProfileAllowed(User $user, array $data): void
     {
-        if ($user->status !== UserStatus::Confirmed) {
+        if (!$this->isRestrictedStatus($user)) {
             return;
         }
 
@@ -89,6 +92,19 @@ class AccountProfileUpdateService
 
     private function getAllowedProfileFields(User $user): array
     {
-        return UserModerationRequirements::editableProfileFields($user->status === UserStatus::Confirmed);
+        return UserModerationRequirements::editableProfileFields($this->isRestrictedStatus($user));
+    }
+
+    private function isRestrictedStatus(User $user): bool
+    {
+        if ($user->status === UserStatus::Confirmed) {
+            return true;
+        }
+
+        return ModerationRequest::query()
+            ->where('entity_type', ModerationEntityType::User->value)
+            ->where('entity_id', $user->id)
+            ->where('status', ModerationStatus::Pending->value)
+            ->exists();
     }
 }

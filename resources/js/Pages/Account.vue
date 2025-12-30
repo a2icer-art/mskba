@@ -85,8 +85,9 @@ const moderationRejectedReason = computed(() => moderationRequest.value?.reject_
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
 const canResubmitModeration = computed(() => hasModerationRejectReason.value);
 const isProfileConfirmed = computed(() => props.user?.status === 'confirmed');
+const isProfileRestricted = computed(() => isProfileConfirmed.value || isModerationPending.value);
 const nonEditableProfileItems = computed(() => {
-    if (!isProfileConfirmed.value) {
+    if (!isProfileRestricted.value) {
         return [];
     }
 
@@ -1318,10 +1319,12 @@ const logout = () => {
                     Заполните доступные поля профиля и сохраните изменения.
                 </p>
                 <div
-                    v-if="isProfileConfirmed"
+                    v-if="isProfileRestricted"
                     class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
                 >
-                    <p class="font-semibold text-slate-700">Подтвержденная информация</p>
+                    <p class="font-semibold text-slate-700">
+                        {{ isProfileConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
+                    </p>
                     <div v-if="nonEditableProfileItems.length" class="mt-2 space-y-2">
                         <div v-for="item in nonEditableProfileItems" :key="item.key" class="flex items-center justify-between gap-3">
                             <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
@@ -1331,7 +1334,7 @@ const logout = () => {
                 </div>
 
                 <div class="mt-4 flex flex-col gap-3">
-                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Имя
                         <input
                             v-model="profileForm.first_name"
@@ -1339,11 +1342,11 @@ const logout = () => {
                             type="text"
                         />
                     </label>
-                    <div v-if="!isProfileConfirmed && profileForm.errors.first_name" class="text-xs text-rose-700">
+                    <div v-if="!isProfileRestricted && profileForm.errors.first_name" class="text-xs text-rose-700">
                         {{ profileForm.errors.first_name }}
                     </div>
 
-                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Фамилия
                         <input
                             v-model="profileForm.last_name"
@@ -1351,7 +1354,7 @@ const logout = () => {
                             type="text"
                         />
                     </label>
-                    <div v-if="!isProfileConfirmed && profileForm.errors.last_name" class="text-xs text-rose-700">
+                    <div v-if="!isProfileRestricted && profileForm.errors.last_name" class="text-xs text-rose-700">
                         {{ profileForm.errors.last_name }}
                     </div>
 
@@ -1367,7 +1370,7 @@ const logout = () => {
                         {{ profileForm.errors.middle_name }}
                     </div>
 
-                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Пол
                         <select
                             v-model="profileForm.gender"
@@ -1378,11 +1381,11 @@ const logout = () => {
                             <option value="female">Женский</option>
                         </select>
                     </label>
-                    <div v-if="!isProfileConfirmed && profileForm.errors.gender" class="text-xs text-rose-700">
+                    <div v-if="!isProfileRestricted && profileForm.errors.gender" class="text-xs text-rose-700">
                         {{ profileForm.errors.gender }}
                     </div>
 
-                    <label v-if="!isProfileConfirmed" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Дата рождения
                         <input
                             v-model="profileForm.birth_date"
@@ -1390,7 +1393,7 @@ const logout = () => {
                             type="date"
                         />
                     </label>
-                    <div v-if="!isProfileConfirmed && profileForm.errors.birth_date" class="text-xs text-rose-700">
+                    <div v-if="!isProfileRestricted && profileForm.errors.birth_date" class="text-xs text-rose-700">
                         {{ profileForm.errors.birth_date }}
                     </div>
                 </div>
