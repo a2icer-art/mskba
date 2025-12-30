@@ -38,6 +38,7 @@ class VenuesController extends Controller
                 'items' => $navItems,
             ],
             'types' => $types,
+            'metros' => $catalog->getMetroOptions(),
         ]);
     }
 
@@ -65,13 +66,14 @@ class VenuesController extends Controller
                 'items' => $navItems,
             ],
             'types' => $types,
+            'metros' => $catalog->getMetroOptions(),
         ]);
     }
 
     public function show(string $type, Venue $venue)
     {
         $user = request()->user();
-        $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress']);
+        $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress', 'metro:id,name,line_name,line_color,city']);
 
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
@@ -96,10 +98,9 @@ class VenuesController extends Controller
                 'name' => $venue->name,
                 'alias' => $venue->alias,
                 'status' => $venue->status?->value,
-                        'address' => $address
+                'address' => $address
                     ? [
                         'city' => $address->city,
-                        'metro_id' => $address->metro_id,
                         'street' => $address->street,
                         'building' => $address->building,
                         'str_address' => $address->str_address,
@@ -107,11 +108,13 @@ class VenuesController extends Controller
                     ]
                     : null,
                 'venue_type_id' => $venue->venue_type_id,
+                'metro_id' => $venue->metro_id,
                 'commentary' => $venue->commentary,
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'confirmed_at' => DateFormatter::dateTime($venue->confirmed_at),
                 'block_reason' => $venue->block_reason,
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
+                'metro' => $venue->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
                 'creator' => $venue->creator?->only(['id', 'login']),
             ],
             'moderationRequest' => $latestRequest
@@ -128,6 +131,7 @@ class VenuesController extends Controller
             ],
             'activeTypeSlug' => $type,
             'types' => $types,
+            'metros' => $catalog->getMetroOptions(),
             'editableFields' => $editableFields,
             'canEdit' => (bool) $isOwner,
         ]);
@@ -143,8 +147,8 @@ class VenuesController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'venue_type_id' => ['required', 'integer', 'exists:venue_types,id'],
+            'metro_id' => ['nullable', 'integer', 'exists:metros,id'],
             'city' => ['required', 'string', 'max:255'],
-            'metro_id' => ['nullable', 'integer', 'min:1'],
             'street' => ['required', 'string', 'max:255'],
             'building' => ['required', 'string', 'max:255'],
             'str_address' => ['nullable', 'string', 'max:255'],
@@ -156,11 +160,11 @@ class VenuesController extends Controller
             'status' => VenueStatus::Unconfirmed,
             'created_by' => $user->id,
             'venue_type_id' => $data['venue_type_id'],
+            'metro_id' => $data['metro_id'] ?? null,
         ]);
 
         $venue->addresses()->create([
             'city' => $data['city'],
-            'metro_id' => $data['metro_id'] ?? null,
             'street' => $data['street'],
             'building' => $data['building'],
             'str_address' => $data['str_address'] ?? null,

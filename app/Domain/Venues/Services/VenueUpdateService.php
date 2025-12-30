@@ -21,12 +21,12 @@ class VenueUpdateService
         $venueFields = Arr::only($data, array_intersect($allowed, [
             'name',
             'venue_type_id',
+            'metro_id',
             'commentary',
         ]));
 
         $addressFields = Arr::only($data, array_intersect($allowed, [
             'city',
-            'metro_id',
             'street',
             'building',
             'str_address',
@@ -58,9 +58,9 @@ class VenueUpdateService
         $rules = [
             'name' => ['nullable', 'string', 'max:255'],
             'venue_type_id' => ['nullable', 'integer', 'exists:venue_types,id'],
+            'metro_id' => ['nullable', 'integer', 'exists:metros,id'],
             'commentary' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:255'],
-            'metro_id' => ['nullable', 'integer', 'min:1'],
             'street' => ['nullable', 'string', 'max:255'],
             'building' => ['nullable', 'string', 'max:255'],
             'str_address' => ['nullable', 'string', 'max:255'],

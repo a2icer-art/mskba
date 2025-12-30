@@ -5,6 +5,7 @@ namespace App\Domain\Venues\Services;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Metros\Models\Metro;
 use App\Support\DateFormatter;
 use Illuminate\Support\Str;
 
@@ -32,6 +33,25 @@ class VenueCatalogService
                 'id' => $type->id,
                 'name' => $type->name,
                 'alias' => $type->alias,
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function getMetroOptions(): array
+    {
+        return Metro::query()
+            ->where('status', 1)
+            ->orderBy('city')
+            ->orderBy('line_name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'line_name', 'line_color', 'city'])
+            ->map(fn (Metro $metro) => [
+                'id' => $metro->id,
+                'name' => $metro->name,
+                'line_name' => $metro->line_name,
+                'line_color' => $metro->line_color,
+                'city' => $metro->city,
             ])
             ->values()
             ->all();
@@ -82,7 +102,7 @@ class VenueCatalogService
     private function getHalls(?int $userId, int $roleLevel): array
     {
         $query = Venue::query()
-            ->with(['venueType:id,name,alias', 'latestAddress'])
+            ->with(['venueType:id,name,alias', 'latestAddress', 'metro:id,name,line_name,line_color,city'])
             ->orderBy('name');
 
         if ($roleLevel <= 20) {
@@ -102,6 +122,7 @@ class VenueCatalogService
                 'alias' => $venue->alias,
                 'status' => $venue->status?->value,
                 'address' => $venue->latestAddress?->display_address,
+                'metro' => $venue->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
                 'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,

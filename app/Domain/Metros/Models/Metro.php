@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Domain\Addresses\Models;
+namespace App\Domain\Metros\Models;
 
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Venues\Models\Venue;
@@ -8,27 +8,31 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Address extends Model
+class Metro extends Model
 {
     use HasFactory;
     use Auditable;
     use SoftDeletes;
 
     protected $fillable = [
-        'venue_id',
+        'name',
+        'alias',
+        'line_name',
+        'line_color',
         'city',
-        'street',
-        'building',
-        'str_address',
+        'status',
+        'commentary',
         'created_by',
         'updated_by',
+        'deleted_by',
     ];
 
-    public function venue(): BelongsTo
+    public function venues(): HasMany
     {
-        return $this->belongsTo(Venue::class);
+        return $this->hasMany(Venue::class);
     }
 
     public function creator(): BelongsTo
@@ -41,18 +45,8 @@ class Address extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    public function getDisplayAddressAttribute(): string
+    public function deleter(): BelongsTo
     {
-        if ($this->str_address) {
-            return $this->str_address;
-        }
-
-        $parts = array_filter([
-            $this->city,
-            $this->street,
-            $this->building,
-        ]);
-
-        return implode(', ', $parts);
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }

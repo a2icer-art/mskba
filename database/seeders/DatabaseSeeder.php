@@ -132,6 +132,8 @@ class DatabaseSeeder extends Seeder
             return [$data['alias'] => $venueType];
         });
 
+        $this->call(MetroSeeder::class);
+
         $venueName = 'Main Hall';
         Venue::query()->create([
             'name' => $venueName,
@@ -150,7 +152,6 @@ class DatabaseSeeder extends Seeder
             Address::query()->create([
                 'venue_id' => $venue->id,
                 'city' => 'Москва',
-                'metro_id' => null,
                 'street' => 'Main street',
                 'building' => '1',
                 'str_address' => 'Main street, 1',

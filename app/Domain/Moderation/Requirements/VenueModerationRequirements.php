@@ -17,7 +17,7 @@ class VenueModerationRequirements
 
     public const OPTIONAL_FIELDS = [
         'commentary',
-       // 'metro_id',
+        'metro_id',
         'str_address',
     ];
 

@@ -19,7 +19,6 @@ class AddressFactory extends Factory
         return [
             'venue_id' => Venue::factory(),
             'city' => 'Москва',
-            'metro_id' => fake()->optional()->numberBetween(1, 200),
             'street' => fake()->streetName(),
             'building' => (string) fake()->buildingNumber(),
             'str_address' => fake()->optional()->address(),

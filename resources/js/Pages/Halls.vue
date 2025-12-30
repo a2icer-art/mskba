@@ -31,6 +31,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    metros: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const page = usePage();
@@ -79,13 +83,7 @@ const createForm = useForm({
     str_address: '',
 });
 
-const metroOptions = [
-    '',
-    'Тверская',
-    'Маяковская',
-    'Пушкинская',
-    'Кузнецкий Мост',
-];
+const metroOptions = computed(() => props.metros ?? []);
 
 const typeOptions = computed(() => {
     const map = new Map();
@@ -115,11 +113,18 @@ const addButtonLabel = computed(() => {
     return `Добавить ${activeTypeOption.value.name?.toLowerCase()}`;
 });
 
+const formatMetroLabel = (metro) => {
+    if (!metro) {
+        return '';
+    }
+    return metro.line_name ? `${metro.name} — ${metro.line_name}` : metro.name;
+};
+
 const normalized = (value) => (value ?? '').toString().toLowerCase();
 
 const filtered = computed(() => {
     const addressNeedle = normalized(addressFilter.value);
-    const metroNeedle = normalized(metroFilter.value);
+    const metroSelected = metroFilter.value ? Number(metroFilter.value) : null;
 
     return props.halls.filter((hall) => {
         if (typeFilter.value && hall.type?.alias !== typeFilter.value) {
@@ -134,7 +139,7 @@ const filtered = computed(() => {
             return false;
         }
 
-        if (metroNeedle && !normalized(hall.address).includes(metroNeedle)) {
+        if (metroSelected && hall.metro?.id !== metroSelected) {
             return false;
         }
 
@@ -315,8 +320,9 @@ const submitCreate = () => {
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                             Метро
                             <select v-model="metroFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option v-for="metro in metroOptions" :key="metro" :value="metro">
-                                    {{ metro || 'Любое' }}
+                                <option value="">Любое</option>
+                                <option v-for="metro in metroOptions" :key="metro.id" :value="metro.id">
+                                    {{ formatMetroLabel(metro) }}
                                 </option>
                             </select>
                         </label>
@@ -365,6 +371,9 @@ const submitCreate = () => {
                                         </p>
                                         <p v-if="hall.address" class="mt-2 text-sm text-slate-600">
                                             {{ hall.address }}
+                                        </p>
+                                        <p v-if="hall.metro?.name" class="mt-1 text-xs text-slate-500">
+                                            Метро: {{ formatMetroLabel(hall.metro) }}
                                         </p>
                                     </div>
                                     <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
@@ -506,13 +515,16 @@ const submitCreate = () => {
                     </div>
 
                     <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Метро (ID)
-                        <input
+                        Метро
+                        <select
                             v-model="createForm.metro_id"
                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="number"
-                            placeholder="ID метро"
-                        />
+                        >
+                            <option value="">Выберите метро</option>
+                            <option v-for="metro in metroOptions" :key="metro.id" :value="metro.id">
+                                {{ formatMetroLabel(metro) }}
+                            </option>
+                        </select>
                     </label>
                     <div v-if="createForm.errors.metro_id" class="text-xs text-rose-700">
                         {{ createForm.errors.metro_id }}

@@ -31,6 +31,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    metros: {
+        type: Array,
+        default: () => [],
+    },
     editableFields: {
         type: Array,
         default: () => [],
@@ -62,20 +66,23 @@ const editForm = useForm({
 });
 
 const availableTypes = computed(() => props.types ?? []);
+const availableMetros = computed(() => props.metros ?? []);
 const editableFields = computed(() => props.editableFields ?? []);
 const canEdit = computed(() => props.canEdit);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
 const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
 const nonEditableItems = computed(() => {
-    const addressFields = ['city', 'metro_id', 'street', 'building', 'str_address'];
+    const addressFields = ['city', 'street', 'building', 'str_address'];
     const labels = {
         venue_type_id: 'Тип',
         name: 'Название',
+        metro_id: 'Метро',
         commentary: 'Комментарий',
     };
     const values = {
         venue_type_id: props.venue?.type?.name ?? '-',
         name: props.venue?.name ?? '-',
+        metro_id: formatMetroLabel(props.venue?.metro),
         commentary: props.venue?.commentary ?? '-',
     };
 
@@ -132,7 +139,7 @@ watch(
 
 const formatDate = (value) => {
     if (!value) {
-        return '—';
+        return '-';
     }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -141,14 +148,21 @@ const formatDate = (value) => {
     return date.toLocaleString('ru-RU');
 };
 
+const formatMetroLabel = (metro) => {
+    if (!metro) {
+        return '-';
+    }
+    return metro.line_name ? `${metro.name} — ${metro.line_name}` : metro.name;
+};
+
 const openEdit = () => {
     editNotice.value = '';
     editForm.clearErrors();
     editForm.name = props.venue?.name ?? '';
     editForm.venue_type_id = props.venue?.venue_type_id ?? props.venue?.type?.id ?? '';
+    editForm.metro_id = props.venue?.metro_id ?? props.venue?.metro?.id ?? '';
     editForm.commentary = props.venue?.commentary ?? '';
     editForm.city = props.venue?.address?.city ?? '';
-    editForm.metro_id = props.venue?.address?.metro_id ?? '';
     editForm.street = props.venue?.address?.street ?? '';
     editForm.building = props.venue?.address?.building ?? '';
     editForm.str_address = props.venue?.address?.str_address ?? '';
@@ -157,7 +171,7 @@ const openEdit = () => {
 
 const closeEdit = () => {
     editOpen.value = false;
-    editForm.reset('name', 'venue_type_id', 'commentary', 'city', 'metro_id', 'street', 'building', 'str_address');
+    editForm.reset('name', 'venue_type_id', 'metro_id', 'commentary', 'city', 'street', 'building', 'str_address');
     editForm.clearErrors();
 };
 
@@ -324,11 +338,15 @@ const submitModerationRequest = () => {
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span class="text-sm font-medium text-slate-800">{{ venue?.address?.display || '—' }}</span>
+                            <span class="text-sm font-medium text-slate-800">{{ venue?.address?.display || '-' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Метро</span>
+                            <span class="text-sm font-medium text-slate-800">{{ formatMetroLabel(venue?.metro) }}</span>
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
-                            <span class="text-sm font-medium text-slate-800">{{ venue?.commentary || '—' }}</span>
+                            <span class="text-sm font-medium text-slate-800">{{ venue?.commentary || '-' }}</span>
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
@@ -424,13 +442,16 @@ const submitModerationRequest = () => {
 
                     <div v-if="editableFields.includes('metro_id')">
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Метро (ID)
-                            <input
+                            Метро
+                            <select
                                 v-model="editForm.metro_id"
                                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="number"
-                                placeholder="ID метро"
-                            />
+                            >
+                                <option value="">Выберите метро</option>
+                                <option v-for="metro in availableMetros" :key="metro.id" :value="metro.id">
+                                    {{ formatMetroLabel(metro) }}
+                                </option>
+                            </select>
                         </label>
                         <div v-if="editForm.errors.metro_id" class="text-xs text-rose-700">
                             {{ editForm.errors.metro_id }}
