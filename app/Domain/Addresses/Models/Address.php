@@ -3,6 +3,7 @@
 namespace App\Domain\Addresses\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Metros\Models\Metro;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ class Address extends Model
     protected $fillable = [
         'venue_id',
         'city',
+        'metro_id',
         'street',
         'building',
         'str_address',
@@ -29,6 +31,11 @@ class Address extends Model
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function metro(): BelongsTo
+    {
+        return $this->belongsTo(Metro::class);
     }
 
     public function creator(): BelongsTo

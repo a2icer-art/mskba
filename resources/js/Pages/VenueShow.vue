@@ -31,10 +31,6 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    metros: {
-        type: Array,
-        default: () => [],
-    },
     editableFields: {
         type: Array,
         default: () => [],
@@ -54,6 +50,13 @@ const moderationNotice = ref('');
 const moderationErrors = ref([]);
 const editOpen = ref(false);
 const editNotice = ref('');
+const editAddressQuery = ref('');
+const editAddressSuggestions = ref([]);
+const editAddressSuggestError = ref('');
+const editAddressSuggestLoading = ref(false);
+const isApplyingEditAddress = ref(false);
+let editAddressSuggestTimer = null;
+let editAddressSuggestRequestId = 0;
 const editForm = useForm({
     name: '',
     venue_type_id: '',
@@ -66,23 +69,23 @@ const editForm = useForm({
 });
 
 const availableTypes = computed(() => props.types ?? []);
-const availableMetros = computed(() => props.metros ?? []);
 const editableFields = computed(() => props.editableFields ?? []);
+const addressEditable = computed(() =>
+    ['city', 'street', 'building', 'metro_id'].some((field) => editableFields.value.includes(field))
+);
 const canEdit = computed(() => props.canEdit);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
 const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
 const nonEditableItems = computed(() => {
-    const addressFields = ['city', 'street', 'building', 'str_address'];
+    const addressFields = ['city', 'street', 'building', 'metro_id'];
     const labels = {
         venue_type_id: 'Тип',
         name: 'Название',
-        metro_id: 'Метро',
         commentary: 'Комментарий',
     };
     const values = {
         venue_type_id: props.venue?.type?.name ?? '-',
         name: props.venue?.name ?? '-',
-        metro_id: formatMetroLabel(props.venue?.metro),
         commentary: props.venue?.commentary ?? '-',
     };
 
@@ -107,6 +110,13 @@ const nonEditableItems = computed(() => {
             label: 'Адрес',
             value: addressValue,
         });
+        if (props.venue?.address?.metro) {
+            items.push({
+                key: 'address_metro',
+                label: 'Метро',
+                value: formatMetroLabel(props.venue?.address?.metro),
+            });
+        }
     }
 
     return items;
@@ -160,12 +170,17 @@ const openEdit = () => {
     editForm.clearErrors();
     editForm.name = props.venue?.name ?? '';
     editForm.venue_type_id = props.venue?.venue_type_id ?? props.venue?.type?.id ?? '';
-    editForm.metro_id = props.venue?.metro_id ?? props.venue?.metro?.id ?? '';
+    editForm.metro_id = props.venue?.address?.metro_id ?? props.venue?.address?.metro?.id ?? '';
     editForm.commentary = props.venue?.commentary ?? '';
     editForm.city = props.venue?.address?.city ?? '';
     editForm.street = props.venue?.address?.street ?? '';
     editForm.building = props.venue?.address?.building ?? '';
-    editForm.str_address = props.venue?.address?.str_address ?? '';
+    editForm.str_address = isVenueConfirmed.value || isVenueOnModeration.value
+        ? props.venue?.str_address ?? ''
+        : props.venue?.address?.str_address ?? '';
+    editAddressQuery.value = props.venue?.address?.display ?? '';
+    editAddressSuggestions.value = [];
+    editAddressSuggestError.value = '';
     editOpen.value = true;
 };
 
@@ -173,6 +188,9 @@ const closeEdit = () => {
     editOpen.value = false;
     editForm.reset('name', 'venue_type_id', 'metro_id', 'commentary', 'city', 'street', 'building', 'str_address');
     editForm.clearErrors();
+    editAddressQuery.value = '';
+    editAddressSuggestions.value = [];
+    editAddressSuggestError.value = '';
 };
 
 const submitEdit = () => {
@@ -191,6 +209,87 @@ const submitEdit = () => {
             editNotice.value = 'Площадка обновлена.';
         },
     });
+};
+
+const scheduleEditAddressSuggest = (value) => {
+    if (isApplyingEditAddress.value) {
+        isApplyingEditAddress.value = false;
+        return;
+    }
+    editAddressSuggestError.value = '';
+    editForm.city = '';
+    editForm.street = '';
+    editForm.building = '';
+    editForm.metro_id = '';
+    editForm.str_address = '';
+    if (editAddressSuggestTimer) {
+        clearTimeout(editAddressSuggestTimer);
+    }
+
+    const query = value?.trim() ?? '';
+    if (query.length < 3) {
+        editAddressSuggestions.value = [];
+        return;
+    }
+
+    editAddressSuggestTimer = setTimeout(() => {
+        fetchEditAddressSuggestions(query);
+    }, 350);
+};
+
+const fetchEditAddressSuggestions = async (query) => {
+    const requestId = ++editAddressSuggestRequestId;
+    editAddressSuggestLoading.value = true;
+    try {
+        const response = await fetch(`/integrations/address-suggest?query=${encodeURIComponent(query)}`, {
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            if (requestId !== editAddressSuggestRequestId) {
+                return;
+            }
+            editAddressSuggestions.value = [];
+            editAddressSuggestError.value = 'Не удалось получить подсказки.';
+            return;
+        }
+        const data = await response.json();
+        if (requestId !== editAddressSuggestRequestId) {
+            return;
+        }
+        editAddressSuggestions.value = data?.suggestions ?? [];
+        if (!editAddressSuggestions.value.length) {
+            editAddressSuggestError.value = 'Варианты не найдены.';
+        } else {
+            editAddressSuggestError.value = '';
+        }
+    } catch (error) {
+        if (requestId !== editAddressSuggestRequestId) {
+            return;
+        }
+        editAddressSuggestions.value = [];
+        editAddressSuggestError.value = 'Не удалось получить подсказки.';
+    } finally {
+        if (requestId !== editAddressSuggestRequestId) {
+            return;
+        }
+        editAddressSuggestLoading.value = false;
+    }
+};
+
+const applyEditAddressSuggestion = (suggestion) => {
+    if (!suggestion?.has_house) {
+        editAddressSuggestError.value = 'Выберите вариант с номером дома.';
+        return;
+    }
+    isApplyingEditAddress.value = true;
+    editAddressQuery.value = suggestion.label || '';
+    editForm.city = suggestion.city || '';
+    editForm.street = suggestion.street || '';
+    editForm.building = suggestion.building || '';
+    editForm.str_address = suggestion.label || '';
+    editForm.metro_id = suggestion.metro_id || '';
+    editAddressSuggestions.value = [];
+    editAddressSuggestError.value = '';
 };
 
 const submitModerationRequest = () => {
@@ -342,7 +441,7 @@ const submitModerationRequest = () => {
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Метро</span>
-                            <span class="text-sm font-medium text-slate-800">{{ formatMetroLabel(venue?.metro) }}</span>
+                            <span class="text-sm font-medium text-slate-800">{{ formatMetroLabel(venue?.address?.metro) }}</span>
                         </div>
                         <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
@@ -425,77 +524,56 @@ const submitModerationRequest = () => {
                         </div>
                     </div>
 
-                    <div v-if="editableFields.includes('city')">
+                    <div v-if="addressEditable && !isVenueConfirmed && !isVenueOnModeration" class="relative">
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Город
+                            Адрес
                             <input
-                                v-model="editForm.city"
+                                v-model="editAddressQuery"
+                                @input="scheduleEditAddressSuggest($event.target.value)"
                                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                                 type="text"
-                                placeholder="Город"
+                                placeholder="Начните вводить адрес"
                             />
                         </label>
-                        <div v-if="editForm.errors.city" class="text-xs text-rose-700">
-                            {{ editForm.errors.city }}
+                        <input v-model="editForm.city" type="hidden" />
+                        <input v-model="editForm.metro_id" type="hidden" />
+                        <input v-model="editForm.street" type="hidden" />
+                        <input v-model="editForm.building" type="hidden" />
+                        <input v-model="editForm.str_address" type="hidden" />
+                        <div v-if="editAddressSuggestLoading" class="text-xs text-slate-500">
+                            Загрузка подсказок...
                         </div>
-                    </div>
-
-                    <div v-if="editableFields.includes('metro_id')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Метро
-                            <select
-                                v-model="editForm.metro_id"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        <div v-else-if="editAddressSuggestError" class="text-xs text-rose-700">
+                            {{ editAddressSuggestError }}
+                        </div>
+                        <div
+                            v-else-if="editAddressSuggestions.length"
+                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                        >
+                            <button
+                                v-for="(suggestion, index) in editAddressSuggestions"
+                                :key="`${suggestion.label}-${index}`"
+                                class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                                type="button"
+                                :disabled="!suggestion.has_house"
+                                @click="applyEditAddressSuggestion(suggestion)"
                             >
-                                <option value="">Выберите метро</option>
-                                <option v-for="metro in availableMetros" :key="metro.id" :value="metro.id">
-                                    {{ formatMetroLabel(metro) }}
-                                </option>
-                            </select>
-                        </label>
-                        <div v-if="editForm.errors.metro_id" class="text-xs text-rose-700">
-                            {{ editForm.errors.metro_id }}
+                                {{ suggestion.label }}
+                            </button>
+                        </div>
+                        <div v-if="editForm.errors.city || editForm.errors.street || editForm.errors.building" class="text-xs text-rose-700">
+                            {{ editForm.errors.city || editForm.errors.street || editForm.errors.building }}
                         </div>
                     </div>
 
-                    <div v-if="editableFields.includes('street')">
+                    <div v-if="editableFields.includes('str_address') && (isVenueConfirmed || isVenueOnModeration)">
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Улица
-                            <input
-                                v-model="editForm.street"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="text"
-                                placeholder="Улица"
-                            />
-                        </label>
-                        <div v-if="editForm.errors.street" class="text-xs text-rose-700">
-                            {{ editForm.errors.street }}
-                        </div>
-                    </div>
-
-                    <div v-if="editableFields.includes('building')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Дом
-                            <input
-                                v-model="editForm.building"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="text"
-                                placeholder="Дом"
-                            />
-                        </label>
-                        <div v-if="editForm.errors.building" class="text-xs text-rose-700">
-                            {{ editForm.errors.building }}
-                        </div>
-                    </div>
-
-                    <div v-if="editableFields.includes('str_address')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес строкой
+                            Адрес (строкой)
                             <input
                                 v-model="editForm.str_address"
                                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                                 type="text"
-                                placeholder="Полный адрес (опционально)"
+                                placeholder="Например, Россия, Москва, Тверская, 1"
                             />
                         </label>
                         <div v-if="editForm.errors.str_address" class="text-xs text-rose-700">

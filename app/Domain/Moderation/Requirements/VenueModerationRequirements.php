@@ -15,22 +15,26 @@ class VenueModerationRequirements
         'building',
     ];
 
-    public const OPTIONAL_FIELDS = [
+    public const OPTIONAL_VENUE_FIELDS = [
         'commentary',
-        'metro_id',
         'str_address',
+    ];
+
+    public const OPTIONAL_ADDRESS_FIELDS = [
+        'metro_id',
     ];
 
     public static function editableFields(bool $confirmed): array
     {
         if ($confirmed) {
-            return self::OPTIONAL_FIELDS;
+            return self::OPTIONAL_VENUE_FIELDS;
         }
 
         return array_values(array_unique(array_merge(
             self::REQUIRED_VENUE_FIELDS,
             self::REQUIRED_ADDRESS_FIELDS,
-            self::OPTIONAL_FIELDS
+            self::OPTIONAL_VENUE_FIELDS,
+            self::OPTIONAL_ADDRESS_FIELDS
         )));
     }
 

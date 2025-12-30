@@ -102,7 +102,7 @@ class VenueCatalogService
     private function getHalls(?int $userId, int $roleLevel): array
     {
         $query = Venue::query()
-            ->with(['venueType:id,name,alias', 'latestAddress', 'metro:id,name,line_name,line_color,city'])
+            ->with(['venueType:id,name,alias', 'latestAddress.metro:id,name,line_name,line_color,city'])
             ->orderBy('name');
 
         if ($roleLevel <= 20) {
@@ -122,7 +122,7 @@ class VenueCatalogService
                 'alias' => $venue->alias,
                 'status' => $venue->status?->value,
                 'address' => $venue->latestAddress?->display_address,
-                'metro' => $venue->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
+                'metro' => $venue->latestAddress?->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
                 'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,

@@ -10,6 +10,7 @@ use App\Http\Controllers\FilamentLogsController;
 use App\Http\Controllers\FilamentUsersModerationController;
 use App\Http\Controllers\FilamentVenuesModerationController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +55,10 @@ Route::prefix('venues')->group(function () {
         ->name('venues.moderation.request');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
+
+Route::get('/integrations/address-suggest', AddressSuggestController::class)
+    ->middleware('auth')
+    ->name('integrations.address-suggest');
 
 Route::middleware('auth')->prefix('filament')->group(function () {
     Route::get('/', [FilamentController::class, 'index'])->name('filament');

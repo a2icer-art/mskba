@@ -73,6 +73,13 @@ const perPage = 6;
 
 const createOpen = ref(false);
 const createNotice = ref('');
+const addressQuery = ref('');
+const addressSuggestions = ref([]);
+const addressSuggestError = ref('');
+const addressSuggestLoading = ref(false);
+const isApplyingAddress = ref(false);
+let addressSuggestTimer = null;
+let addressSuggestRequestId = 0;
 const createForm = useForm({
     name: '',
     venue_type_id: '',
@@ -226,6 +233,9 @@ const openCreate = () => {
     createForm.street = '';
     createForm.building = '';
     createForm.str_address = '';
+    addressQuery.value = '';
+    addressSuggestions.value = [];
+    addressSuggestError.value = '';
     createOpen.value = true;
 };
 
@@ -233,6 +243,8 @@ const closeCreate = () => {
     createOpen.value = false;
     createForm.reset('name', 'venue_type_id', 'city', 'metro_id', 'street', 'building', 'str_address');
     createForm.clearErrors();
+    addressSuggestions.value = [];
+    addressSuggestError.value = '';
 };
 
 const submitCreate = () => {
@@ -244,6 +256,87 @@ const submitCreate = () => {
             closeCreate();
         },
     });
+};
+
+const scheduleAddressSuggest = (value) => {
+    if (isApplyingAddress.value) {
+        isApplyingAddress.value = false;
+        return;
+    }
+    addressSuggestError.value = '';
+    createForm.city = '';
+    createForm.street = '';
+    createForm.building = '';
+    createForm.metro_id = '';
+    createForm.str_address = '';
+    if (addressSuggestTimer) {
+        clearTimeout(addressSuggestTimer);
+    }
+
+    const query = value?.trim() ?? '';
+    if (query.length < 3) {
+        addressSuggestions.value = [];
+        return;
+    }
+
+    addressSuggestTimer = setTimeout(() => {
+        fetchAddressSuggestions(query);
+    }, 350);
+};
+
+const fetchAddressSuggestions = async (query) => {
+    const requestId = ++addressSuggestRequestId;
+    addressSuggestLoading.value = true;
+    try {
+        const response = await fetch(`/integrations/address-suggest?query=${encodeURIComponent(query)}`, {
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            if (requestId !== addressSuggestRequestId) {
+                return;
+            }
+            addressSuggestions.value = [];
+            addressSuggestError.value = 'Не удалось получить подсказки.';
+            return;
+        }
+        const data = await response.json();
+        if (requestId !== addressSuggestRequestId) {
+            return;
+        }
+        addressSuggestions.value = data?.suggestions ?? [];
+        if (!addressSuggestions.value.length) {
+            addressSuggestError.value = 'Варианты не найдены.';
+        } else {
+            addressSuggestError.value = '';
+        }
+    } catch (error) {
+        if (requestId !== addressSuggestRequestId) {
+            return;
+        }
+        addressSuggestions.value = [];
+        addressSuggestError.value = 'Не удалось получить подсказки.';
+    } finally {
+        if (requestId !== addressSuggestRequestId) {
+            return;
+        }
+        addressSuggestLoading.value = false;
+    }
+};
+
+const applyAddressSuggestion = (suggestion) => {
+    if (!suggestion?.has_house) {
+        addressSuggestError.value = 'Выберите вариант с номером дома.';
+        return;
+    }
+    isApplyingAddress.value = true;
+    addressQuery.value = suggestion.label || '';
+    createForm.city = suggestion.city || '';
+    createForm.street = suggestion.street || '';
+    createForm.building = suggestion.building || '';
+    createForm.str_address = suggestion.label || '';
+    createForm.metro_id = suggestion.metro_id || '';
+    addressSuggestions.value = [];
+    addressSuggestError.value = '';
 };
 </script>
 
@@ -501,72 +594,46 @@ const submitCreate = () => {
                         {{ createForm.errors.name }}
                     </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Город
-                        <input
-                            v-model="createForm.city"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Город"
-                        />
-                    </label>
-                    <div v-if="createForm.errors.city" class="text-xs text-rose-700">
-                        {{ createForm.errors.city }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Метро
-                        <select
-                            v-model="createForm.metro_id"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                    <div class="relative">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Адрес
+                            <input
+                                v-model="addressQuery"
+                                @input="scheduleAddressSuggest($event.target.value)"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="text"
+                                placeholder="Начните вводить адрес"
+                            />
+                        </label>
+                        <input v-model="createForm.city" type="hidden" />
+                        <input v-model="createForm.metro_id" type="hidden" />
+                        <input v-model="createForm.street" type="hidden" />
+                        <input v-model="createForm.building" type="hidden" />
+                        <input v-model="createForm.str_address" type="hidden" />
+                        <div v-if="addressSuggestLoading" class="text-xs text-slate-500">
+                            Загрузка подсказок...
+                        </div>
+                        <div v-else-if="addressSuggestError" class="text-xs text-rose-700">
+                            {{ addressSuggestError }}
+                        </div>
+                        <div
+                            v-else-if="addressSuggestions.length"
+                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
                         >
-                            <option value="">Выберите метро</option>
-                            <option v-for="metro in metroOptions" :key="metro.id" :value="metro.id">
-                                {{ formatMetroLabel(metro) }}
-                            </option>
-                        </select>
-                    </label>
-                    <div v-if="createForm.errors.metro_id" class="text-xs text-rose-700">
-                        {{ createForm.errors.metro_id }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Улица
-                        <input
-                            v-model="createForm.street"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Улица"
-                        />
-                    </label>
-                    <div v-if="createForm.errors.street" class="text-xs text-rose-700">
-                        {{ createForm.errors.street }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Дом
-                        <input
-                            v-model="createForm.building"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Дом"
-                        />
-                    </label>
-                    <div v-if="createForm.errors.building" class="text-xs text-rose-700">
-                        {{ createForm.errors.building }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Адрес строкой
-                        <input
-                            v-model="createForm.str_address"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Полный адрес (опционально)"
-                        />
-                    </label>
-                    <div v-if="createForm.errors.str_address" class="text-xs text-rose-700">
-                        {{ createForm.errors.str_address }}
+                            <button
+                                v-for="(suggestion, index) in addressSuggestions"
+                                :key="`${suggestion.label}-${index}`"
+                                class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                                type="button"
+                                :disabled="!suggestion.has_house"
+                                @click="applyAddressSuggestion(suggestion)"
+                            >
+                                {{ suggestion.label }}
+                            </button>
+                        </div>
+                        <div v-if="createForm.errors.city || createForm.errors.street || createForm.errors.building" class="text-xs text-rose-700">
+                            {{ createForm.errors.city || createForm.errors.street || createForm.errors.building }}
+                        </div>
                     </div>
                 </div>
 
