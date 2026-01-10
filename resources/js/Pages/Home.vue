@@ -15,13 +15,21 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    initialAuthMode: {
+        type: String,
+        default: 'login',
+    },
+    showAuthModalOnLoad: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
-const showAuthModal = ref(false);
-const authMode = ref('login');
+const showAuthModal = ref(props.showAuthModalOnLoad);
+const authMode = ref(props.initialAuthMode);
 const hasSidebar = computed(() => false);
 
 watch(

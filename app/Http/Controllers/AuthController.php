@@ -7,9 +7,19 @@ use App\Domain\Users\Services\RegisterUserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
 
 class AuthController extends Controller
 {
+    public function showLogin()
+    {
+        return Inertia::render('Home', [
+            'appName' => config('app.name'),
+            'initialAuthMode' => 'login',
+            'showAuthModalOnLoad' => true,
+        ]);
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
