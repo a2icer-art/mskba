@@ -4,10 +4,12 @@ namespace App\Domain\Venues\Models;
 
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Addresses\Models\Address;
+use App\Domain\Venues\Builders\VenueQueryBuilder;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -88,5 +90,10 @@ class Venue extends Model
     public function getRouteKeyName(): string
     {
         return 'alias';
+    }
+
+    public function newEloquentBuilder($query): Builder
+    {
+        return new VenueQueryBuilder($query);
     }
 }

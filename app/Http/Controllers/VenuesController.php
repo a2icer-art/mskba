@@ -21,12 +21,11 @@ class VenuesController extends Controller
     public function index()
     {
         $user = request()->user();
-        $roleLevel = $user ? (int) $user->roles()->max('level') : 0;
 
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
         $types = $catalog->getTypeOptions();
-        $catalogData = $catalog->getHallsList(null, $user?->id, $roleLevel);
+        $catalogData = $catalog->getHallsList(null, $user);
 
         return Inertia::render('Halls', [
             'appName' => config('app.name'),
@@ -45,12 +44,11 @@ class VenuesController extends Controller
     public function type(string $type)
     {
         $user = request()->user();
-        $roleLevel = $user ? (int) $user->roles()->max('level') : 0;
 
         $catalog = app(VenueCatalogService::class);
         $navItems = $catalog->getNavigationItems();
         $types = $catalog->getTypeOptions();
-        $catalogData = $catalog->getHallsList($type, $user?->id, $roleLevel);
+        $catalogData = $catalog->getHallsList($type, $user);
 
         if (!$catalogData) {
             abort(404);
@@ -73,6 +71,10 @@ class VenuesController extends Controller
     public function show(string $type, Venue $venue)
     {
         $user = request()->user();
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
         $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress.metro:id,name,line_name,line_color,city']);
 
         $catalog = app(VenueCatalogService::class);

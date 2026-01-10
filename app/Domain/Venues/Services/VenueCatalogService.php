@@ -4,9 +4,9 @@ namespace App\Domain\Venues\Services;
 
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
-use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Metros\Models\Metro;
 use App\Support\DateFormatter;
+use App\Models\User;
 use Illuminate\Support\Str;
 
 class VenueCatalogService
@@ -57,11 +57,11 @@ class VenueCatalogService
             ->all();
     }
 
-    public function getHallsList(?string $typeSlug = null, ?int $userId = null, int $roleLevel = 0): ?array
+    public function getHallsList(?string $typeSlug = null, ?User $user = null): ?array
     {
         if (!$typeSlug) {
             return [
-                'halls' => $this->getHalls($userId, $roleLevel),
+                'halls' => $this->getHalls($user),
                 'activeType' => null,
                 'activeTypeSlug' => null,
             ];
@@ -73,7 +73,7 @@ class VenueCatalogService
         }
 
         return [
-            'halls' => $this->getHalls($userId, $roleLevel),
+            'halls' => $this->getHalls($user),
             'activeType' => $venueType->alias,
             'activeTypeSlug' => Str::plural($venueType->alias),
         ];
@@ -99,21 +99,13 @@ class VenueCatalogService
             ->first();
     }
 
-    private function getHalls(?int $userId, int $roleLevel): array
+    private function getHalls(?User $user): array
     {
         $query = Venue::query()
             ->with(['venueType:id,name,alias', 'latestAddress.metro:id,name,line_name,line_color,city'])
             ->orderBy('name');
 
-        if ($roleLevel <= 20) {
-            $query->where(function ($builder) use ($userId) {
-                $builder->where('status', VenueStatus::Confirmed->value);
-
-                if ($userId) {
-                    $builder->orWhere('created_by', $userId);
-                }
-            });
-        }
+        $query->visibleFor($user);
 
         return $query->get(['id', 'name', 'alias', 'venue_type_id', 'created_at', 'status', 'created_by'])
             ->map(fn (Venue $venue) => [
