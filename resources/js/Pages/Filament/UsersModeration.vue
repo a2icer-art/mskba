@@ -262,7 +262,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
 
-        <div class="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
+        <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
                 :app-name="appName"
                 :is-authenticated="true"
