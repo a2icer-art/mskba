@@ -4,6 +4,7 @@ namespace App\Domain\Integrations\Services;
 
 use App\Domain\Integrations\Contracts\AddressSuggestProviderInterface;
 use App\Domain\Integrations\Providers\Yandex\YandexAddressSuggestProvider;
+use App\Domain\Cities\Models\City;
 use App\Domain\Metros\Models\Metro;
 use Illuminate\Support\Str;
 
@@ -16,19 +17,22 @@ class AddressSuggestService
     public function suggest(string $query): array
     {
         $provider = $this->resolveProvider();
-        $normalizedQuery = $this->normalizeQuery($query);
-        $suggestions = $provider->suggest($normalizedQuery);
-        $supportedCities = config('integrations.address.supported_cities', []);
-        $defaultCountry = config('integrations.address.default_country');
+        $suggestions = $provider->suggest(trim($query));
+        $defaultCountry = trim((string) config('integrations.address.default_country'));
+        $cities = $this->getCityList();
 
         $result = [];
         foreach ($suggestions as $suggestion) {
-            if ($defaultCountry && !$this->matchesValue($suggestion->label, $defaultCountry)) {
+            if (
+                $defaultCountry !== ''
+                && $suggestion->country
+                && !$this->containsValue($suggestion->country, $defaultCountry)
+            ) {
                 continue;
             }
-            $city = $this->matchSupportedCity($suggestion->city, $supportedCities)
-                ?? $this->matchSupportedCity($normalizedQuery, $supportedCities);
-            if (!$city) {
+
+            $matchedCity = $this->matchCity($suggestion->city, $cities);
+            if (!$matchedCity) {
                 continue;
             }
 
@@ -48,7 +52,8 @@ class AddressSuggestService
 
             $result[] = [
                 'label' => $suggestion->label,
-                'city' => $city,
+                'country' => $suggestion->country,
+                'city' => $matchedCity,
                 'street' => $suggestion->street,
                 'building' => $suggestion->building,
                 'has_house' => (bool) $suggestion->building,
@@ -58,22 +63,6 @@ class AddressSuggestService
         }
 
         return $result;
-    }
-
-    private function normalizeQuery(string $query): string
-    {
-        $normalized = trim($query);
-        $defaultCountry = config('integrations.address.default_country');
-
-        if (!$defaultCountry) {
-            return $normalized;
-        }
-
-        if ($this->matchesValue($normalized, $defaultCountry)) {
-            return $normalized;
-        }
-
-        return trim($defaultCountry . ' ' . $normalized);
     }
 
     private function resolveProvider(): AddressSuggestProviderInterface
@@ -86,25 +75,41 @@ class AddressSuggestService
         };
     }
 
-    private function matchSupportedCity(?string $value, array $cities): ?string
+    /**
+     * @return string[]
+     */
+    private function getCityList(): array
     {
-        if (!$value) {
+        return City::query()
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+    }
+
+    private function matchCity(?string $city, array $cities): ?string
+    {
+        if (!$city) {
             return null;
         }
 
-        foreach ($cities as $city) {
-            if (!$city) {
-                continue;
-            }
-            if ($this->matchesValue($value, $city)) {
-                return $city;
+        $normalized = $this->normalizeValue($city);
+
+        foreach ($cities as $name) {
+            $normalizedName = $this->normalizeValue($name);
+            if ($normalized === $normalizedName || $this->containsValue($normalized, $normalizedName)) {
+                return $name;
             }
         }
 
         return null;
     }
 
-    private function matchesValue(string $haystack, string $needle): bool
+    private function normalizeValue(string $value): string
+    {
+        return Str::lower(trim($value));
+    }
+
+    private function containsValue(string $haystack, string $needle): bool
     {
         return mb_stripos($haystack, $needle, 0, 'UTF-8') !== false;
     }

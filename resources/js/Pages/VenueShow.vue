@@ -530,7 +530,8 @@ const submitModerationRequest = () => {
                             <input
                                 v-model="editAddressQuery"
                                 @input="scheduleEditAddressSuggest($event.target.value)"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                :class="{ 'is-loading': editAddressSuggestLoading }"
                                 type="text"
                                 placeholder="Начните вводить адрес"
                             />
@@ -540,14 +541,11 @@ const submitModerationRequest = () => {
                         <input v-model="editForm.street" type="hidden" />
                         <input v-model="editForm.building" type="hidden" />
                         <input v-model="editForm.str_address" type="hidden" />
-                        <div v-if="editAddressSuggestLoading" class="text-xs text-slate-500">
-                            Загрузка подсказок...
-                        </div>
-                        <div v-else-if="editAddressSuggestError" class="text-xs text-rose-700">
+                        <div v-if="editAddressSuggestError" class="text-xs text-rose-700">
                             {{ editAddressSuggestError }}
                         </div>
                         <div
-                            v-else-if="editAddressSuggestions.length"
+                            v-else-if="!editAddressSuggestLoading && editAddressSuggestions.length"
                             class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
                         >
                             <button

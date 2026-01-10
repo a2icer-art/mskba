@@ -600,7 +600,8 @@ const applyAddressSuggestion = (suggestion) => {
                             <input
                                 v-model="addressQuery"
                                 @input="scheduleAddressSuggest($event.target.value)"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                :class="{ 'is-loading': addressSuggestLoading }"
                                 type="text"
                                 placeholder="Начните вводить адрес"
                             />
@@ -610,14 +611,11 @@ const applyAddressSuggestion = (suggestion) => {
                         <input v-model="createForm.street" type="hidden" />
                         <input v-model="createForm.building" type="hidden" />
                         <input v-model="createForm.str_address" type="hidden" />
-                        <div v-if="addressSuggestLoading" class="text-xs text-slate-500">
-                            Загрузка подсказок...
-                        </div>
-                        <div v-else-if="addressSuggestError" class="text-xs text-rose-700">
+                        <div v-if="addressSuggestError" class="text-xs text-rose-700">
                             {{ addressSuggestError }}
                         </div>
                         <div
-                            v-else-if="addressSuggestions.length"
+                            v-else-if="!addressSuggestLoading && addressSuggestions.length"
                             class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
                         >
                             <button

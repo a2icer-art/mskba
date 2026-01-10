@@ -24,6 +24,17 @@
         border-color: #34d399 !important;
         outline: none !important;
     }
+
+    .input-predictive {
+        padding-right: 2.5rem;
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 16px;
+    }
+
+    .input-predictive.is-loading {
+        background-image: url("../images/loading.gif");
+    }
 }
 
 @layer utilities {

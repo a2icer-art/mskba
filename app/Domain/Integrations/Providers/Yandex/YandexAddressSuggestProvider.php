@@ -90,7 +90,9 @@ class YandexAddressSuggestProvider implements AddressSuggestProviderInterface
             $components = $address['Components'] ?? [];
 
             $label = (string) ($meta['text'] ?? '');
-            $city = $this->findComponent($components, ['locality', 'province', 'area']);
+            $country = $this->findComponent($components, ['country']);
+            $city = $this->findComponent($components, ['locality'])
+                ?? $this->findComponent($components, ['province', 'area']);
             $street = $this->findComponent($components, ['street']);
             $building = $this->findComponent($components, ['house']);
             $metroNames = $this->findComponents($components, ['metro']);
@@ -105,6 +107,7 @@ class YandexAddressSuggestProvider implements AddressSuggestProviderInterface
 
             $suggestions[] = new AddressSuggestion(
                 $label ?: trim($city . ', ' . $street . ', ' . $building),
+                $country,
                 $city,
                 $street,
                 $building,

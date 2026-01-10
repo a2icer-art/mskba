@@ -132,6 +132,7 @@ class DatabaseSeeder extends Seeder
             return [$data['alias'] => $venueType];
         });
 
+        $this->call(CitySeeder::class);
         $this->call(MetroSeeder::class);
 
         $venueName = 'Main Hall';
