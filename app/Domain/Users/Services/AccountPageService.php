@@ -11,36 +11,19 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Resources\UserProfileViewResource;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
+use App\Presentation\Navigation\AccountNavigationPresenter;
 use App\Support\DateFormatter;
 
 class AccountPageService
 {
-    public function getNavigationItems(User $user): array
-    {
-        $roleItems = $this->getParticipantRoles($user);
-
-        $items = [
-            ['key' => 'user', 'label' => 'Пользователь', 'href' => '/account'],
-            ['key' => 'profile', 'label' => 'Профиль', 'href' => '/account/profile'],
-            ['key' => 'contacts', 'label' => 'Контакты', 'href' => '/account/contacts'],
-        ];
-
-        foreach ($roleItems as $role) {
-            $items[] = [
-                'key' => 'role-' . $role['id'],
-                'label' => $role['label'],
-                'href' => '/account/roles/' . $role['id'],
-            ];
-        }
-
-        return $items;
-    }
-
     public function getProps(User $user, string $activeTab): array
     {
         $user->load(['profile', 'contacts']);
 
         $participantRoles = $this->getParticipantRoles($user);
+        $navigation = app(AccountNavigationPresenter::class)->present([
+            'participantRoles' => $participantRoles,
+        ]);
 
         return [
             'activeTab' => $activeTab,
@@ -81,7 +64,7 @@ class AccountPageService
             ],
             'contactVerifications' => $this->getContactVerifications($user),
             'moderationRequest' => $this->getModerationRequest($user),
-            'accountNavigation' => $this->getNavigationItems($user),
+            'navigation' => $navigation,
         ];
     }
 

@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Presentation\Navigation;
+
+class AccountNavigationPresenter extends NavigationPresenter
+{
+    protected function buildItems(array $ctx): array
+    {
+        $items = [
+            ['key' => 'user', 'label' => 'Пользователь', 'href' => '/account'],
+            ['key' => 'profile', 'label' => 'Профиль', 'href' => '/account/profile'],
+            ['key' => 'contacts', 'label' => 'Контакты', 'href' => '/account/contacts'],
+        ];
+
+        $roles = $ctx['participantRoles'] ?? [];
+        foreach ($roles as $role) {
+            $items[] = [
+                'key' => 'role-' . $role['id'],
+                'label' => $role['label'],
+                'href' => '/account/roles/' . $role['id'],
+            ];
+        }
+
+        return $items;
+    }
+}

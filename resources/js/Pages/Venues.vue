@@ -248,6 +248,21 @@ const closeCreate = () => {
     addressSuggestError.value = '';
 };
 
+watch(addressQuery, (value) => {
+    const query = value?.trim() ?? '';
+    if (query !== '') {
+        return;
+    }
+
+    createForm.city = '';
+    createForm.metro_id = '';
+    createForm.street = '';
+    createForm.building = '';
+    createForm.str_address = '';
+    addressSuggestions.value = [];
+    addressSuggestError.value = '';
+});
+
 const submitCreate = () => {
     createNotice.value = '';
     createForm.post('/venues', {
@@ -258,6 +273,16 @@ const submitCreate = () => {
         },
     });
 };
+
+const canSubmitCreate = computed(() => {
+    return Boolean(
+        createForm.name?.trim()
+            && createForm.venue_type_id
+            && createForm.city?.trim()
+            && createForm.street?.trim()
+            && createForm.building?.trim()
+    );
+});
 
 const scheduleAddressSuggest = (value) => {
     if (isApplyingAddress.value) {
@@ -653,9 +678,9 @@ const applyAddressSuggestion = (suggestion) => {
                         Отмена
                     </button>
                     <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
                         type="submit"
-                        :disabled="createForm.processing"
+                        :disabled="createForm.processing || !canSubmitCreate"
                     >
                         Создать
                     </button>

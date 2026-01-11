@@ -34,7 +34,7 @@ class VenuesController extends Controller
         $catalog = app(VenueCatalogService::class);
         $catalogData = $catalog->getHallsList(null, $user);
 
-        return Inertia::render('Halls', [
+        return Inertia::render('Venues', [
             'appName' => config('app.name'),
             'venues' => $catalogData['venues'],
             'activeType' => $catalogData['activeType'],
@@ -50,7 +50,7 @@ class VenuesController extends Controller
         $user = request()->user();
 
         $navigation = app(VenueNavigationPresenter::class)->present([
-            'title' => 'Навигация',
+            'title' => 'Площадки',
         ]);
         $catalog = app(VenueCatalogService::class);
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
@@ -60,7 +60,7 @@ class VenuesController extends Controller
             abort(404);
         }
 
-        return Inertia::render('Halls', [
+        return Inertia::render('Venues', [
             'appName' => config('app.name'),
             'venues' => $catalogData['venues'],
             'activeType' => $catalogData['activeType'],

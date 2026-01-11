@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -52,6 +53,12 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (Throwable $e, Request $request) use ($renderErrorPage) {
+            if ($e instanceof ValidationException) {
+                return null;
+            }
+
+            logger()->error($e->getMessage(), ['exception' => $e]);
+
             return $renderErrorPage($request, 500, 'Внутренняя ошибка сервера.');
         });
     })->create();

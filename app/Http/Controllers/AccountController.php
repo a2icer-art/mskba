@@ -39,6 +39,9 @@ class AccountController extends Controller
     private function renderAccount(Request $request, string $activeTab)
     {
         $user = $request->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
         $service = app(AccountPageService::class);
 
         return Inertia::render('Account', array_merge(

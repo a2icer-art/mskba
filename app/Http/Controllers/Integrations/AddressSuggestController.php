@@ -14,7 +14,12 @@ class AddressSuggestController
             'query' => ['required', 'string', 'min:3'],
         ]);
 
-        $suggestions = $service->suggest($data['query']);
+        try {
+            $suggestions = $service->suggest($data['query']);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $suggestions = [];
+        }
 
         return response()->json([
             'suggestions' => $suggestions,

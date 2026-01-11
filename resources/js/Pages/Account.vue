@@ -46,15 +46,17 @@ const props = defineProps({
         type: String,
         default: 'user',
     },
-    accountNavigation: {
-        type: Array,
-        default: () => [],
+    navigation: {
+        type: Object,
+        default: () => ({ title: 'Аккаунт', data: [] }),
     },
 });
 
+const navigationData = computed(() => props.navigation?.data ?? props.navigation ?? []);
+
 const accountMenuItems = computed(() => {
-    if (props.accountNavigation.length) {
-        return props.accountNavigation;
+    if (navigationData.value.length) {
+        return navigationData.value;
     }
 
     const items = [
@@ -847,8 +849,8 @@ const logout = () => {
             <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
-                    title="Аккаунт"
-                    :items="accountMenuItems"
+                    :title="navigation?.title || 'Аккаунт'"
+                    :data="accountMenuItems"
                     :active-href="activeAccountHref"
                 />
 
