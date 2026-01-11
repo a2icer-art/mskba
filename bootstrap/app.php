@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -50,6 +51,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (ModelNotFoundException $e, Request $request) use ($renderErrorPage) {
             return $renderErrorPage($request, 404, 'Страница не найдена.');
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return redirect()->guest(route('login'));
         });
 
         $exceptions->render(function (Throwable $e, Request $request) use ($renderErrorPage) {
