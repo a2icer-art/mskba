@@ -1,17 +1,21 @@
 <?php
 
-namespace App\Domain\Venues\Services;
+namespace App\Domain\Venues\UseCases;
 
-use App\Domain\Moderation\Requirements\VenueModerationRequirements;
-use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Services\VenueEditPolicy;
+use App\Domain\Moderation\Requirements\VenueModerationRequirements;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
-class VenueUpdateService
+class UpdateVenue
 {
-    public function updateVenue(User $actor, Venue $venue, array $data): Venue
+    public function __construct(private readonly VenueEditPolicy $editPolicy)
+    {
+    }
+
+    public function execute(User $actor, Venue $venue, array $data): Venue
     {
         $this->ensureOwner($actor, $venue);
         $this->ensureFieldsAllowed($venue, $data);
@@ -86,7 +90,7 @@ class VenueUpdateService
 
     public function getEditableFields(Venue $venue): array
     {
-        return VenueModerationRequirements::editableFields($this->isRestrictedStatus($venue));
+        return $this->editPolicy->getEditableFields($venue);
     }
 
     private function ensureOwner(User $actor, Venue $venue): void
@@ -167,6 +171,6 @@ class VenueUpdateService
 
     private function isRestrictedStatus(Venue $venue): bool
     {
-        return in_array($venue->status, [VenueStatus::Confirmed, VenueStatus::Moderation], true);
+        return $this->editPolicy->isRestrictedStatus($venue);
     }
 }

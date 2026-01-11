@@ -11,19 +11,6 @@ use Illuminate\Support\Str;
 
 class VenueCatalogService
 {
-    public function getNavigationItems(): array
-    {
-        return VenueType::query()
-            ->orderBy('name')
-            ->get(['name', 'plural_name', 'alias'])
-            ->map(fn (VenueType $type) => [
-                'label' => $type->plural_name ?: $type->name,
-                'href' => '/venues/' . Str::plural($type->alias),
-            ])
-            ->values()
-            ->all();
-    }
-
     public function getTypeOptions(): array
     {
         return VenueType::query()
@@ -61,7 +48,7 @@ class VenueCatalogService
     {
         if (!$typeSlug) {
             return [
-                'halls' => $this->getHalls($user),
+                'venues' => $this->getHalls($user),
                 'activeType' => null,
                 'activeTypeSlug' => null,
             ];
@@ -73,7 +60,7 @@ class VenueCatalogService
         }
 
         return [
-            'halls' => $this->getHalls($user),
+            'venues' => $this->getHalls($user),
             'activeType' => $venueType->alias,
             'activeTypeSlug' => Str::plural($venueType->alias),
         ];

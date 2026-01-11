@@ -12,7 +12,7 @@ const props = defineProps({
     },
     navigation: {
         type: Object,
-        default: () => ({ title: 'Разделы', items: [] }),
+        default: () => ({ title: 'Разделы', data: [] }),
     },
     activeHref: {
         type: String,
@@ -32,7 +32,8 @@ const props = defineProps({
     },
 });
 
-const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
+const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasEntities = computed(() => props.entities.length > 0);
 const hasLogs = computed(() => props.logs?.data?.length > 0);
 const actionLabels = {
@@ -83,7 +84,7 @@ const formatValue = (value) => {
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
-                    :items="navigation.items"
+                    :data="navigationData"
                     :active-href="activeHref"
                 />
 

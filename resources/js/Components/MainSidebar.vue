@@ -7,6 +7,10 @@ const props = defineProps({
         type: String,
         default: 'Навигация',
     },
+    data: {
+        type: Array,
+        default: null,
+    },
     items: {
         type: Array,
         default: () => [],
@@ -17,8 +21,16 @@ const props = defineProps({
     },
 });
 
+const normalizedItems = computed(() => {
+    if (Array.isArray(props.data)) {
+        return props.data;
+    }
+
+    return props.items;
+});
+
 const groups = computed(() => {
-    const items = props.items;
+    const items = normalizedItems.value;
 
     if (!Array.isArray(items) || items.length === 0) {
         return [];

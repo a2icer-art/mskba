@@ -11,13 +11,13 @@ const props = defineProps({
         type: String,
         default: 'Laravel',
     },
-    halls: {
+    venues: {
         type: Array,
         default: () => [],
     },
     navigation: {
         type: Object,
-        default: () => ({ title: 'Навигация', items: [] }),
+        default: () => ({ title: 'Навигация', data: [] }),
     },
     activeType: {
         type: String,
@@ -43,7 +43,8 @@ const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
 const showAuthModal = ref(false);
 const authMode = ref('login');
-const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
+const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 
 watch(
     () => page.props.errors,
@@ -94,7 +95,7 @@ const metroOptions = computed(() => props.metros ?? []);
 
 const typeOptions = computed(() => {
     const map = new Map();
-    props.halls.forEach((hall) => {
+    props.venues.forEach((hall) => {
         if (hall.type?.alias) {
             map.set(hall.type.alias, hall.type.name || hall.type.alias);
         }
@@ -133,7 +134,7 @@ const filtered = computed(() => {
     const addressNeedle = normalized(addressFilter.value);
     const metroSelected = metroFilter.value ? Number(metroFilter.value) : null;
 
-    return props.halls.filter((hall) => {
+    return props.venues.filter((hall) => {
         if (typeFilter.value && hall.type?.alias !== typeFilter.value) {
             return false;
         }
@@ -357,7 +358,7 @@ const applyAddressSuggestion = (suggestion) => {
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
-                    :items="navigation.items"
+                    :data="navigationData"
                     :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
                 />
 

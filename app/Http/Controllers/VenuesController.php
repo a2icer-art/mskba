@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Moderation\Enums\ModerationEntityType;
-use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Moderation\UseCases\SubmitModerationRequest;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueCatalogService;
-use App\Domain\Venues\Services\VenueUpdateService;
-use App\Support\DateFormatter;
+use App\Domain\Venues\UseCases\CreateVenue;
+use App\Domain\Venues\UseCases\UpdateVenue;
+use App\Http\Requests\Venues\StoreVenueRequest;
+use App\Presentation\Navigation\VenueNavigationPresenter;
+use App\Presentation\Venues\MetroOptionsPresenter;
+use App\Presentation\Venues\VenueShowPresenter;
+use App\Presentation\Venues\VenueTypeOptionsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -22,22 +26,22 @@ class VenuesController extends Controller
     {
         $user = request()->user();
 
+        $navigation = app(VenueNavigationPresenter::class)->present([
+            'title' => 'Площадки',
+        ]);
+
+        $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $catalog = app(VenueCatalogService::class);
-        $navItems = $catalog->getNavigationItems();
-        $types = $catalog->getTypeOptions();
         $catalogData = $catalog->getHallsList(null, $user);
 
         return Inertia::render('Halls', [
             'appName' => config('app.name'),
-            'halls' => $catalogData['halls'],
+            'venues' => $catalogData['venues'],
             'activeType' => $catalogData['activeType'],
             'activeTypeSlug' => $catalogData['activeTypeSlug'],
-            'navigation' => [
-                'title' => 'Площадки',
-                'items' => $navItems,
-            ],
+            'navigation' => $navigation,
             'types' => $types,
-            'metros' => $catalog->getMetroOptions(),
+            'metros' => app(MetroOptionsPresenter::class)->present()['data'],
         ]);
     }
 
@@ -45,9 +49,11 @@ class VenuesController extends Controller
     {
         $user = request()->user();
 
+        $navigation = app(VenueNavigationPresenter::class)->present([
+            'title' => 'Навигация',
+        ]);
         $catalog = app(VenueCatalogService::class);
-        $navItems = $catalog->getNavigationItems();
-        $types = $catalog->getTypeOptions();
+        $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $catalogData = $catalog->getHallsList($type, $user);
 
         if (!$catalogData) {
@@ -56,15 +62,12 @@ class VenuesController extends Controller
 
         return Inertia::render('Halls', [
             'appName' => config('app.name'),
-            'halls' => $catalogData['halls'],
+            'venues' => $catalogData['venues'],
             'activeType' => $catalogData['activeType'],
             'activeTypeSlug' => $catalogData['activeTypeSlug'],
-            'navigation' => [
-                'title' => 'Навигация',
-                'items' => $navItems,
-            ],
+            'navigation' => $navigation,
             'types' => $types,
-            'metros' => $catalog->getMetroOptions(),
+            'metros' => app(MetroOptionsPresenter::class)->present()['data'],
         ]);
     }
 
@@ -77,106 +80,27 @@ class VenuesController extends Controller
             ->firstOrFail();
         $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress.metro:id,name,line_name,line_color,city']);
 
-        $catalog = app(VenueCatalogService::class);
-        $navItems = $catalog->getNavigationItems();
-        $types = $catalog->getTypeOptions();
+        $data = app(VenueShowPresenter::class)->present([
+            'user' => $user,
+            'venue' => $venue,
+            'typeSlug' => $type,
+        ])['data'];
 
-        $updateService = app(VenueUpdateService::class);
-        $isOwner = $user && $venue->created_by === $user->id;
-        $editableFields = $isOwner ? $updateService->getEditableFields($venue) : [];
-
-        $latestRequest = ModerationRequest::query()
-            ->where('entity_type', ModerationEntityType::Venue->value)
-            ->where('entity_id', $venue->id)
-            ->orderByDesc('submitted_at')
-            ->first(['status', 'submitted_at', 'reviewed_at', 'reject_reason']);
-
-        $address = $venue->latestAddress;
-
-        return Inertia::render('VenueShow', [
-            'appName' => config('app.name'),
-            'venue' => [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'alias' => $venue->alias,
-                'status' => $venue->status?->value,
-                'address' => $address
-                    ? [
-                        'city' => $address->city,
-                        'metro_id' => $address->metro_id,
-                        'street' => $address->street,
-                        'building' => $address->building,
-                        'str_address' => $address->str_address,
-                        'display' => $address->display_address,
-                        'metro' => $address->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
-                    ]
-                    : null,
-                'venue_type_id' => $venue->venue_type_id,
-                'str_address' => $venue->str_address,
-                'commentary' => $venue->commentary,
-                'created_at' => DateFormatter::dateTime($venue->created_at),
-                'confirmed_at' => DateFormatter::dateTime($venue->confirmed_at),
-                'block_reason' => $venue->block_reason,
-                'type' => $venue->venueType?->only(['id', 'name', 'alias']),
-                'creator' => $venue->creator?->only(['id', 'login']),
-            ],
-            'moderationRequest' => $latestRequest
-                ? [
-                    'status' => $latestRequest->status?->value,
-                    'submitted_at' => DateFormatter::dateTime($latestRequest->submitted_at),
-                    'reviewed_at' => DateFormatter::dateTime($latestRequest->reviewed_at),
-                    'reject_reason' => $latestRequest->reject_reason,
-                ]
-                : null,
-            'navigation' => [
-                'title' => 'Площадки',
-                'items' => $navItems,
-            ],
-            'activeTypeSlug' => $type,
-            'types' => $types,
-            'editableFields' => $editableFields,
-            'canEdit' => (bool) $isOwner,
-        ]);
+        return Inertia::render('VenueShow', array_merge(
+            ['appName' => config('app.name')],
+            $data
+        ));
     }
 
-    public function store(Request $request)
+    public function store(StoreVenueRequest $request, CreateVenue $useCase)
     {
         $user = $request->user();
         if (!$user || $user->status !== UserStatus::Confirmed) {
             return back()->withErrors(['venue' => 'Добавление площадок доступно только подтвержденным пользователям.']);
         }
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'venue_type_id' => ['required', 'integer', 'exists:venue_types,id'],
-            'city' => ['required', 'string', 'max:255'],
-            'metro_id' => ['nullable', 'integer', 'exists:metros,id'],
-            'street' => ['required', 'string', 'max:255'],
-            'building' => ['required', 'string', 'max:255'],
-            'str_address' => ['nullable', 'string', 'max:255'],
-        ], [
-            'city.required' => 'Необходимо указать адрес.',
-            'street.required' => 'Необходимо указать адрес.',
-            'building.required' => 'Не указан дом.',
-        ]);
-
-        $venue = Venue::query()->create([
-            'name' => $data['name'],
-            'alias' => $this->generateUniqueAlias($data['name']),
-            'status' => VenueStatus::Unconfirmed,
-            'created_by' => $user->id,
-            'venue_type_id' => $data['venue_type_id'],
-        ]);
-
-        $venue->addresses()->create([
-            'city' => $data['city'],
-            'metro_id' => $data['metro_id'] ?? null,
-            'street' => $data['street'],
-            'building' => $data['building'],
-            'str_address' => $data['str_address'] ?? null,
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-        ]);
+        $data = $request->validated();
+        $venue = $useCase->execute($user, $data);
 
         $typeSlug = $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : '';
 
@@ -208,42 +132,24 @@ class VenuesController extends Controller
         return back();
     }
 
-    public function update(Request $request, string $type, Venue $venue, VenueUpdateService $service)
+    public function update(Request $request, string $type, Venue $venue, UpdateVenue $useCase)
     {
         $user = $request->user();
         if (!$user) {
             return back()->withErrors(['venue' => 'Необходимо авторизоваться для редактирования.']);
         }
 
-        $fields = $service->getEditableFields($venue);
+        $fields = $useCase->getEditableFields($venue);
         if ($fields === []) {
             return back()->withErrors(['venue' => 'Редактирование недоступно для этой площадки.']);
         }
 
-        $rules = Arr::only($service->getValidationRules($venue), $fields);
+        $rules = Arr::only($useCase->getValidationRules($venue), $fields);
         $data = validator($request->only($fields), $rules)->validate();
-        $service->updateVenue($user, $venue, $data);
+        $useCase->execute($user, $venue, $data);
 
         return back();
     }
 
-    private function generateAliasBase(string $name): string
-    {
-        $base = Str::slug($name);
-        return $base ?: 'venue';
-    }
-
-    private function generateUniqueAlias(string $name): string
-    {
-        $base = $this->generateAliasBase($name);
-        $alias = $base;
-        $counter = 2;
-
-        while (Venue::query()->where('alias', $alias)->exists()) {
-            $alias = $base . '-' . $counter;
-            $counter++;
-        }
-
-        return $alias;
-    }
+    // Методы генерации alias перенесены в доменный use case.
 }

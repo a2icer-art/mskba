@@ -7,6 +7,7 @@ use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -48,5 +49,15 @@ class Metro extends Model
     public function deleter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    public function scopeForOptions(Builder $query): Builder
+    {
+        return $query
+            ->where('status', 1)
+            ->orderBy('city')
+            ->orderBy('line_name')
+            ->orderBy('name')
+            ->select(['id', 'name', 'line_name', 'line_color', 'city']);
     }
 }

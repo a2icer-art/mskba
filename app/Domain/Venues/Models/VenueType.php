@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VenueType extends Model
@@ -37,5 +38,19 @@ class VenueType extends Model
     public function deleter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    public function scopeForNavigation(Builder $query): Builder
+    {
+        return $query
+            ->orderBy('name')
+            ->select(['id', 'name', 'plural_name', 'alias']);
+    }
+
+    public function scopeForOptions(Builder $query): Builder
+    {
+        return $query
+            ->orderBy('name')
+            ->select(['id', 'name', 'alias']);
     }
 }

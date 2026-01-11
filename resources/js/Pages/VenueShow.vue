@@ -21,7 +21,7 @@ const props = defineProps({
     },
     navigation: {
         type: Object,
-        default: () => ({ title: 'Площадки', items: [] }),
+        default: () => ({ title: 'Площадки', data: [] }),
     },
     activeTypeSlug: {
         type: String,
@@ -44,7 +44,8 @@ const props = defineProps({
 const page = usePage();
 const showAuthModal = ref(false);
 const authMode = ref('login');
-const hasSidebar = computed(() => (props.navigation?.items?.length ?? 0) > 0);
+const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const moderationForm = useForm({});
 const moderationNotice = ref('');
 const moderationErrors = ref([]);
@@ -337,7 +338,7 @@ const submitModerationRequest = () => {
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
-                    :items="navigation.items"
+                    :data="navigationData"
                     :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
                 />
 
