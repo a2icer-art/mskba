@@ -38,10 +38,22 @@ class FilamentLogsService
                 'href' => '/filament/logs/venues',
             ],
             [
+                'key' => 'addresses',
+                'label' => 'Адреса',
+                'model' => \App\Domain\Addresses\Models\Address::class,
+                'href' => '/filament/logs/addresses',
+            ],
+            [
                 'key' => 'venue-types',
                 'label' => 'Типы площадок',
                 'model' => \App\Domain\Venues\Models\VenueType::class,
                 'href' => '/filament/logs/venue-types',
+            ],
+            [
+                'key' => 'metros',
+                'label' => 'Станции метро',
+                'model' => \App\Domain\Metros\Models\Metro::class,
+                'href' => '/filament/logs/metros',
             ],
             [
                 'key' => 'participant-roles',
