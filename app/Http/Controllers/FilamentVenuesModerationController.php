@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Filament\Services\FilamentNavigationService;
+use App\Presentation\Navigation\FilamentNavigationPresenter;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
@@ -22,8 +22,9 @@ class FilamentVenuesModerationController extends Controller
             abort(403);
         }
 
-        $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuGroups($roleLevel);
+        $navigation = app(FilamentNavigationPresenter::class)->present([
+            'roleLevel' => $roleLevel,
+        ]);
 
         $status = $request->string('status')->toString();
         $sort = $request->string('sort', 'submitted_at_desc')->toString();
@@ -98,10 +99,7 @@ class FilamentVenuesModerationController extends Controller
 
         return Inertia::render('Filament/VenuesModeration', [
             'appName' => config('app.name'),
-            'navigation' => [
-                'title' => 'Разделы',
-                'items' => $items,
-            ],
+            'navigation' => $navigation,
             'activeHref' => '/filament/venues-moderation',
             'filters' => [
                 'status' => $status,

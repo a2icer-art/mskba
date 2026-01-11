@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Filament\Services\FilamentLogsService;
-use App\Domain\Filament\Services\FilamentNavigationService;
+use App\Presentation\Navigation\FilamentNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -47,16 +47,14 @@ class FilamentLogsController extends Controller
                 ];
             });
 
-        $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuGroups($roleLevel);
+        $navigation = app(FilamentNavigationPresenter::class)->present([
+            'roleLevel' => $roleLevel,
+        ]);
         $entities = $this->getEntitiesWithAll($logsService);
 
         return Inertia::render('Filament/Logs', [
             'appName' => config('app.name'),
-            'navigation' => [
-                'title' => 'Разделы',
-                'items' => $items,
-            ],
+            'navigation' => $navigation,
             'activeHref' => '/filament/logs',
             'entities' => $entities,
             'activeEntity' => [
@@ -110,16 +108,14 @@ class FilamentLogsController extends Controller
                 ];
             });
 
-        $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuGroups($roleLevel);
+        $navigation = app(FilamentNavigationPresenter::class)->present([
+            'roleLevel' => $roleLevel,
+        ]);
         $entities = $this->getEntitiesWithAll($logsService);
 
         return Inertia::render('Filament/Logs', [
             'appName' => config('app.name'),
-            'navigation' => [
-                'title' => 'Разделы',
-                'items' => $items,
-            ],
+            'navigation' => $navigation,
             'activeHref' => $entityData['href'],
             'entities' => $entities,
             'activeEntity' => $entityData,

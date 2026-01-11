@@ -6,7 +6,7 @@ use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Users\Enums\UserConfirmedBy;
-use App\Domain\Filament\Services\FilamentNavigationService;
+use App\Presentation\Navigation\FilamentNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,8 +22,9 @@ class FilamentUsersModerationController extends Controller
             abort(403);
         }
 
-        $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuGroups($roleLevel);
+        $navigation = app(FilamentNavigationPresenter::class)->present([
+            'roleLevel' => $roleLevel,
+        ]);
 
         $status = $request->string('status')->toString();
         $sort = $request->string('sort', 'submitted_at_desc')->toString();
@@ -99,10 +100,7 @@ class FilamentUsersModerationController extends Controller
 
         return Inertia::render('Filament/UsersModeration', [
             'appName' => config('app.name'),
-            'navigation' => [
-                'title' => 'Разделы',
-                'items' => $items,
-            ],
+            'navigation' => $navigation,
             'activeHref' => '/filament/users-moderation',
             'filters' => [
                 'status' => $status,

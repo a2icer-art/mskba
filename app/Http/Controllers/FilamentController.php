@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Filament\Services\FilamentNavigationService;
+use App\Presentation\Navigation\FilamentNavigationPresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,15 +13,13 @@ class FilamentController extends Controller
         $roleLevel = $this->getRoleLevel($request);
         $this->ensureAccess($roleLevel, 10);
 
-        $navigation = app(FilamentNavigationService::class);
-        $items = $navigation->getMenuGroups($roleLevel);
+        $navigation = app(FilamentNavigationPresenter::class)->present([
+            'roleLevel' => $roleLevel,
+        ]);
 
         return Inertia::render('Filament/Index', [
             'appName' => config('app.name'),
-            'navigation' => [
-                'title' => 'Разделы',
-                'items' => $items,
-            ],
+            'navigation' => $navigation,
             'activeHref' => '',
         ]);
     }
