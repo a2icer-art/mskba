@@ -62,14 +62,17 @@ class DatabaseSeeder extends Seeder
 
         $roles = [
             'admin' => RoleFactory::new()->admin()->create([
+                'level' => 40,
                 'created_by' => $admin->id,
                 'updated_by' => $admin->id,
             ]),
             'moderator' => RoleFactory::new()->moderator()->create([
+                'level' => 30,
                 'created_by' => $admin->id,
                 'updated_by' => $admin->id,
             ]),
             'editor' => RoleFactory::new()->editor()->create([
+                'level' => 20,
                 'created_by' => $admin->id,
                 'updated_by' => $admin->id,
             ]),
