@@ -51,6 +51,7 @@
 
 - `Venue` (app/Domain/Venues/Models/Venue)
   - Место проведения (зал/площадка). Ссылка на тип VenueType.
+  - Доступность: `is_available` (по умолчанию true), `closure_reason` (nullable).
 - `VenueType` (app/Domain/Venues/Models/VenueType)
   - Справочник типов мест проведения.
 - `VenueCatalogService` (app/Domain/Venues/Services/VenueCatalogService)

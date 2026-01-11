@@ -135,31 +135,6 @@ class DatabaseSeeder extends Seeder
         $this->call(CitySeeder::class);
         $this->call(MetroSeeder::class);
 
-        $venueName = 'Main Hall';
-        Venue::query()->create([
-            'name' => $venueName,
-            'alias' => Str::slug($venueName),
-            'status' => VenueStatus::Confirmed,
-            'created_by' => $admin->id,
-            'updated_by' => $admin->id,
-            'confirmed_at' => now(),
-            'confirmed_by' => $admin->id,
-            'venue_type_id' => $venueTypes['hall']->id,
-        ]);
-
-        $venue = Venue::query()->where('alias', Str::slug($venueName))->first();
-
-        if ($venue) {
-            Address::query()->create([
-                'venue_id' => $venue->id,
-                'city' => 'Москва',
-                'street' => 'Main street',
-                'building' => '1',
-                'str_address' => 'Main street, 1',
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-            ]);
-        }
     }
 
     private function seedUserContact(User $user, string $email, int $updatedBy): void

@@ -25,6 +25,8 @@ class Venue extends Model
         'name',
         'alias',
         'status',
+        'is_available',
+        'closure_reason',
         'created_by',
         'updated_by',
         'confirmed_at',
@@ -42,6 +44,7 @@ class Venue extends Model
     {
         return [
             'status' => VenueStatus::class,
+            'is_available' => 'boolean',
             'confirmed_at' => 'datetime',
             'blocked_at' => 'datetime',
         ];
