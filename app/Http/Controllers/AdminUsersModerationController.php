@@ -6,12 +6,12 @@ use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Users\Enums\UserConfirmedBy;
-use App\Presentation\Navigation\FilamentNavigationPresenter;
+use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class FilamentUsersModerationController extends Controller
+class AdminUsersModerationController extends Controller
 {
     public function index(Request $request)
     {
@@ -22,7 +22,7 @@ class FilamentUsersModerationController extends Controller
             abort(403);
         }
 
-        $navigation = app(FilamentNavigationPresenter::class)->present([
+        $navigation = app(AdminNavigationPresenter::class)->present([
             'roleLevel' => $roleLevel,
         ]);
 
@@ -98,10 +98,10 @@ class FilamentUsersModerationController extends Controller
                 ];
             });
 
-        return Inertia::render('Filament/UsersModeration', [
+        return Inertia::render('Admin/UsersModeration', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
-            'activeHref' => '/filament/users-moderation',
+            'activeHref' => '/admin/users-moderation',
             'filters' => [
                 'status' => $status,
                 'sort' => $sort,

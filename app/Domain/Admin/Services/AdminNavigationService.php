@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Domain\Filament\Services;
+namespace App\Domain\Admin\Services;
 
-use App\Domain\Filament\Services\FilamentLogsService;
+use App\Domain\Admin\Services\AdminLogsService;
 
-class FilamentNavigationService
+class AdminNavigationService
 {
     public function __construct(
-        private readonly FilamentLogsService $logsService
+        private readonly AdminLogsService $logsService
     ) {
     }
 
@@ -20,16 +20,16 @@ class FilamentNavigationService
         if ($roleLevel > 20) {
             $moderationItems[] = [
                 'label' => 'Пользователи',
-                'href' => '/filament/users-moderation',
+                'href' => '/admin/users-moderation',
             ];
             $moderationItems[] = [
                 'label' => 'Площадки',
-                'href' => '/filament/venues-moderation',
+                'href' => '/admin/venues-moderation',
             ];
 
             $moderationItems[] = [
                 'label' => 'Логи',
-                'href' => '/filament/logs',
+                'href' => '/admin/logs',
             ];
         }
 

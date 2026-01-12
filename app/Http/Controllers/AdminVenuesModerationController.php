@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Presentation\Navigation\FilamentNavigationPresenter;
+use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
@@ -11,7 +11,7 @@ use App\Support\DateFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class FilamentVenuesModerationController extends Controller
+class AdminVenuesModerationController extends Controller
 {
     public function index(Request $request)
     {
@@ -22,7 +22,7 @@ class FilamentVenuesModerationController extends Controller
             abort(403);
         }
 
-        $navigation = app(FilamentNavigationPresenter::class)->present([
+        $navigation = app(AdminNavigationPresenter::class)->present([
             'roleLevel' => $roleLevel,
         ]);
 
@@ -97,10 +97,10 @@ class FilamentVenuesModerationController extends Controller
                 ];
             });
 
-        return Inertia::render('Filament/VenuesModeration', [
+        return Inertia::render('Admin/VenuesModeration', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
-            'activeHref' => '/filament/venues-moderation',
+            'activeHref' => '/admin/venues-moderation',
             'filters' => [
                 'status' => $status,
                 'sort' => $sort,

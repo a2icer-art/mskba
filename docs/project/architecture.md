@@ -74,9 +74,9 @@
 - `ParticipantRoleAssignment` (app/Domain/Participants/Models/ParticipantRoleAssignment)
   - Назначение роли пользователю с опциональным контекстом (polymorphic).
 
-## Домен Filament
+## Домен Admin
 
-- `FilamentNavigationService` (app/Domain/Filament/Services/FilamentNavigationService)
+- `AdminNavigationService` (app/Domain/Admin/Services/AdminNavigationService)
   - Формирует меню разделов панели управления на основе уровня роли.
 
 ## Связи между доменами

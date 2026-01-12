@@ -3,15 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\Models\AuditLog;
-use App\Domain\Filament\Services\FilamentLogsService;
-use App\Presentation\Navigation\FilamentNavigationPresenter;
+use App\Domain\Admin\Services\AdminLogsService;
+use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class FilamentLogsController extends Controller
+class AdminLogsController extends Controller
 {
-    public function index(Request $request, FilamentLogsService $logsService)
+    public function index(Request $request, AdminLogsService $logsService)
     {
         $roleLevel = $this->getRoleLevel($request);
         $this->ensureAccess($roleLevel, 20);
@@ -47,26 +47,26 @@ class FilamentLogsController extends Controller
                 ];
             });
 
-        $navigation = app(FilamentNavigationPresenter::class)->present([
+        $navigation = app(AdminNavigationPresenter::class)->present([
             'roleLevel' => $roleLevel,
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
 
-        return Inertia::render('Filament/Logs', [
+        return Inertia::render('Admin/Logs', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
-            'activeHref' => '/filament/logs',
+            'activeHref' => '/admin/logs',
             'entities' => $entities,
             'activeEntity' => [
                 'key' => 'all',
                 'label' => 'Все логи',
-                'href' => '/filament/logs',
+                'href' => '/admin/logs',
             ],
             'logs' => $logs,
         ]);
     }
 
-    public function show(Request $request, string $entity, FilamentLogsService $logsService)
+    public function show(Request $request, string $entity, AdminLogsService $logsService)
     {
         $roleLevel = $this->getRoleLevel($request);
         $this->ensureAccess($roleLevel, 20);
@@ -108,12 +108,12 @@ class FilamentLogsController extends Controller
                 ];
             });
 
-        $navigation = app(FilamentNavigationPresenter::class)->present([
+        $navigation = app(AdminNavigationPresenter::class)->present([
             'roleLevel' => $roleLevel,
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
 
-        return Inertia::render('Filament/Logs', [
+        return Inertia::render('Admin/Logs', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => $entityData['href'],
@@ -141,19 +141,19 @@ class FilamentLogsController extends Controller
         }
     }
 
-    private function getEntitiesWithAll(FilamentLogsService $logsService): array
+    private function getEntitiesWithAll(AdminLogsService $logsService): array
     {
         return array_merge(
             [[
                 'key' => 'all',
                 'label' => 'Все логи',
-                'href' => '/filament/logs',
+                'href' => '/admin/logs',
             ]],
             $logsService->getEntities()
         );
     }
 
-    private function getModelLabels(FilamentLogsService $logsService): array
+    private function getModelLabels(AdminLogsService $logsService): array
     {
         $labels = [];
         foreach ($logsService->getEntities() as $entity) {

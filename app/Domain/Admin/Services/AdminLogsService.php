@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Domain\Filament\Services;
+namespace App\Domain\Admin\Services;
 
-class FilamentLogsService
+class AdminLogsService
 {
     public function getEntities(): array
     {
@@ -11,61 +11,61 @@ class FilamentLogsService
                 'key' => 'users',
                 'label' => 'Пользователи',
                 'model' => \App\Models\User::class,
-                'href' => '/filament/logs/users',
+                'href' => '/admin/logs/users',
             ],
             [
                 'key' => 'user-profiles',
                 'label' => 'Профили пользователей',
                 'model' => \App\Domain\Users\Models\UserProfile::class,
-                'href' => '/filament/logs/user-profiles',
+                'href' => '/admin/logs/user-profiles',
             ],
             [
                 'key' => 'roles',
                 'label' => 'Роли',
                 'model' => \App\Domain\Users\Models\Role::class,
-                'href' => '/filament/logs/roles',
+                'href' => '/admin/logs/roles',
             ],
             [
                 'key' => 'user-roles',
                 'label' => 'Роли пользователей',
                 'model' => \App\Domain\Users\Models\UserRole::class,
-                'href' => '/filament/logs/user-roles',
+                'href' => '/admin/logs/user-roles',
             ],
             [
                 'key' => 'venues',
                 'label' => 'Площадки',
                 'model' => \App\Domain\Venues\Models\Venue::class,
-                'href' => '/filament/logs/venues',
+                'href' => '/admin/logs/venues',
             ],
             [
                 'key' => 'addresses',
                 'label' => 'Адреса',
                 'model' => \App\Domain\Addresses\Models\Address::class,
-                'href' => '/filament/logs/addresses',
+                'href' => '/admin/logs/addresses',
             ],
             [
                 'key' => 'venue-types',
                 'label' => 'Типы площадок',
                 'model' => \App\Domain\Venues\Models\VenueType::class,
-                'href' => '/filament/logs/venue-types',
+                'href' => '/admin/logs/venue-types',
             ],
             [
                 'key' => 'metros',
                 'label' => 'Станции метро',
                 'model' => \App\Domain\Metros\Models\Metro::class,
-                'href' => '/filament/logs/metros',
+                'href' => '/admin/logs/metros',
             ],
             [
                 'key' => 'participant-roles',
                 'label' => 'Роли участников',
                 'model' => \App\Domain\Participants\Models\ParticipantRole::class,
-                'href' => '/filament/logs/participant-roles',
+                'href' => '/admin/logs/participant-roles',
             ],
             [
                 'key' => 'participant-role-assignments',
                 'label' => 'Назначения ролей',
                 'model' => \App\Domain\Participants\Models\ParticipantRoleAssignment::class,
-                'href' => '/filament/logs/participant-role-assignments',
+                'href' => '/admin/logs/participant-role-assignments',
             ],
         ];
     }

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import MainFooter from '../../Components/MainFooter.vue';
@@ -68,7 +68,6 @@ const statusLabelMap = {
     rejected: 'Отклонено',
 };
 
-
 const formatDate = (value) => {
     if (!value) {
         return '—';
@@ -80,9 +79,10 @@ const formatDate = (value) => {
     return date.toLocaleString('ru-RU');
 };
 
+
 const applyFilters = () => {
     router.get(
-        '/filament/venues-moderation',
+        '/admin/users-moderation',
         {
             status: filterForm.status,
             sort: filterForm.sort,
@@ -105,10 +105,10 @@ const approveRequest = (requestItem) => {
     actionNotice.value = '';
     actionError.value = '';
 
-    approveForm.post(`/filament/venues-moderation/${requestItem.id}/approve`, {
+    approveForm.post(`/admin/users-moderation/${requestItem.id}/approve`, {
         preserveScroll: true,
         onSuccess: () => {
-            actionNotice.value = 'Площадка подтверждена.';
+            actionNotice.value = 'Пользователь подтвержден.';
         },
         onError: (errors) => {
             actionError.value = errors.moderation || 'Не удалось подтвердить заявку.';
@@ -121,38 +121,17 @@ const approveRequest = (requestItem) => {
     });
 };
 
-const openApprove = (requestItem) => {
-    actionNotice.value = '';
-    actionError.value = '';
-    approveTarget.value = requestItem;
-    approveOpen.value = true;
-};
-
-const closeApprove = () => {
-    approveOpen.value = false;
-    approveTarget.value = null;
-};
-
-const submitApprove = () => {
-    if (!approveTarget.value) {
-        return;
-    }
-
-    approveRequest(approveTarget.value);
-    closeApprove();
-};
-
-const blockVenue = (requestItem) => {
+const blockUser = (requestItem) => {
     actionNotice.value = '';
     actionError.value = '';
 
-    blockForm.post(`/filament/venues-moderation/${requestItem.id}/block`, {
+    blockForm.post(`/admin/users-moderation/${requestItem.id}/block`, {
         preserveScroll: true,
         onSuccess: () => {
-            actionNotice.value = 'Площадка заблокирована.';
+            actionNotice.value = 'Пользователь заблокирован.';
         },
         onError: (errors) => {
-            actionError.value = errors.moderation || blockForm.errors.reason || 'Не удалось заблокировать площадку.';
+            actionError.value = errors.moderation || blockForm.errors.reason || 'Не удалось заблокировать пользователя.';
         },
         onFinish: () => {
             if (page.props?.errors?.moderation) {
@@ -162,17 +141,17 @@ const blockVenue = (requestItem) => {
     });
 };
 
-const unblockVenue = (requestItem) => {
+const unblockUser = (requestItem) => {
     actionNotice.value = '';
     actionError.value = '';
 
-    unblockForm.post(`/filament/venues-moderation/${requestItem.id}/unblock`, {
+    unblockForm.post(`/admin/users-moderation/${requestItem.id}/unblock`, {
         preserveScroll: true,
         onSuccess: () => {
-            actionNotice.value = 'Площадка разблокирована.';
+            actionNotice.value = 'Пользователь разблокирован.';
         },
         onError: (errors) => {
-            actionError.value = errors.moderation || 'Не удалось разблокировать площадку.';
+            actionError.value = errors.moderation || 'Не удалось разблокировать пользователя.';
         },
         onFinish: () => {
             if (page.props?.errors?.moderation) {
@@ -203,8 +182,39 @@ const submitBlock = () => {
         return;
     }
 
-    blockVenue(blockTarget.value);
+    blockUser(blockTarget.value);
     closeBlock();
+};
+
+const openView = (requestItem) => {
+    viewTarget.value = requestItem;
+    viewOpen.value = true;
+};
+
+const closeView = () => {
+    viewOpen.value = false;
+    viewTarget.value = null;
+};
+
+const openApprove = (requestItem) => {
+    actionNotice.value = '';
+    actionError.value = '';
+    approveTarget.value = requestItem;
+    approveOpen.value = true;
+};
+
+const closeApprove = () => {
+    approveOpen.value = false;
+    approveTarget.value = null;
+};
+
+const submitApprove = () => {
+    if (!approveTarget.value) {
+        return;
+    }
+
+    approveRequest(approveTarget.value);
+    closeApprove();
 };
 
 const openReject = (requestItem) => {
@@ -223,22 +233,12 @@ const closeReject = () => {
     rejectForm.clearErrors();
 };
 
-const openView = (requestItem) => {
-    viewTarget.value = requestItem;
-    viewOpen.value = true;
-};
-
-const closeView = () => {
-    viewOpen.value = false;
-    viewTarget.value = null;
-};
-
 const submitReject = () => {
     if (!rejectTarget.value) {
         return;
     }
 
-    rejectForm.post(`/filament/venues-moderation/${rejectTarget.value.id}/reject`, {
+    rejectForm.post(`/admin/users-moderation/${rejectTarget.value.id}/reject`, {
         preserveScroll: true,
         onSuccess: () => {
             actionNotice.value = 'Заявка отклонена.';
@@ -279,8 +279,8 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Filament</p>
-                    <h1 class="mt-2 text-3xl font-semibold text-slate-900">Модерация площадок</h1>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Admin</p>
+                    <h1 class="mt-2 text-3xl font-semibold text-slate-900">Модерация пользователей</h1>
 
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div class="flex flex-wrap items-center gap-4">
@@ -313,96 +313,101 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 
                     <div v-if="hasRequests" class="mt-6 w-full overflow-x-auto rounded-2xl border border-slate-200">
                         <div class="min-w-max">
-                            <div class="grid grid-cols-[160px_140px_200px_80px_160px_220px_140px_160px_160px_160px_160px] gap-4 bg-slate-50 px-4 py-3 text-xs uppercase tracking-[0.15em] text-slate-500 whitespace-nowrap">
-                                <span>Площадка</span>
-                                <span>Статус</span>
-                                <span>Действия</span>
-                                <span>ID</span>
-                                <span>Тип</span>
-                                <span>Адрес</span>
-                                <span>Создатель</span>
-                                <span>Создана</span>
-                                <span>Отправлено</span>
-                                <span>Решение</span>
-                                <span>Кто решил</span>
-                            </div>
+                        <div class="grid grid-cols-[120px_140px_200px_70px_140px_140px_100px_140px_180px_160px_160px_160px] gap-4 bg-slate-50 px-4 py-3 text-xs uppercase tracking-[0.15em] text-slate-500 whitespace-nowrap">
+                            <span>Логин</span>
+                            <span>Статус</span>
+                            <span>Действия</span>
+                            <span>ID</span>
+                            <span>Фамилия</span>
+                            <span>Имя</span>
+                            <span>Пол</span>
+                            <span>Дата рождения</span>
+                            <span>Контакт</span>
+                            <span>Отправлено</span>
+                            <span>Решение</span>
+                            <span>Кто решил</span>
+                        </div>
 
-                            <div
-                                v-for="requestItem in requests.data"
-                                :key="requestItem.id"
-                                class="grid grid-cols-[160px_140px_200px_80px_160px_220px_140px_160px_160px_160px_160px] gap-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700 whitespace-nowrap"
-                            >
+                        <div v-for="requestItem in requests.data" :key="requestItem.id" class="grid grid-cols-[120px_140px_200px_70px_140px_140px_100px_140px_180px_160px_160px_160px] gap-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700 whitespace-nowrap">
                             <div>
                                 <button
                                     class="text-left text-sm font-medium text-slate-800 transition hover:text-slate-700"
                                     type="button"
                                     @click="openView(requestItem)"
                                 >
-                                    {{ requestItem.venue?.name || '—' }}
+                                    {{ requestItem.user?.login || '—' }}
                                 </button>
                             </div>
-                                <div>
-                                    <span
-                                        class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600"
-                                        :class="{
-                                            'border-amber-200 bg-amber-50 text-amber-800': requestItem.status === 'pending',
-                                            'border-emerald-200 bg-emerald-50 text-emerald-700': requestItem.status === 'approved',
-                                            'border-rose-200 bg-rose-50 text-rose-700': requestItem.status === 'rejected',
-                                        }"
-                                        :title="requestItem.submitted_at ? formatDate(requestItem.submitted_at) : undefined"
-                                    >
-                                        {{ statusLabelMap[requestItem.status] || '—' }}
-                                    </span>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <button
-                                        v-if="requestItem.status === 'pending'"
-                                        class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
-                                        type="button"
-                                        :disabled="approveForm.processing"
-                                        @click="openApprove(requestItem)"
-                                    >
-                                        Подтвердить
-                                    </button>
-                                    <button
-                                        v-if="requestItem.status === 'pending'"
-                                        class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
-                                        type="button"
-                                        :disabled="rejectForm.processing"
-                                        @click="openReject(requestItem)"
-                                    >
-                                        Отклонить
-                                    </button>
-                                    <button
-                                        v-if="requestItem.status === 'approved' && requestItem.venue?.status === 'confirmed'"
-                                        class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
-                                        type="button"
-                                        :disabled="blockForm.processing"
-                                        @click="openBlock(requestItem)"
-                                    >
-                                        Заблокировать
-                                    </button>
-                                    <button
-                                        v-if="requestItem.status === 'approved' && requestItem.venue?.status === 'blocked'"
-                                        class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
-                                        type="button"
-                                        :disabled="unblockForm.processing"
-                                        @click="unblockVenue(requestItem)"
-                                    >
-                                        Разблокировать
-                                    </button>
-                                </div>
-                                <div class="font-semibold text-slate-800">#{{ requestItem.id }}</div>
-                                <div>{{ requestItem.type?.name || '—' }}</div>
-                                <div class="truncate" :title="requestItem.venue?.address || ''">
-                                    {{ requestItem.venue?.address || '—' }}
-                                </div>
-                                <div>{{ requestItem.creator?.login || '—' }}</div>
-                                <div>{{ requestItem.venue?.created_at || '—' }}</div>
-                                <div>{{ requestItem.submitted_at ? formatDate(requestItem.submitted_at) : '—' }}</div>
-                                <div>{{ requestItem.reviewed_at ? formatDate(requestItem.reviewed_at) : '—' }}</div>
-                                <div>{{ requestItem.reviewer?.login || '—' }}</div>
+                            <div>
+                                <span
+                                    class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600"
+                                    :class="{
+                                        'border-amber-200 bg-amber-50 text-amber-800': requestItem.status === 'pending',
+                                        'border-emerald-200 bg-emerald-50 text-emerald-700': requestItem.status === 'approved',
+                                        'border-rose-200 bg-rose-50 text-rose-700': requestItem.status === 'rejected',
+                                    }"
+                                    :title="requestItem.submitted_at ? formatDate(requestItem.submitted_at) : undefined"
+                                >
+                                    {{ statusLabelMap[requestItem.status] || '—' }}
+                                </span>
                             </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button
+                                    v-if="requestItem.status === 'pending'"
+                                    class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
+                                    type="button"
+                                    :disabled="approveForm.processing"
+                                    @click="openApprove(requestItem)"
+                                >
+                                    Подтвердить
+                                </button>
+                                <button
+                                    v-if="requestItem.status === 'pending'"
+                                    class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                    type="button"
+                                    :disabled="rejectForm.processing"
+                                    @click="openReject(requestItem)"
+                                >
+                                    Отклонить
+                                </button>
+                                <button
+                                    v-if="requestItem.status === 'approved' && requestItem.user?.status === 'confirmed'"
+                                    class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                    type="button"
+                                    :disabled="blockForm.processing"
+                                    @click="openBlock(requestItem)"
+                                >
+                                    Заблокировать
+                                </button>
+                                <button
+                                    v-if="requestItem.status === 'approved' && requestItem.user?.status === 'blocked'"
+                                    class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
+                                    type="button"
+                                    :disabled="unblockForm.processing"
+                                    @click="unblockUser(requestItem)"
+                                >
+                                    Разблокировать
+                                </button>
+                            </div>
+                            <div class="font-semibold text-slate-800">#{{ requestItem.id }}</div>
+                            <div>{{ requestItem.profile?.last_name || '—' }}</div>
+                            <div>{{ requestItem.profile?.first_name || '—' }}</div>
+                            <div>{{ requestItem.profile?.gender || '—' }}</div>
+                            <div>{{ requestItem.profile?.birth_date || '—' }}</div>
+                            <div class="flex items-center gap-2">
+                                <span>{{ requestItem.contact?.value || '—' }}</span>
+                                <span
+                                    v-if="requestItem.contact?.confirmed_at"
+                                    class="text-emerald-600"
+                                    :title="formatDate(requestItem.contact.confirmed_at)"
+                                >
+                                    ✓
+                                </span>
+                            </div>
+                            <div>{{ requestItem.submitted_at ? formatDate(requestItem.submitted_at) : '—' }}</div>
+                            <div>{{ requestItem.reviewed_at ? formatDate(requestItem.reviewed_at) : '—' }}</div>
+                            <div>{{ requestItem.reviewer?.login || '—' }}</div>
+                        </div>
                         </div>
                     </div>
                     <div v-else class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
@@ -433,7 +438,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                 <form :class="{ loading: rejectForm.processing }" @submit.prevent="submitReject">
                 <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
                 <p class="mt-2 text-sm text-slate-600">
-                    Вы можете указать причину отклонения. Она будет показана владельцу площадки.
+                    Вы можете указать причину отклонения. Она будет показана пользователю.
                 </p>
                 <textarea
                     v-model="rejectForm.reason"
@@ -464,12 +469,77 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
             </div>
         </div>
 
+        <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
+                <h2 class="text-lg font-semibold text-slate-900">Подтвердить пользователя</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                    Пользователь будет подтвержден, а заявка переведена в статус "Подтверждено".
+                </p>
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                        <span class="font-semibold">{{ approveTarget?.user?.login || '—' }}</span>
+                    </div>
+                    <div class="mt-3 grid gap-2 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
+                            <span>{{ approveTarget?.profile?.last_name || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
+                            <span>{{ approveTarget?.profile?.first_name || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
+                            <span>{{ approveTarget?.profile?.gender || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
+                            <span>{{ approveTarget?.profile?.birth_date || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
+                            <span class="flex items-center gap-2">
+                                {{ approveTarget?.contact?.value || '—' }}
+                                <span
+                                    v-if="approveTarget?.contact?.confirmed_at"
+                                    class="text-emerald-600"
+                                    :title="formatDate(approveTarget?.contact?.confirmed_at)"
+                                >
+                                    ✓
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="approveForm.processing"
+                        @click="closeApprove"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                        type="submit"
+                        :disabled="approveForm.processing"
+                    >
+                        Подтвердить
+                    </button>
+                </div>
+                </form>
+            </div>
+        </div>
+
         <div v-if="blockOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
                 <form :class="{ loading: blockForm.processing }" @submit.prevent="submitBlock">
-                <h2 class="text-lg font-semibold text-slate-900">Заблокировать площадку</h2>
+                <h2 class="text-lg font-semibold text-slate-900">Заблокировать пользователя</h2>
                 <p class="mt-2 text-sm text-slate-600">
-                    Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с владельцем.
+                    Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с пользователем.
                 </p>
                 <textarea
                     v-model="blockForm.reason"
@@ -502,28 +572,41 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 
         <div v-if="viewOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <h2 class="text-lg font-semibold text-slate-900">Данные площадки</h2>
+                <h2 class="text-lg font-semibold text-slate-900">Данные пользователя</h2>
                 <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
-                        <span class="font-semibold">{{ viewTarget?.venue?.name || '—' }}</span>
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                        <span class="font-semibold">{{ viewTarget?.user?.login || '—' }}</span>
                     </div>
                     <div class="mt-3 grid gap-2 text-sm">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
-                            <span>{{ viewTarget?.type?.name || '—' }}</span>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
+                            <span>{{ viewTarget?.profile?.last_name || '—' }}</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span>{{ viewTarget?.venue?.address || '—' }}</span>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
+                            <span>{{ viewTarget?.profile?.first_name || '—' }}</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
-                            <span>{{ viewTarget?.creator?.login || '—' }}</span>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
+                            <span>{{ viewTarget?.profile?.gender || '—' }}</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создана</span>
-                            <span>{{ viewTarget?.venue?.created_at || '—' }}</span>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
+                            <span>{{ viewTarget?.profile?.birth_date || '—' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
+                            <span class="flex items-center gap-2">
+                                {{ viewTarget?.contact?.value || '—' }}
+                                <span
+                                    v-if="viewTarget?.contact?.confirmed_at"
+                                    class="text-emerald-600"
+                                    :title="formatDate(viewTarget?.contact?.confirmed_at)"
+                                >
+                                    ✓
+                                </span>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -536,54 +619,6 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         Закрыть
                     </button>
                 </div>
-            </div>
-        </div>
-
-        <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
-                <h2 class="text-lg font-semibold text-slate-900">Подтвердить площадку</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Площадка будет подтверждена, а заявка переведена в статус "Подтверждено".
-                </p>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
-                        <span class="font-semibold">{{ approveTarget?.venue?.name || '—' }}</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
-                            <span>{{ approveTarget?.type?.name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span>{{ approveTarget?.venue?.address || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
-                            <span>{{ approveTarget?.creator?.login || '—' }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="approveForm.processing"
-                        @click="closeApprove"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                        type="submit"
-                        :disabled="approveForm.processing"
-                    >
-                        Подтвердить
-                    </button>
-                </div>
-                </form>
             </div>
         </div>
     </main>

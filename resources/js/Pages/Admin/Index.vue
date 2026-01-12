@@ -44,7 +44,7 @@ const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Filament</p>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Admin</p>
                     <h1 class="mt-2 text-3xl font-semibold text-slate-900">Панель управления</h1>
                     <p class="mt-4 text-sm text-slate-600">
                         Выберите раздел в меню слева, чтобы перейти к настройкам.

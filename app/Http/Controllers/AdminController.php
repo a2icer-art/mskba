@@ -2,22 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Presentation\Navigation\FilamentNavigationPresenter;
+use App\Presentation\Navigation\AdminNavigationPresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class FilamentController extends Controller
+class AdminController extends Controller
 {
     public function index(Request $request)
     {
         $roleLevel = $this->getRoleLevel($request);
         $this->ensureAccess($roleLevel, 10);
 
-        $navigation = app(FilamentNavigationPresenter::class)->present([
+        $navigation = app(AdminNavigationPresenter::class)->present([
             'roleLevel' => $roleLevel,
         ]);
 
-        return Inertia::render('Filament/Index', [
+        return Inertia::render('Admin/Index', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => $this->resolveActiveHref($navigation),

@@ -5,10 +5,10 @@ use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\FilamentController;
-use App\Http\Controllers\FilamentLogsController;
-use App\Http\Controllers\FilamentUsersModerationController;
-use App\Http\Controllers\FilamentVenuesModerationController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminLogsController;
+use App\Http\Controllers\AdminUsersModerationController;
+use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\VenuesController;
@@ -60,28 +60,28 @@ Route::get('/integrations/address-suggest', AddressSuggestController::class)
     ->middleware('auth')
     ->name('integrations.address-suggest');
 
-Route::middleware('auth')->prefix('filament')->group(function () {
-    Route::get('/', [FilamentController::class, 'index'])->name('filament');
-    Route::get('/users-moderation', [FilamentUsersModerationController::class, 'index'])
-        ->name('filament.users.moderation');
-    Route::post('/users-moderation/{moderationRequest}/approve', [FilamentUsersModerationController::class, 'approve'])
-        ->name('filament.users.moderation.approve');
-    Route::post('/users-moderation/{moderationRequest}/reject', [FilamentUsersModerationController::class, 'reject'])
-        ->name('filament.users.moderation.reject');
-    Route::post('/users-moderation/{moderationRequest}/block', [FilamentUsersModerationController::class, 'block'])
-        ->name('filament.users.moderation.block');
-    Route::post('/users-moderation/{moderationRequest}/unblock', [FilamentUsersModerationController::class, 'unblock'])
-        ->name('filament.users.moderation.unblock');
-    Route::get('/venues-moderation', [FilamentVenuesModerationController::class, 'index'])
-        ->name('filament.venues.moderation');
-    Route::post('/venues-moderation/{moderationRequest}/approve', [FilamentVenuesModerationController::class, 'approve'])
-        ->name('filament.venues.moderation.approve');
-    Route::post('/venues-moderation/{moderationRequest}/reject', [FilamentVenuesModerationController::class, 'reject'])
-        ->name('filament.venues.moderation.reject');
-    Route::post('/venues-moderation/{moderationRequest}/block', [FilamentVenuesModerationController::class, 'block'])
-        ->name('filament.venues.moderation.block');
-    Route::post('/venues-moderation/{moderationRequest}/unblock', [FilamentVenuesModerationController::class, 'unblock'])
-        ->name('filament.venues.moderation.unblock');
-    Route::get('/logs', [FilamentLogsController::class, 'index'])->name('filament.logs');
-    Route::get('/logs/{entity}', [FilamentLogsController::class, 'show'])->name('filament.logs.show');
+Route::middleware('auth')->prefix('admin')->group(function () {
+    Route::get('/', [AdminController::class, 'index'])->name('admin');
+    Route::get('/users-moderation', [AdminUsersModerationController::class, 'index'])
+        ->name('admin.users.moderation');
+    Route::post('/users-moderation/{moderationRequest}/approve', [AdminUsersModerationController::class, 'approve'])
+        ->name('admin.users.moderation.approve');
+    Route::post('/users-moderation/{moderationRequest}/reject', [AdminUsersModerationController::class, 'reject'])
+        ->name('admin.users.moderation.reject');
+    Route::post('/users-moderation/{moderationRequest}/block', [AdminUsersModerationController::class, 'block'])
+        ->name('admin.users.moderation.block');
+    Route::post('/users-moderation/{moderationRequest}/unblock', [AdminUsersModerationController::class, 'unblock'])
+        ->name('admin.users.moderation.unblock');
+    Route::get('/venues-moderation', [AdminVenuesModerationController::class, 'index'])
+        ->name('admin.venues.moderation');
+    Route::post('/venues-moderation/{moderationRequest}/approve', [AdminVenuesModerationController::class, 'approve'])
+        ->name('admin.venues.moderation.approve');
+    Route::post('/venues-moderation/{moderationRequest}/reject', [AdminVenuesModerationController::class, 'reject'])
+        ->name('admin.venues.moderation.reject');
+    Route::post('/venues-moderation/{moderationRequest}/block', [AdminVenuesModerationController::class, 'block'])
+        ->name('admin.venues.moderation.block');
+    Route::post('/venues-moderation/{moderationRequest}/unblock', [AdminVenuesModerationController::class, 'unblock'])
+        ->name('admin.venues.moderation.unblock');
+    Route::get('/logs', [AdminLogsController::class, 'index'])->name('admin.logs');
+    Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])->name('admin.logs.show');
 });

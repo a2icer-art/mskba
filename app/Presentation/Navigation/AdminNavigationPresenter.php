@@ -2,11 +2,11 @@
 
 namespace App\Presentation\Navigation;
 
-use App\Domain\Filament\Services\FilamentNavigationService;
+use App\Domain\Admin\Services\AdminNavigationService;
 
-class FilamentNavigationPresenter extends NavigationPresenter
+class AdminNavigationPresenter extends NavigationPresenter
 {
-    public function __construct(private readonly FilamentNavigationService $navigation)
+    public function __construct(private readonly AdminNavigationService $navigation)
     {
     }
 
