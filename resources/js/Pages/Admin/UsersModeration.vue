@@ -34,6 +34,10 @@ const props = defineProps({
         type: Object,
         default: () => ({ data: [], links: [] }),
     },
+    permissionGroups: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const navigationData = computed(() => props.navigation?.data ?? []);
@@ -49,7 +53,9 @@ const rejectTarget = ref(null);
 const rejectForm = useForm({
     reason: '',
 });
-const approveForm = useForm({});
+const approveForm = useForm({
+    permissions: [],
+});
 const blockForm = useForm({
     reason: '',
 });
@@ -60,6 +66,9 @@ const blockOpen = ref(false);
 const blockTarget = ref(null);
 const viewOpen = ref(false);
 const viewTarget = ref(null);
+const viewPermissionsForm = useForm({
+    permissions: [],
+});
 const page = usePage();
 
 const statusLabelMap = {
@@ -188,24 +197,33 @@ const submitBlock = () => {
 
 const openView = (requestItem) => {
     viewTarget.value = requestItem;
+    viewPermissionsForm.permissions = requestItem?.assigned_permissions ? [...requestItem.assigned_permissions] : [];
+    viewPermissionsForm.clearErrors();
     viewOpen.value = true;
 };
 
 const closeView = () => {
     viewOpen.value = false;
     viewTarget.value = null;
+    viewPermissionsForm.reset('permissions');
+    viewPermissionsForm.clearErrors();
 };
+
 
 const openApprove = (requestItem) => {
     actionNotice.value = '';
     actionError.value = '';
     approveTarget.value = requestItem;
+    approveForm.permissions = requestItem?.assigned_permissions ? [...requestItem.assigned_permissions] : [];
+    approveForm.clearErrors();
     approveOpen.value = true;
 };
 
 const closeApprove = () => {
     approveOpen.value = false;
     approveTarget.value = null;
+    approveForm.reset('permissions');
+    approveForm.clearErrors();
 };
 
 const submitApprove = () => {
@@ -246,6 +264,33 @@ const submitReject = () => {
         },
         onError: (errors) => {
             actionError.value = errors.moderation || rejectForm.errors.reason || 'Не удалось отклонить заявку.';
+        },
+        onFinish: () => {
+            if (page.props?.errors?.moderation) {
+                actionError.value = page.props.errors.moderation;
+            }
+        },
+    });
+};
+
+const submitViewPermissions = () => {
+    if (!viewTarget.value) {
+        return;
+    }
+
+    actionNotice.value = '';
+    actionError.value = '';
+
+    viewPermissionsForm.post(`/admin/users-moderation/${viewTarget.value.id}/permissions`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            actionNotice.value = 'Права пользователя обновлены.';
+            if (viewTarget.value) {
+                viewTarget.value.assigned_permissions = [...viewPermissionsForm.permissions];
+            }
+        },
+        onError: (errors) => {
+            actionError.value = errors.moderation || viewPermissionsForm.errors.permissions || 'Не удалось обновить права.';
         },
         onFinish: () => {
             if (page.props?.errors?.moderation) {
@@ -513,6 +558,40 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         </div>
                     </div>
                 </div>
+                <div class="mt-4">
+                    <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права после подтверждения</p>
+                    <p class="mt-2 text-xs text-slate-500">
+                        Выберите права, которые будут назначены пользователю после подтверждения.
+                    </p>
+                    <div v-if="permissionGroups.length" class="mt-3 max-h-[300px] overflow-y-auto pr-2">
+                        <div class="grid gap-4">
+                        <div v-for="group in permissionGroups" :key="group.key" class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
+                            <div class="mt-3 grid gap-2">
+                                <label
+                                    v-for="permission in group.items"
+                                    :key="permission.code"
+                                    class="flex items-start gap-2 text-sm text-slate-700"
+                                >
+                                    <input
+                                        v-model="approveForm.permissions"
+                                        type="checkbox"
+                                        class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                                        :value="permission.code"
+                                    />
+                                    <span>{{ permission.label }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div v-else class="mt-2 text-sm text-slate-500">
+                        Права не загружены.
+                    </div>
+                    <div v-if="approveForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                        {{ approveForm.errors.permissions }}
+                    </div>
+                </div>
                 <div class="mt-6 flex flex-wrap justify-end gap-3">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
@@ -610,13 +689,57 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         </div>
                     </div>
                 </div>
+                <div class="mt-4">
+                    <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права пользователя</p>
+                    <div v-if="permissionGroups.length" class="mt-2 max-h-[240px] overflow-y-auto pr-2">
+                        <div class="grid gap-4">
+                            <div
+                                v-for="group in permissionGroups"
+                                :key="group.key"
+                                class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                            >
+                                <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
+                                <div class="mt-3 grid gap-2">
+                                    <label
+                                        v-for="permission in group.items"
+                                        :key="permission.code"
+                                        class="flex items-start gap-2 text-sm text-slate-700"
+                                    >
+                                        <input
+                                            v-model="viewPermissionsForm.permissions"
+                                            type="checkbox"
+                                            class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                                            :value="permission.code"
+                                        />
+                                        <span>{{ permission.label }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="mt-2 text-sm text-slate-500">
+                        Права не загружены.
+                    </div>
+                    <div v-if="viewPermissionsForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                        {{ viewPermissionsForm.errors.permissions }}
+                    </div>
+                </div>
                 <div class="mt-6 flex flex-wrap justify-end gap-3">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
+                        :disabled="viewPermissionsForm.processing"
                         @click="closeView"
                     >
-                        Закрыть
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="button"
+                        :disabled="viewPermissionsForm.processing"
+                        @click="submitViewPermissions"
+                    >
+                        Сохранить
                     </button>
                 </div>
             </div>

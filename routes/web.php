@@ -25,6 +25,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/', [AccountController::class, 'index'])->name('account');
     Route::get('/profile', [AccountController::class, 'profile'])->name('account.profile');
     Route::get('/contacts', [AccountController::class, 'contacts'])->name('account.contacts');
+    Route::get('/access', [AccountController::class, 'access'])->name('account.access');
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
@@ -48,8 +49,12 @@ Route::middleware('auth')->prefix('account')->group(function () {
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
     Route::get('/{type}/{venue}', [VenuesController::class, 'show'])->name('venues.show');
-    Route::post('/', [VenuesController::class, 'store'])->middleware('auth')->name('venues.store');
-    Route::patch('/{type}/{venue}', [VenuesController::class, 'update'])->middleware('auth')->name('venues.update');
+    Route::post('/', [VenuesController::class, 'store'])
+        ->middleware(['auth', 'can:venue.create'])
+        ->name('venues.store');
+    Route::patch('/{type}/{venue}', [VenuesController::class, 'update'])
+        ->middleware(['auth', 'can:update,venue'])
+        ->name('venues.update');
     Route::post('/{type}/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
         ->middleware('auth')
         ->name('venues.moderation.request');
@@ -60,12 +65,14 @@ Route::get('/integrations/address-suggest', AddressSuggestController::class)
     ->middleware('auth')
     ->name('integrations.address-suggest');
 
-Route::middleware('auth')->prefix('admin')->group(function () {
+Route::middleware(['auth', 'can:moderation.access'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');
     Route::get('/users-moderation', [AdminUsersModerationController::class, 'index'])
         ->name('admin.users.moderation');
     Route::post('/users-moderation/{moderationRequest}/approve', [AdminUsersModerationController::class, 'approve'])
         ->name('admin.users.moderation.approve');
+    Route::post('/users-moderation/{moderationRequest}/permissions', [AdminUsersModerationController::class, 'updatePermissions'])
+        ->name('admin.users.moderation.permissions');
     Route::post('/users-moderation/{moderationRequest}/reject', [AdminUsersModerationController::class, 'reject'])
         ->name('admin.users.moderation.reject');
     Route::post('/users-moderation/{moderationRequest}/block', [AdminUsersModerationController::class, 'block'])
@@ -82,6 +89,10 @@ Route::middleware('auth')->prefix('admin')->group(function () {
         ->name('admin.venues.moderation.block');
     Route::post('/venues-moderation/{moderationRequest}/unblock', [AdminVenuesModerationController::class, 'unblock'])
         ->name('admin.venues.moderation.unblock');
-    Route::get('/logs', [AdminLogsController::class, 'index'])->name('admin.logs');
-    Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])->name('admin.logs.show');
+    Route::get('/logs', [AdminLogsController::class, 'index'])
+        ->middleware('can:logs.view')
+        ->name('admin.logs');
+    Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])
+        ->middleware('can:logs.view')
+        ->name('admin.logs.show');
 });

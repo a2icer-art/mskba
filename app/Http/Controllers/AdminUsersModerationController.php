@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
+use App\Domain\Permissions\Enums\PermissionScope;
+use App\Domain\Permissions\Models\Permission;
 use App\Domain\Users\Enums\UserConfirmedBy;
+use App\Models\User;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
@@ -23,7 +26,7 @@ class AdminUsersModerationController extends Controller
         }
 
         $navigation = app(AdminNavigationPresenter::class)->present([
-            'roleLevel' => $roleLevel,
+            'user' => $request->user(),
         ]);
 
         $status = $request->string('status')->toString();
@@ -40,6 +43,8 @@ class AdminUsersModerationController extends Controller
             ->with([
                 'entityUser.profile',
                 'entityUser.contacts' => fn ($builder) => $builder->whereNotNull('confirmed_at'),
+                'entityUser.roles.permissions:id,code,label',
+                'entityUser.permissions:id,code,label',
                 'reviewer:id,login',
             ]);
 
@@ -61,6 +66,8 @@ class AdminUsersModerationController extends Controller
                 $profile = $user?->profile;
                 $confirmedContact = $user?->contacts?->sortBy('id')->first();
                 $reviewer = $request->reviewer;
+                $permissions = $this->resolveUserPermissions($user);
+                $assignedPermissions = $this->resolveDirectPermissionCodes($user);
 
                 return [
                     'id' => $request->id,
@@ -95,6 +102,8 @@ class AdminUsersModerationController extends Controller
                             'confirmed_at' => DateFormatter::dateTime($confirmedContact->confirmed_at),
                         ]
                         : null,
+                    'permissions' => $permissions,
+                    'assigned_permissions' => $assignedPermissions,
                 ];
             });
 
@@ -117,6 +126,7 @@ class AdminUsersModerationController extends Controller
                 ['value' => 'submitted_at_asc', 'label' => 'Сначала старые'],
             ],
             'requests' => $requests,
+            'permissionGroups' => $this->getPermissionGroups(),
         ]);
     }
 
@@ -146,6 +156,23 @@ class AdminUsersModerationController extends Controller
             return back()->withErrors(['moderation' => 'Пользователь уже подтвержден.']);
         }
 
+        $data = $request->validate([
+            'permissions' => ['array'],
+            'permissions.*' => ['string', 'exists:permissions,code'],
+        ]);
+
+        $permissionCodes = $this->filterApprovalPermissionCodes($data['permissions'] ?? []);
+        $permissionIds = [];
+        if ($permissionCodes !== []) {
+            $permissionIds = Permission::query()
+                ->whereIn('code', $permissionCodes)
+                ->where('scope', PermissionScope::Global)
+                ->pluck('id')
+                ->all();
+        }
+
+        $user->permissions()->sync($permissionIds);
+
         $moderationRequest->update([
             'status' => ModerationStatus::Approved,
             'reviewed_by' => $request->user()?->id,
@@ -158,6 +185,44 @@ class AdminUsersModerationController extends Controller
             'confirmed_at' => now(),
             'confirmed_by' => UserConfirmedBy::Admin,
         ]);
+
+        return back();
+    }
+
+    public function updatePermissions(Request $request, ModerationRequest $moderationRequest)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::User) {
+            abort(404);
+        }
+
+        $user = $moderationRequest->entityUser;
+        if (!$user) {
+            return back()->withErrors(['moderation' => 'Пользователь не найден.']);
+        }
+
+        $data = $request->validate([
+            'permissions' => ['array'],
+            'permissions.*' => ['string', 'exists:permissions,code'],
+        ]);
+
+        $permissionCodes = $this->filterApprovalPermissionCodes($data['permissions'] ?? []);
+        $permissionIds = [];
+        if ($permissionCodes !== []) {
+            $permissionIds = Permission::query()
+                ->whereIn('code', $permissionCodes)
+                ->where('scope', PermissionScope::Global)
+                ->pluck('id')
+                ->all();
+        }
+
+        $user->permissions()->sync($permissionIds);
 
         return back();
     }
@@ -277,5 +342,123 @@ class AdminUsersModerationController extends Controller
         if ($roleLevel <= $minLevel) {
             abort(403);
         }
+    }
+
+    private function resolveUserPermissions(?User $user): array
+    {
+        if (!$user) {
+            return [];
+        }
+
+        $rolePermissions = $user->roles
+            ? $user->roles->flatMap(fn ($role) => $role->permissions ?? collect())
+            : collect();
+        $userPermissions = $user->permissions ?? collect();
+
+        return $rolePermissions
+            ->merge($userPermissions)
+            ->unique('code')
+            ->sortBy('label')
+            ->values()
+            ->map(static function ($permission): array {
+                return [
+                    'code' => $permission->code,
+                    'label' => $permission->label ?: $permission->code,
+                ];
+            })
+            ->all();
+    }
+
+    private function resolveDirectPermissionCodes(?User $user): array
+    {
+        if (!$user || !$user->permissions) {
+            return [];
+        }
+
+        return $user->permissions
+            ->pluck('code')
+            ->all();
+    }
+
+    private function getPermissionGroups(): array
+    {
+        $titles = [
+            'admin' => 'Система',
+            'moderation' => 'Модерация',
+            'logs' => 'Система',
+            'venue' => 'Площадки',
+            'event' => 'События',
+            'comment' => 'Комментарии',
+            'rating' => 'Рейтинги',
+            'article' => 'Статьи',
+            'article_category' => 'Категории статей',
+        ];
+
+        $permissions = Permission::query()
+            ->where('scope', PermissionScope::Global)
+            ->orderBy('label')
+            ->get(['code', 'label']);
+
+        $allowedPrefixes = $this->getApprovalPermissionPrefixes();
+        $grouped = [];
+        foreach ($permissions as $permission) {
+            $prefix = explode('.', $permission->code, 2)[0];
+            if (!in_array($prefix, $allowedPrefixes, true)) {
+                continue;
+            }
+            $title = $titles[$prefix] ?? 'Прочее';
+            $grouped[$title][] = [
+                'code' => $permission->code,
+                'label' => $permission->label ?: $permission->code,
+            ];
+        }
+
+        $orderedGroups = [];
+        foreach (array_unique(array_values($titles)) as $title) {
+            if (!empty($grouped[$title])) {
+                $orderedGroups[] = [
+                    'title' => $title,
+                    'items' => $grouped[$title],
+                ];
+            }
+            unset($grouped[$title]);
+        }
+
+        foreach ($grouped as $title => $items) {
+            $orderedGroups[] = [
+                'title' => $title,
+                'items' => $items,
+            ];
+        }
+
+        return $orderedGroups;
+    }
+
+    private function getApprovalPermissionPrefixes(): array
+    {
+        return [
+            'venue',
+            'event',
+            'comment',
+            'rating',
+        ];
+    }
+
+    private function filterApprovalPermissionCodes(array $permissionCodes): array
+    {
+        if ($permissionCodes === []) {
+            return [];
+        }
+
+        $allowedPrefixes = $this->getApprovalPermissionPrefixes();
+
+        return array_values(array_filter(
+            $permissionCodes,
+            static function (string $code) use ($allowedPrefixes): bool {
+                $prefix = explode('.', $code, 2)[0];
+
+                return in_array($prefix, $allowedPrefixes, true);
+            }
+        ));
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
+use App\Domain\Permissions\Models\Permission;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,6 +41,16 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $userRoles = $user ? $user->roles()->pluck('alias')->all() : [];
         $userRoleLevel = $user ? (int) $user->roles()->max('level') : 0;
+        $permissionCodes = [];
+        if ($user) {
+            $roleIds = $user->roles()->pluck('roles.id')->all();
+            $rolePermissions = Permission::query()
+                ->whereHas('roles', fn ($query) => $query->whereIn('roles.id', $roleIds))
+                ->pluck('code')
+                ->all();
+            $userPermissions = $user->permissions()->pluck('code')->all();
+            $permissionCodes = array_values(array_unique(array_merge($rolePermissions, $userPermissions)));
+        }
 
         return [
             ...parent::share($request),
@@ -51,6 +62,7 @@ class HandleInertiaRequests extends Middleware
                         'status' => $user->status?->value,
                         'roles' => $userRoles,
                         'role_level' => $userRoleLevel,
+                        'permissions' => $permissionCodes,
                     ]
                     : null,
             ],

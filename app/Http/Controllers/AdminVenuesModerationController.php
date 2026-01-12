@@ -23,7 +23,7 @@ class AdminVenuesModerationController extends Controller
         }
 
         $navigation = app(AdminNavigationPresenter::class)->present([
-            'roleLevel' => $roleLevel,
+            'user' => $request->user(),
         ]);
 
         $status = $request->string('status')->toString();

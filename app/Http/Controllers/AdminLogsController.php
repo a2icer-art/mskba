@@ -48,7 +48,7 @@ class AdminLogsController extends Controller
             });
 
         $navigation = app(AdminNavigationPresenter::class)->present([
-            'roleLevel' => $roleLevel,
+            'user' => $request->user(),
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
 
@@ -109,7 +109,7 @@ class AdminLogsController extends Controller
             });
 
         $navigation = app(AdminNavigationPresenter::class)->present([
-            'roleLevel' => $roleLevel,
+            'user' => $request->user(),
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
 

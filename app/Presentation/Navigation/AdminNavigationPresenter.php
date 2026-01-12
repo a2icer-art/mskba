@@ -17,8 +17,11 @@ class AdminNavigationPresenter extends NavigationPresenter
 
     protected function buildGroups(array $ctx): array
     {
-        $roleLevel = (int) ($ctx['roleLevel'] ?? 0);
+        $user = $ctx['user'] ?? null;
+        if (!$user) {
+            return [];
+        }
 
-        return $this->navigation->getMenuGroups($roleLevel);
+        return $this->navigation->getMenuGroups($user);
     }
 }

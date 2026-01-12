@@ -74,6 +74,21 @@
 - `ParticipantRoleAssignment` (app/Domain/Participants/Models/ParticipantRoleAssignment)
   - Назначение роли пользователю с опциональным контекстом (polymorphic).
 
+## Домен Permissions
+
+- `Permission` (app/Domain/Permissions/Models/Permission)
+  - Реестр прав (code/label/scope/target_model).
+- `RolePermission` / `UserPermission` / `EntityPermission`
+  - Назначения прав ролям, пользователям и конкретным сущностям.
+- `PermissionRegistry` / `RolePermissionPreset`
+  - Единый реестр прав и базовые пресеты для ролей.
+- `PermissionChecker`
+  - Доменная проверка прав (global и resource).
+- Интеграция с Laravel
+  - Policy для ресурсных прав (например, `VenuePolicy`).
+  - Gate для глобальных прав (`admin.access`, `moderation.access`, `logs.view`).
+  - Доступы в UI и маршрутах должны опираться на permissions (например, `can:venue.create`).
+
 ## Домен Admin
 
 - `AdminNavigationService` (app/Domain/Admin/Services/AdminNavigationService)

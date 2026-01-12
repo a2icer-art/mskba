@@ -4,6 +4,7 @@ namespace App\Domain\Moderation\Rules;
 
 use App\Domain\Moderation\Contracts\ModerationRulesContract;
 use App\Domain\Moderation\Requirements\VenueModerationRequirements;
+use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,10 @@ class VenueModerationRules implements ModerationRulesContract
 
         if ($entity->created_by && $actor->id !== $entity->created_by) {
             $missing[] = 'Запрос может отправить только владелец площадки.';
+        }
+
+        if ($actor->status?->value !== UserStatus::Confirmed->value) {
+            $missing[] = 'Подтвердите аккаунт, чтобы отправлять площадку на модерацию.';
         }
 
         $venueLabels = [

@@ -14,7 +14,7 @@ class AdminController extends Controller
         $this->ensureAccess($roleLevel, 10);
 
         $navigation = app(AdminNavigationPresenter::class)->present([
-            'roleLevel' => $roleLevel,
+            'user' => $request->user(),
         ]);
 
         return Inertia::render('Admin/Index', [

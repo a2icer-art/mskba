@@ -10,6 +10,7 @@ class AccountNavigationPresenter extends NavigationPresenter
             ['key' => 'user', 'label' => 'Пользователь', 'href' => '/account'],
             ['key' => 'profile', 'label' => 'Профиль', 'href' => '/account/profile'],
             ['key' => 'contacts', 'label' => 'Контакты', 'href' => '/account/contacts'],
+            ['key' => 'access', 'label' => 'Доступы', 'href' => '/account/access'],
         ];
 
         $roles = $ctx['participantRoles'] ?? [];

@@ -4,6 +4,7 @@ namespace App\Presentation\Venues;
 
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Models\ModerationRequest;
+use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Presentation\BasePresenter;
@@ -20,6 +21,7 @@ class VenueShowPresenter extends BasePresenter
         $typeSlug = $ctx['typeSlug'] ?? '';
 
         $isOwner = $user && $venue->created_by === $user->id;
+        $canSubmitModeration = $isOwner && $user?->status?->value === UserStatus::Confirmed->value;
         $editPolicy = app(VenueEditPolicy::class);
         $editableFields = $isOwner ? $editPolicy->getEditableFields($venue) : [];
 
@@ -72,6 +74,7 @@ class VenueShowPresenter extends BasePresenter
             'types' => app(VenueTypeOptionsPresenter::class)->present()['data'],
             'editableFields' => $editableFields,
             'canEdit' => (bool) $isOwner,
+            'canSubmitModeration' => $canSubmitModeration,
         ];
     }
 }
