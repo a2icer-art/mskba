@@ -19,7 +19,7 @@ const props = defineProps({
     },
 });
 
-const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const navigationData = computed(() => props.navigation?.data ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 </script>
 
@@ -31,7 +31,7 @@ const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
                 :app-name="appName"
-                :is-authenticated="true"
+                :is-authenticated="Boolean($page.props.auth?.user)"
                 :login-label="$page.props.auth?.user?.login"
             />
 

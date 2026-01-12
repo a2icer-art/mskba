@@ -20,7 +20,7 @@ class FilamentController extends Controller
         return Inertia::render('Filament/Index', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
-            'activeHref' => '',
+            'activeHref' => $this->resolveActiveHref($navigation),
         ]);
     }
 
@@ -40,5 +40,24 @@ class FilamentController extends Controller
         if ($roleLevel <= $minLevel) {
             abort(403);
         }
+    }
+
+    private function resolveActiveHref(array $navigation): string
+    {
+        $data = $navigation['data'] ?? [];
+        if (!is_array($data) || $data === []) {
+            return '';
+        }
+
+        $first = $data[0] ?? [];
+        if (is_array($first) && isset($first['href'])) {
+            return (string) $first['href'];
+        }
+
+        if (is_array($first) && isset($first['items'][0]['href'])) {
+            return (string) $first['items'][0]['href'];
+        }
+
+        return '';
     }
 }

@@ -32,7 +32,7 @@ const props = defineProps({
     },
 });
 
-const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const navigationData = computed(() => props.navigation?.data ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasEntities = computed(() => props.entities.length > 0);
 const hasLogs = computed(() => props.logs?.data?.length > 0);
@@ -76,7 +76,7 @@ const formatValue = (value) => {
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
                 :app-name="appName"
-                :is-authenticated="true"
+                :is-authenticated="Boolean($page.props.auth?.user)"
                 :login-label="$page.props.auth?.user?.login"
             />
 
@@ -96,7 +96,7 @@ const formatValue = (value) => {
                     </p>
 
                     <div v-if="hasEntities" class="mt-6 flex flex-wrap gap-3">
-                        <a
+                        <Link
                             v-for="entity in entities"
                             :key="entity.key"
                             class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
@@ -104,7 +104,7 @@ const formatValue = (value) => {
                             :href="entity.href"
                         >
                             {{ entity.label }}
-                        </a>
+                        </Link>
                     </div>
 
                     <div v-else class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-600">
