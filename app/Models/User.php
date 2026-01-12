@@ -11,6 +11,7 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
+use App\Domain\Contracts\Models\Contract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -114,5 +115,10 @@ class User extends Authenticatable
     public function participantRoleAssignments(): HasMany
     {
         return $this->hasMany(ParticipantRoleAssignment::class);
+    }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
     }
 }
