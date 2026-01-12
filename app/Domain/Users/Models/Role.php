@@ -5,6 +5,7 @@ namespace App\Domain\Users\Models;
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Users\Enums\RoleStatus;
 use App\Models\User;
+use App\Domain\Permissions\Models\Permission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -58,5 +59,10 @@ class Role extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_roles');
+    }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'role_permissions');
     }
 }

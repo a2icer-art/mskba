@@ -39,6 +39,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    canSubmitModeration: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
@@ -75,6 +79,7 @@ const addressEditable = computed(() =>
     ['city', 'street', 'building', 'metro_id'].some((field) => editableFields.value.includes(field))
 );
 const canEdit = computed(() => props.canEdit);
+const canSubmitModeration = computed(() => props.canSubmitModeration);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
 const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
 const nonEditableItems = computed(() => {
@@ -129,7 +134,6 @@ const isModerationRejected = computed(() => moderationRequest.value?.status === 
 const moderationRejectedAt = computed(() => moderationRequest.value?.reviewed_at ?? moderationRequest.value?.submitted_at);
 const moderationRejectedReason = computed(() => moderationRequest.value?.reject_reason ?? '');
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
-const canResubmitModeration = computed(() => hasModerationRejectReason.value);
 
 watch(
     () => page.props.errors,
@@ -297,8 +301,8 @@ const submitModerationRequest = () => {
     moderationNotice.value = '';
     moderationErrors.value = [];
 
-    if (!canEdit.value) {
-        moderationErrors.value = ['Отправить на модерацию может только создатель площадки.'];
+    if (!canSubmitModeration.value) {
+        moderationErrors.value = ['Отправить на модерацию может только владелец подтвержденного аккаунта.'];
         return;
     }
 
@@ -319,6 +323,7 @@ const submitModerationRequest = () => {
         },
     });
 };
+
 </script>
 
 <template>
@@ -390,7 +395,7 @@ const submitModerationRequest = () => {
                                     Отклонено
                                 </span>
                                 <button
-                                    v-if="isModerationRejected && canResubmitModeration && venue?.status === 'unconfirmed'"
+                                    v-if="isModerationRejected && canSubmitModeration && venue?.status === 'unconfirmed'"
                                     class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                     type="button"
                                     :disabled="moderationForm.processing"
@@ -399,7 +404,7 @@ const submitModerationRequest = () => {
                                     Отправить повторно
                                 </button>
                                 <button
-                                    v-else-if="!isModerationPending && !isModerationRejected && venue?.status === 'unconfirmed'"
+                                    v-else-if="!isModerationPending && !isModerationRejected && venue?.status === 'unconfirmed' && canSubmitModeration"
                                     class="rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                                     type="button"
                                     :disabled="moderationForm.processing"
@@ -420,7 +425,7 @@ const submitModerationRequest = () => {
                                 {{ moderationRejectedReason }}
                             </div>
                             <div v-else-if="isModerationRejected" class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                                Причина отклонения пока не указана. Повторная отправка станет доступна после комментария модератора.
+                                Причина отклонения пока не указана.
                             </div>
                             <div v-else-if="venue?.status === 'blocked'" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                 {{ venue?.block_reason || 'Причина блокировки не определена.' }}

@@ -25,6 +25,11 @@ class AccountController extends Controller
         return $this->renderAccount($request, 'contacts');
     }
 
+    public function access(Request $request)
+    {
+        return $this->renderAccount($request, 'access');
+    }
+
     public function role(Request $request, ParticipantRoleAssignment $assignment)
     {
         $user = $request->user();

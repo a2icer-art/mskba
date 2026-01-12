@@ -12,9 +12,11 @@ use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\UserContact;
+use App\Domain\Users\Models\Role;
 use App\Models\User;
-use Database\Factories\VenueTypeFactory;
 use Database\Factories\RoleFactory;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -36,24 +38,10 @@ class DatabaseSeeder extends Seeder
             'confirmed_by' => UserConfirmedBy::Admin,
         ];
 
-        $admin = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'login' => 'admin',
-        ]));
-
-        $moderator = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'login' => 'moderator',
-            'created_by' => $admin->id,
-        ]));
-
-        $editor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'login' => 'editor',
-            'created_by' => $admin->id,
-        ]));
-
-        $supereditor = User::factory()->withProfile()->create(array_merge($commonUserState, [
-            'login' => 'supereditor',
-            'created_by' => $admin->id,
-        ]));
+        $admin = $this->getOrCreateUser('admin', null, $commonUserState);
+        $moderator = $this->getOrCreateUser('moderator', $admin->id, $commonUserState);
+        $editor = $this->getOrCreateUser('editor', $admin->id, $commonUserState);
+        $supereditor = $this->getOrCreateUser('supereditor', $admin->id, $commonUserState);
 
         $this->seedUserContact($admin, 'admin@example.com', $admin->id);
         $this->seedUserContact($moderator, 'moderator@example.com', $admin->id);
@@ -61,25 +49,10 @@ class DatabaseSeeder extends Seeder
         $this->seedUserContact($supereditor, 'supereditor@example.com', $admin->id);
 
         $roles = [
-            'admin' => RoleFactory::new()->admin()->create([
-                'level' => 40,
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-            ]),
-            'moderator' => RoleFactory::new()->moderator()->create([
-                'level' => 30,
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-            ]),
-            'editor' => RoleFactory::new()->editor()->create([
-                'level' => 20,
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-            ]),
-            'user' => RoleFactory::new()->user()->create([
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-            ]),
+            'admin' => $this->getOrCreateRole('admin', 40, $admin->id),
+            'moderator' => $this->getOrCreateRole('moderator', 30, $admin->id),
+            'editor' => $this->getOrCreateRole('editor', 20, $admin->id),
+            'user' => $this->getOrCreateRole('user', 10, $admin->id),
         ];
 
         $admin->roles()->sync([
@@ -98,6 +71,11 @@ class DatabaseSeeder extends Seeder
             $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
 
+        $this->call([
+            PermissionSeeder::class,
+            RolePermissionSeeder::class,
+        ]);
+
         $participantRoles = [
             ['name' => 'Игрок', 'plural_name' => 'Игроки', 'alias' => 'player'],
             ['name' => 'Тренер', 'plural_name' => 'Тренеры', 'alias' => 'coach'],
@@ -110,17 +88,19 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($participantRoles as $index => $role) {
-            ParticipantRole::query()->create([
-                'name' => $role['name'],
-                'plural_name' => $role['plural_name'],
-                'alias' => $role['alias'],
-                'status' => ParticipantRoleStatus::Confirmed,
-                'sort' => $index + 1,
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
-                'confirmed_at' => now(),
-                'confirmed_by' => $admin->id,
-            ]);
+            ParticipantRole::query()->updateOrCreate(
+                ['alias' => $role['alias']],
+                [
+                    'name' => $role['name'],
+                    'plural_name' => $role['plural_name'],
+                    'status' => ParticipantRoleStatus::Confirmed,
+                    'sort' => $index + 1,
+                    'created_by' => $admin->id,
+                    'updated_by' => $admin->id,
+                    'confirmed_at' => now(),
+                    'confirmed_by' => $admin->id,
+                ]
+            );
         }
 
         $venueTypes = collect([
@@ -128,9 +108,15 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Корт', 'plural_name' => 'Корты', 'alias' => 'court'],
             ['name' => 'Уличная площадка', 'plural_name' => 'Уличные площадки', 'alias' => 'outdoor'],
         ])->mapWithKeys(function (array $data) use ($admin): array {
-            $venueType = VenueTypeFactory::new()
-                ->named($data['name'], $data['alias'], $data['plural_name'], $admin->id)
-                ->create();
+            $venueType = VenueType::query()->updateOrCreate(
+                ['alias' => $data['alias']],
+                [
+                    'name' => $data['name'],
+                    'plural_name' => $data['plural_name'],
+                    'created_by' => $admin->id,
+                    'updated_by' => $admin->id,
+                ]
+            );
 
             return [$data['alias'] => $venueType];
         });
@@ -163,6 +149,38 @@ class DatabaseSeeder extends Seeder
             'confirmed_at' => now(),
             'created_by' => $updatedBy,
             'updated_by' => $updatedBy,
+        ]);
+    }
+
+    private function getOrCreateUser(string $login, ?int $createdBy, array $commonUserState): User
+    {
+        $user = User::query()->where('login', $login)->first();
+        if ($user) {
+            return $user;
+        }
+
+        $data = array_merge($commonUserState, [
+            'login' => $login,
+        ]);
+
+        if ($createdBy) {
+            $data['created_by'] = $createdBy;
+        }
+
+        return User::factory()->withProfile()->create($data);
+    }
+
+    private function getOrCreateRole(string $alias, int $level, int $createdBy): Role
+    {
+        $role = Role::query()->where('alias', $alias)->first();
+        if ($role) {
+            return $role;
+        }
+
+        return RoleFactory::new()->named($alias)->create([
+            'level' => $level,
+            'created_by' => $createdBy,
+            'updated_by' => $createdBy,
         ]);
     }
 }

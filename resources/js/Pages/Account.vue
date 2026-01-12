@@ -42,6 +42,10 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    permissions: {
+        type: Array,
+        default: () => [],
+    },
     activeTab: {
         type: String,
         default: 'user',
@@ -63,6 +67,7 @@ const accountMenuItems = computed(() => {
         { key: 'user', label: 'Пользователь', href: '/account' },
         { key: 'profile', label: 'Профиль', href: '/account/profile' },
         { key: 'contacts', label: 'Контакты', href: '/account/contacts' },
+        { key: 'access', label: 'Доступы', href: '/account/access' },
     ];
 
     const roleItems = props.participantRoles.map((role) => ({
@@ -87,6 +92,7 @@ const moderationRejectedReason = computed(() => moderationRequest.value?.reject_
 const hasModerationRejectReason = computed(() => Boolean(moderationRequest.value?.reject_reason));
 const canResubmitModeration = computed(() => hasModerationRejectReason.value);
 const isProfileConfirmed = computed(() => props.user?.status === 'confirmed');
+const isUserBlocked = computed(() => props.user?.status === 'blocked');
 const isProfileRestricted = computed(() => isProfileConfirmed.value || isModerationPending.value);
 const nonEditableProfileItems = computed(() => {
     if (!isProfileRestricted.value) {
@@ -154,6 +160,7 @@ const roleItems = (role) => [
 ];
 
 const activeRole = computed(() => props.participantRoles.find((role) => `role-${role.id}` === activeTab.value) ?? null);
+const permissions = computed(() => props.permissions ?? []);
 
 const emails = computed(() =>
     [...props.emails].sort((left, right) => left.id - right.id)
@@ -1280,6 +1287,22 @@ const logout = () => {
                                 Сначала сохраните или отмените текущую правку контакта.
                             </p>
                         </fieldset>
+                    </div>
+
+                    <div v-else-if="activeTab === 'access'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div v-if="permissions.length" class="flex flex-wrap gap-2">
+                            <span
+                                v-for="permission in permissions"
+                                :key="permission.code"
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                                :class="isUserBlocked ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-700'"
+                            >
+                                {{ permission.label }}
+                            </span>
+                        </div>
+                        <div v-else class="text-sm text-slate-500">
+                            Права не назначены.
+                        </div>
                     </div>
 
                     <div v-else-if="activeRole" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">

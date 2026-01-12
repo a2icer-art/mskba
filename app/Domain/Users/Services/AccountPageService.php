@@ -18,7 +18,7 @@ class AccountPageService
 {
     public function getProps(User $user, string $activeTab): array
     {
-        $user->load(['profile', 'contacts']);
+        $user->load(['profile', 'contacts', 'roles.permissions', 'permissions']);
 
         $participantRoles = $this->getParticipantRoles($user);
         $navigation = app(AccountNavigationPresenter::class)->present([
@@ -64,6 +64,7 @@ class AccountPageService
             ],
             'contactVerifications' => $this->getContactVerifications($user),
             'moderationRequest' => $this->getModerationRequest($user),
+            'permissions' => $this->resolveUserPermissions($user),
             'navigation' => $navigation,
         ];
     }
@@ -132,5 +133,26 @@ class AccountPageService
             'reviewed_at' => DateFormatter::dateTime($request->reviewed_at),
             'reject_reason' => $request->reject_reason,
         ];
+    }
+
+    private function resolveUserPermissions(User $user): array
+    {
+        $rolePermissions = $user->roles
+            ? $user->roles->flatMap(fn ($role) => $role->permissions ?? collect())
+            : collect();
+        $userPermissions = $user->permissions ?? collect();
+
+        return $rolePermissions
+            ->merge($userPermissions)
+            ->unique('code')
+            ->sortBy('label')
+            ->values()
+            ->map(static function ($permission): array {
+                return [
+                    'code' => $permission->code,
+                    'label' => $permission->label ?: $permission->code,
+                ];
+            })
+            ->all();
     }
 }

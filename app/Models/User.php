@@ -11,6 +11,7 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\UserRole;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
+use App\Domain\Permissions\Models\Permission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -104,6 +105,11 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'user_permissions');
     }
 
     public function contacts(): HasMany

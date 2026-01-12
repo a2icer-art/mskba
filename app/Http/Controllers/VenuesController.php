@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\UseCases\SubmitModerationRequest;
-use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueCatalogService;
@@ -94,11 +93,9 @@ class VenuesController extends Controller
 
     public function store(StoreVenueRequest $request, CreateVenue $useCase)
     {
-        $user = $request->user();
-        if (!$user || $user->status !== UserStatus::Confirmed) {
-            return back()->withErrors(['venue' => 'Добавление площадок доступно только подтвержденным пользователям.']);
-        }
+        $this->authorize('create', Venue::class);
 
+        $user = $request->user();
         $data = $request->validated();
         $venue = $useCase->execute($user, $data);
 
@@ -110,14 +107,25 @@ class VenuesController extends Controller
         ]);
     }
 
-    public function submitModerationRequest(Request $request, string $type, Venue $venue, SubmitModerationRequest $useCase)
+    public function update(Request $request, string $type, Venue $venue, UpdateVenue $useCase)
     {
-        $user = $request->user();
-        if (!$user || $user->status !== UserStatus::Confirmed) {
-            return back()->withErrors(['moderation' => 'Отправить на модерацию может только подтвержденный пользователь.']);
+        $this->authorize('update', $venue);
+
+        $fields = $useCase->getEditableFields($venue);
+        if ($fields === []) {
+            return back()->withErrors(['venue' => 'Редактирование недоступно для этой площадки.']);
         }
 
-        $result = $useCase->execute($user, ModerationEntityType::Venue, $venue);
+        $rules = Arr::only($useCase->getValidationRules($venue), $fields);
+        $data = validator($request->only($fields), $rules)->validate();
+        $useCase->execute($request->user(), $venue, $data);
+
+        return back();
+    }
+
+    public function submitModerationRequest(Request $request, string $type, Venue $venue, SubmitModerationRequest $useCase)
+    {
+        $result = $useCase->execute($request->user(), ModerationEntityType::Venue, $venue);
 
         if (!$result->success) {
             return back()->withErrors([
@@ -128,25 +136,6 @@ class VenuesController extends Controller
         $venue->update([
             'status' => VenueStatus::Moderation,
         ]);
-
-        return back();
-    }
-
-    public function update(Request $request, string $type, Venue $venue, UpdateVenue $useCase)
-    {
-        $user = $request->user();
-        if (!$user) {
-            return back()->withErrors(['venue' => 'Необходимо авторизоваться для редактирования.']);
-        }
-
-        $fields = $useCase->getEditableFields($venue);
-        if ($fields === []) {
-            return back()->withErrors(['venue' => 'Редактирование недоступно для этой площадки.']);
-        }
-
-        $rules = Arr::only($useCase->getValidationRules($venue), $fields);
-        $data = validator($request->only($fields), $rules)->validate();
-        $useCase->execute($user, $venue, $data);
 
         return back();
     }

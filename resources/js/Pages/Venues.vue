@@ -40,7 +40,9 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
-const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
+const userPermissions = computed(() => page.props.auth?.user?.permissions ?? []);
+const isUserBlocked = computed(() => page.props.auth?.user?.status === 'blocked');
+const canCreateVenue = computed(() => !isUserBlocked.value && userPermissions.value.includes('venue.create'));
 const showAuthModal = ref(false);
 const authMode = ref('login');
 const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
@@ -397,7 +399,7 @@ const applyAddressSuggestion = (suggestion) => {
                             </p>
                         </div>
                         <button
-                            v-if="isUserConfirmed"
+                            v-if="canCreateVenue"
                             class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                             type="button"
                             @click="openCreate"

@@ -3,21 +3,26 @@
 namespace App\Domain\Admin\Services;
 
 use App\Domain\Admin\Services\AdminLogsService;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Permissions\Services\PermissionChecker;
+use App\Models\User;
 
 class AdminNavigationService
 {
     public function __construct(
-        private readonly AdminLogsService $logsService
+        private readonly AdminLogsService $logsService,
+        private readonly PermissionChecker $permissionChecker
     ) {
     }
 
-    public function getMenuGroups(int $roleLevel): array
+    public function getMenuGroups(User $user): array
     {
         $groups = [];
         $moderationItems = [];
+        $systemItems = [];
         $contentItems = [];
 
-        if ($roleLevel > 20) {
+        if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
             $moderationItems[] = [
                 'label' => 'Пользователи',
                 'href' => '/admin/users-moderation',
@@ -26,8 +31,10 @@ class AdminNavigationService
                 'label' => 'Площадки',
                 'href' => '/admin/venues-moderation',
             ];
+        }
 
-            $moderationItems[] = [
+        if ($this->permissionChecker->can($user, PermissionCode::LogsView)) {
+            $systemItems[] = [
                 'label' => 'Логи',
                 'href' => '/admin/logs',
             ];
@@ -37,6 +44,13 @@ class AdminNavigationService
             $groups[] = [
                 'title' => 'Модерация',
                 'items' => $moderationItems,
+            ];
+        }
+
+        if ($systemItems !== []) {
+            $groups[] = [
+                'title' => 'Система',
+                'items' => $systemItems,
             ];
         }
 
@@ -50,11 +64,11 @@ class AdminNavigationService
         return $groups;
     }
 
-    public function getMenuItems(int $roleLevel): array
+    public function getMenuItems(User $user): array
     {
         $items = [];
 
-        foreach ($this->getMenuGroups($roleLevel) as $group) {
+        foreach ($this->getMenuGroups($user) as $group) {
             foreach ($group['items'] as $item) {
                 $items[] = $item;
             }
@@ -63,9 +77,9 @@ class AdminNavigationService
         return $items;
     }
 
-    public function getDefaultHref(int $roleLevel): ?string
+    public function getDefaultHref(User $user): ?string
     {
-        $items = $this->getMenuItems($roleLevel);
+        $items = $this->getMenuItems($user);
 
         return $items[0]['href'] ?? null;
     }
