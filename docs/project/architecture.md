@@ -78,8 +78,8 @@
 
 - `Permission` (app/Domain/Permissions/Models/Permission)
   - Реестр прав (code/label/scope/target_model).
-- `RolePermission` / `UserPermission` / `EntityPermission`
-  - Назначения прав ролям, пользователям и конкретным сущностям.
+- `RolePermission` / `UserPermission`
+  - Назначения прав ролям и пользователям.
 - `PermissionRegistry` / `RolePermissionPreset`
   - Единый реестр прав и базовые пресеты для ролей.
 - `PermissionChecker`
@@ -88,6 +88,15 @@
   - Policy для ресурсных прав (например, `VenuePolicy`).
   - Gate для глобальных прав (`admin.access`, `moderation.access`, `logs.view`).
   - Доступы в UI и маршрутах должны опираться на permissions (например, `can:venue.create`).
+
+## Домен Contracts
+
+- `Contract` (app/Domain/Contracts/Models/Contract)
+  - Контракт пользователя на конкретную сущность (`entity_type` + `entity_id`).
+  - Поля: name, contract_type (creator/owner/manager/controller/employee), starts_at, ends_at, status (active/inactive), comment.
+  - Связи: user (1:N), permissions (M:N через contract_permissions).
+- Контрактные права используются для действий над конкретными сущностями.
+  Глобальные права остаются в `roles` и `user_permissions`.
 
 ## Домен Admin
 
@@ -111,3 +120,12 @@
 - Если в слой представления/схемы передается `User`, то вычисляемые из него параметры
   (например, `roleLevel`, `permissions`) не должны рассчитываться в контроллере и не обязаны
   передаваться; при отсутствии они вычисляются внутри соответствующего слоя.
+## Контракты: иерархия и делегирование
+
+- Иерархия типов (сверху вниз): admin > creator > owner > manager > controller/employee (один уровень).
+- Тип контракта можно назначать только уровнем ниже.
+- Активный owner может быть только один на сущность.
+- Назначать/аннулировать контракты могут только admin/creator/owner/manager (manager — только ниже уровнем).
+- Права, назначаемые в контракте, фильтруются по правам назначателя.
+- Права contract.assign/contract.revoke разрешено назначать только при выдаче контрактов owner/manager и только admin/creator/owner.
+- Контракт хранит created_by для контроля делегирования и аннулирования.

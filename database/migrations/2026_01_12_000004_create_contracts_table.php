@@ -12,17 +12,18 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('name');
+            $table->string('contract_type');
             $table->string('entity_type');
             $table->unsignedBigInteger('entity_id');
             $table->string('status');
-            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('starts_at');
             $table->timestamp('ends_at')->nullable();
             $table->text('comment')->nullable();
             $table->timestamps();
 
             $table->index(['entity_type', 'entity_id']);
             $table->index(['user_id', 'entity_type', 'entity_id']);
-            $table->unique(['user_id', 'entity_type', 'entity_id', 'status'], 'contracts_unique_status');
+            $table->index(['status', 'ends_at']);
         });
     }
 

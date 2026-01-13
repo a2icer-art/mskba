@@ -29,4 +29,7 @@ enum PermissionCode: string
     case ArticleCategoryCreate = 'article_category.create';
     case ArticleCategoryUpdate = 'article_category.update';
     case ArticleCategoryDelete = 'article_category.delete';
+
+    case ContractAssign = 'contract.assign';
+    case ContractRevoke = 'contract.revoke';
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
+use App\Http\Controllers\Integrations\UserSuggestController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,12 +59,24 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
         ->middleware('auth')
         ->name('venues.moderation.request');
+    Route::get('/{type}/{venue}/contracts', [VenuesController::class, 'contracts'])
+        ->middleware('auth')
+        ->name('venues.contracts');
+    Route::post('/{type}/{venue}/contracts', [VenuesController::class, 'assignContract'])
+        ->middleware('auth')
+        ->name('venues.contracts.assign');
+    Route::post('/{type}/{venue}/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
+        ->middleware('auth')
+        ->name('venues.contracts.revoke');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
 
 Route::get('/integrations/address-suggest', AddressSuggestController::class)
     ->middleware('auth')
     ->name('integrations.address-suggest');
+Route::get('/integrations/user-suggest', UserSuggestController::class)
+    ->middleware('auth')
+    ->name('integrations.user-suggest');
 
 Route::middleware(['auth', 'can:moderation.access'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');

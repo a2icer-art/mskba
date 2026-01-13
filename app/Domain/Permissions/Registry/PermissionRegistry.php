@@ -90,6 +90,18 @@ class PermissionRegistry
                 'target_model' => Venue::class,
             ],
             [
+                'code' => PermissionCode::ContractAssign,
+                'label' => 'Назначение контрактов',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
+                'code' => PermissionCode::ContractRevoke,
+                'label' => 'Аннулирование контрактов',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
                 'code' => PermissionCode::ArticleCreate,
                 'label' => 'Создание статьи',
                 'scope' => PermissionScope::Resource,

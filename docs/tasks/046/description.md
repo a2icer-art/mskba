@@ -7,7 +7,8 @@
 # full_description
 
 ## Уточнения и решения
-- ContractType не используем: в Contract добавляем `entity_type` + `entity_id`.
+- ContractType как сущность не используем: в Contract добавляем `entity_type` + `entity_id`.
+- Добавляем `contract_type` (enum): creator, owner, manager, controller, employee.
 - `user_permissions` остаются для базовых (глобальных) прав пользователя.
 - Контракты используются для прав, связанных с конкретными сущностями.
 - Статусы контракта: `active` / `inactive`.

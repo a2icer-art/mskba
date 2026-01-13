@@ -8,7 +8,6 @@ use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Presentation\BasePresenter;
-use App\Presentation\Navigation\VenueNavigationPresenter;
 use App\Support\DateFormatter;
 
 class VenueShowPresenter extends BasePresenter
@@ -67,8 +66,11 @@ class VenueShowPresenter extends BasePresenter
                     'reject_reason' => $latestRequest->reject_reason,
                 ]
                 : null,
-            'navigation' => app(VenueNavigationPresenter::class)->present([
+            'navigation' => app(VenueSidebarPresenter::class)->present([
                 'title' => 'Площадки',
+                'typeSlug' => $typeSlug,
+                'venue' => $venue,
+                'user' => $user,
             ]),
             'activeTypeSlug' => $typeSlug,
             'types' => app(VenueTypeOptionsPresenter::class)->present()['data'],

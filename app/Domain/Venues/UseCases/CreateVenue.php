@@ -4,8 +4,10 @@ namespace App\Domain\Venues\UseCases;
 
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
-use App\Domain\Permissions\Enums\PermissionCode;
-use App\Domain\Permissions\Models\EntityPermission;
+use App\Domain\Contracts\Enums\ContractStatus;
+use App\Domain\Contracts\Enums\ContractType;
+use App\Domain\Contracts\Models\Contract;
+use App\Domain\Permissions\Enums\PermissionScope;
 use App\Domain\Permissions\Models\Permission;
 use App\Models\User;
 use App\Support\AliasGenerator;
@@ -43,32 +45,38 @@ class CreateVenue
 
     private function grantOwnerPermissions(User $user, Venue $venue): void
     {
-        $codes = [
-            PermissionCode::VenueUpdate->value,
-            PermissionCode::VenueScheduleManage->value,
-            PermissionCode::VenueMediaManage->value,
-        ];
-
         $permissionIds = Permission::query()
-            ->whereIn('code', $codes)
-            ->pluck('id');
+            ->where('scope', PermissionScope::Resource)
+            ->where('target_model', Venue::class)
+            ->pluck('id')
+            ->all();
 
-        if ($permissionIds->isEmpty()) {
+        if ($permissionIds === []) {
             return;
         }
 
-        $now = now();
-        $rows = $permissionIds
-            ->map(fn (int $permissionId) => [
-                'permission_id' => $permissionId,
+        $contract = Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('status', ContractStatus::Active->value)
+            ->first();
+
+        if (!$contract) {
+            $contract = Contract::query()->create([
                 'user_id' => $user->id,
+                'created_by' => $user->id,
+                'name' => 'Создатель',
+                'contract_type' => ContractType::Creator,
                 'entity_type' => $venue->getMorphClass(),
                 'entity_id' => $venue->getKey(),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ])
-            ->all();
+                'starts_at' => now(),
+                'ends_at' => null,
+                'status' => ContractStatus::Active,
+                'comment' => null,
+            ]);
+        }
 
-        EntityPermission::query()->insertOrIgnore($rows);
+        $contract->permissions()->syncWithoutDetaching($permissionIds);
     }
 }

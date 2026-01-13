@@ -2,18 +2,19 @@
 Архитектура контрактов (Contract) и прав по сущностям
 
 # task_status
-[0%]
+[x]
 
 # task_init_description
 давай разработаем еще систему контрактов (Contract и ContractType), к которым будут крепиться права на сущности - то есть связь будет не через user_id <> permission_id - а contract_id <> permission_id. у доменной сущности контракт помимо того что контракт необходимо связать с User будут следующие атрибуты: string name, ContractType contract_type (связь с типом контрактов), datetime starts_at ( или предложи свое название ), ends_at (или предложи свое название), status. Также нужно создать сущность ContractType: string name, string/model entity
 
 # task_short_description
-Спроектировать систему контрактов (Contract) без ContractType, связать права по сущностям через contract_id и определить статусы/поля.
+Спроектировать и реализовать систему контрактов (Contract) с типами (enum) и привязкой прав по сущностям через contract_id.
 
 # full_description
 
 ## Контекст и решения
-- ContractType не используется: в Contract добавляем `entity_type` + `entity_id`.
+- ContractType как сущность не используется: в Contract добавляем `entity_type` + `entity_id`.
+- Добавляем `contract_type` (enum): creator, owner, manager, controller, employee.
 - `user_permissions` остаются для базовых (глобальных) прав пользователя.
 - Контракты используются для прав, связанных с конкретными сущностями.
 - Статусы контракта: `active` / `inactive`.
@@ -30,3 +31,16 @@
 2. Спроектировать таблицы: `contracts`, `contract_permissions` (и уникальности).
 3. Обновить PermissionChecker для проверки прав через контракты по сущности.
 4. Обновить документацию архитектуры и процессов.
+### Делегирование контрактов и прав
+- Иерархия типов: admin > creator > owner > manager > controller/employee.
+- Назначение типа — только уровнем ниже.
+- Активный owner единственный на сущность.
+- Назначение/аннулирование доступно admin/creator/owner/manager (manager — только для контрактов ниже уровня).
+- Назначаемые права ограничиваются правами назначателя.
+- contract.assign и contract.revoke выдаются только при назначении owner/manager и только admin/creator/owner.
+- Контракт хранит created_by для контроля аннулирования и делегирования.
+
+## Итог
+- Введены контракты с типом (enum) и привязкой к сущности (`entity_type`, `entity_id`).
+- Добавлена связь прав через `contract_permissions` и проверки на уровне PermissionChecker.
+- Реализованы правила делегирования типов/прав и ограничения по активным контрактам.
