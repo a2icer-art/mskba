@@ -49,6 +49,8 @@ const navigationData = computed(() => props.navigation?.data ?? props.navigation
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasContracts = computed(() => props.contracts?.length > 0);
 const assignOpen = ref(false);
+const editOpen = ref(false);
+const editTarget = ref(null);
 const getTodayValue = () => new Date().toISOString().slice(0, 10);
 const assignForm = useForm({
     login: '',
@@ -58,6 +60,9 @@ const assignForm = useForm({
     starts_at: getTodayValue(),
     ends_at: '',
     comment: '',
+    permissions: [],
+});
+const editForm = useForm({
     permissions: [],
 });
 const revokeForm = useForm({});
@@ -80,16 +85,26 @@ const isAssignDisabled = computed(() => {
     }
     return !assignForm.starts_at;
 });
-const allowedPermissions = computed(() => {
-    if (!assignForm.contract_type) {
+const filterPermissionsByType = (contractType) => {
+    if (!contractType) {
         return [];
     }
     return props.availablePermissions.filter((permission) => {
         if (!permission.allowed_types) {
             return true;
         }
-        return permission.allowed_types.includes(assignForm.contract_type);
+        return permission.allowed_types.includes(contractType);
     });
+};
+const allowedPermissions = computed(() => filterPermissionsByType(assignForm.contract_type));
+const editAllowedPermissions = computed(() =>
+    filterPermissionsByType(editTarget.value?.contract_type)
+);
+const isEditDisabled = computed(() => {
+    if (editForm.processing) {
+        return true;
+    }
+    return !editTarget.value;
 });
 const contractTypeLabels = {
     creator: 'Создатель',
@@ -114,6 +129,13 @@ const openAssign = () => {
     assignOpen.value = true;
 };
 
+const openEdit = (contract) => {
+    editForm.clearErrors();
+    editTarget.value = contract;
+    editForm.permissions = (contract.permissions ?? []).map((permission) => permission.code);
+    editOpen.value = true;
+};
+
 watch(
     () => assignForm.contract_type,
     () => {
@@ -133,6 +155,13 @@ const closeAssign = () => {
     assignOpen.value = false;
 };
 
+const closeEdit = () => {
+    editForm.reset('permissions');
+    editForm.clearErrors();
+    editTarget.value = null;
+    editOpen.value = false;
+};
+
 const submitAssign = () => {
     assignForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/contracts`, {
         preserveScroll: true,
@@ -143,6 +172,23 @@ const submitAssign = () => {
             assignOpen.value = false;
         },
     });
+};
+
+const submitEditPermissions = () => {
+    if (!editTarget.value || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+
+    editForm.patch(
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/contracts/${editTarget.value.id}/permissions`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                editTarget.value = null;
+                editOpen.value = false;
+            },
+        }
+    );
 };
 
 const scheduleUserSuggestions = (value) => {
@@ -290,6 +336,15 @@ const formatDate = (value) => {
                                         {{ contract.status === 'active' ? 'Активен' : 'Неактивен' }}
                                     </span>
                                     <button
+                                        v-if="contract.can_update_permissions && contract.status === 'active' && contract.contract_type !== 'creator'"
+                                        class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
+                                        type="button"
+                                        :disabled="editForm.processing"
+                                        @click="openEdit(contract)"
+                                    >
+                                        Редактировать права
+                                    </button>
+                                    <button
                                         v-if="contract.can_revoke && contract.status === 'active' && contract.contract_type !== 'creator'"
                                         class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
                                         type="button"
@@ -342,6 +397,65 @@ const formatDate = (value) => {
             </section>
 
             <MainFooter :app-name="appName" />
+        </div>
+
+        <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <form :class="{ loading: editForm.processing }" @submit.prevent="submitEditPermissions">
+                <h2 class="text-lg font-semibold text-slate-900">Редактировать права</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                    Права для контракта: {{ editTarget?.name || 'Контракт' }}
+                </p>
+
+                <div class="mt-4 grid gap-3">
+                    <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</div>
+                    <div
+                        class="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3"
+                    >
+                        <div v-if="editAllowedPermissions.length" class="grid gap-2 text-sm text-slate-700">
+                            <label
+                                v-for="permission in editAllowedPermissions"
+                                :key="permission.code"
+                                class="flex items-center gap-2"
+                            >
+                                <input
+                                    v-model="editForm.permissions"
+                                    :value="permission.code"
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                />
+                                <span>{{ permission.label }}</span>
+                            </label>
+                        </div>
+                        <p v-else class="text-sm text-slate-500">Нет доступных прав для редактирования.</p>
+                    </div>
+                    <div v-if="editForm.errors.permissions" class="text-xs text-rose-700">
+                        {{ editForm.errors.permissions }}
+                    </div>
+                    <div v-if="actionError" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                        {{ actionError }}
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="editForm.processing"
+                        @click="closeEdit"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="isEditDisabled"
+                    >
+                        Сохранить
+                    </button>
+                </div>
+                </form>
+            </div>
         </div>
 
         <div v-if="assignOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">

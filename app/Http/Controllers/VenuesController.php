@@ -198,6 +198,7 @@ class VenuesController extends Controller
                     'created_at' => $contract->created_at?->timestamp,
                     'is_current_user' => $currentUserId !== null && $contractUserId === $currentUserId,
                     'can_revoke' => $manager->canRevoke($user, $contract, $venue),
+                    'can_update_permissions' => $manager->canUpdatePermissions($user, $contract, $venue),
                     'user' => $contract->user
                         ? [
                             'id' => $contract->user->id,
@@ -205,6 +206,7 @@ class VenuesController extends Controller
                         ]
                         : null,
                     'permissions' => $contract->permissions
+                        ->filter(static fn ($permission) => (bool) $permission->pivot?->is_active)
                         ->map(static fn ($permission) => [
                             'code' => $permission->code,
                             'label' => $permission->label ?: $permission->code,
@@ -252,6 +254,41 @@ class VenuesController extends Controller
             'activeHref' => "/venues/{$type}/{$venue->alias}/contracts",
             'activeTypeSlug' => $type,
         ]);
+    }
+
+    public function updateContractPermissions(
+        Request $request,
+        string $type,
+        Venue $venue,
+        Contract $contract,
+        ContractManager $manager
+    ) {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        if ($contract->entity_type !== $venue->getMorphClass() || $contract->entity_id !== $venue->getKey()) {
+            abort(404);
+        }
+
+        $data = validator($request->all(), [
+            'permissions' => ['array'],
+            'permissions.*' => ['string', 'exists:permissions,code'],
+        ])->validate();
+
+        $result = $manager->updatePermissions($user, $contract, $venue, $data['permissions'] ?? []);
+
+        if (!$result->success) {
+            return back()->withErrors(['contract' => $result->error ?? 'Не удалось обновить права контракта.']);
+        }
+
+        return back();
     }
 
     public function assignContract(Request $request, string $type, Venue $venue, ContractManager $manager)

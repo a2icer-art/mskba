@@ -33,4 +33,5 @@ enum PermissionCode: string
 
     case ContractAssign = 'contract.assign';
     case ContractRevoke = 'contract.revoke';
+    case ContractPermissionsUpdate = 'contract.permissions.update';
 }

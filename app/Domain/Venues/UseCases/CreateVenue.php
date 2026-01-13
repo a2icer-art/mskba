@@ -77,6 +77,10 @@ class CreateVenue
             ]);
         }
 
-        $contract->permissions()->syncWithoutDetaching($permissionIds);
+        $syncData = [];
+        foreach ($permissionIds as $permissionId) {
+            $syncData[$permissionId] = ['is_active' => true];
+        }
+        $contract->permissions()->syncWithoutDetaching($syncData);
     }
 }

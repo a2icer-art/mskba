@@ -91,7 +91,8 @@ class PermissionChecker
                     ->orWhere('ends_at', '>=', $now);
             })
             ->whereHas('permissions', function ($query) use ($permission) {
-                $query->where('permissions.id', $permission->id);
+                $query->where('permissions.id', $permission->id)
+                    ->where('contract_permissions.is_active', true);
             })
             ->exists();
     }

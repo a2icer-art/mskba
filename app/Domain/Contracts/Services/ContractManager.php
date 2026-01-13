@@ -68,7 +68,11 @@ class ContractManager
         ]);
 
         if ($permissionIds !== []) {
-            $contract->permissions()->sync($permissionIds);
+            $syncData = [];
+            foreach ($permissionIds as $permissionId) {
+                $syncData[$permissionId] = ['is_active' => true];
+            }
+            $contract->permissions()->sync($syncData);
         }
 
         return new ContractResult(true, $contract);
@@ -92,6 +96,57 @@ class ContractManager
         return new ContractResult(true, $contract);
     }
 
+    public function updatePermissions(
+        User $actor,
+        Contract $contract,
+        Model $entity,
+        array $permissionCodes
+    ): ContractResult {
+        if (!$this->canUpdatePermissions($actor, $contract, $entity)) {
+            return new ContractResult(false, null, 'Недостаточно прав для редактирования контракта.');
+        }
+
+        if ($contract->contract_type?->value === ContractType::Creator->value) {
+            return new ContractResult(false, null, 'Нельзя редактировать контракт создателя.');
+        }
+
+        $targetType = $contract->contract_type;
+        if (!$targetType) {
+            return new ContractResult(false, null, 'Тип контракта не определен.');
+        }
+
+        $editableCodes = Permission::query()
+            ->where('scope', PermissionScope::Resource)
+            ->where('target_model', $entity::class)
+            ->pluck('code')
+            ->all();
+        $editableCodes = $this->filterAssignablePermissionCodes($actor, $entity, $editableCodes, $targetType, false);
+        $editableIds = $this->resolvePermissionIds($editableCodes, $entity);
+
+        $requestedCodes = $this->filterAssignablePermissionCodes($actor, $entity, $permissionCodes, $targetType, false);
+        $requestedIds = $this->resolvePermissionIds($requestedCodes, $entity);
+        $requestedSet = array_flip($requestedIds);
+
+        $currentIds = $contract->permissions()->pluck('permissions.id')->all();
+        $currentSet = array_flip($currentIds);
+
+        foreach ($editableIds as $permissionId) {
+            $isActive = array_key_exists($permissionId, $requestedSet);
+
+            if (array_key_exists($permissionId, $currentSet)) {
+                $contract->permissions()->updateExistingPivot($permissionId, [
+                    'is_active' => $isActive,
+                ]);
+            } else {
+                $contract->permissions()->attach($permissionId, [
+                    'is_active' => $isActive,
+                ]);
+            }
+        }
+
+        return new ContractResult(true, $contract);
+    }
+
     public function canAssign(User $actor, Model $entity): bool
     {
         if (!app(PermissionChecker::class)->can($actor, PermissionCode::ContractAssign, $entity)) {
@@ -110,6 +165,34 @@ class ContractManager
     public function canRevoke(User $actor, Contract $contract, Model $entity): bool
     {
         if (!app(PermissionChecker::class)->can($actor, PermissionCode::ContractRevoke, $entity)) {
+            return false;
+        }
+
+        if ($this->isAdmin($actor)) {
+            return true;
+        }
+
+        if ($contract->created_by !== $actor->id) {
+            return false;
+        }
+
+        $actorType = $this->resolveActorContractType($actor, $entity);
+        $targetType = $contract->contract_type;
+
+        if (!$actorType || !$targetType) {
+            return false;
+        }
+
+        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Manager], true)) {
+            return false;
+        }
+
+        return $actorType->level() > $targetType->level();
+    }
+
+    public function canUpdatePermissions(User $actor, Contract $contract, Model $entity): bool
+    {
+        if (!app(PermissionChecker::class)->can($actor, PermissionCode::ContractPermissionsUpdate, $entity)) {
             return false;
         }
 
@@ -159,7 +242,8 @@ class ContractManager
         User $actor,
         Model $entity,
         array $permissionCodes,
-        ContractType $targetType
+        ContractType $targetType,
+        bool $autoGrant = true
     ): array {
         $checker = app(PermissionChecker::class);
         $allowed = [];
@@ -186,11 +270,11 @@ class ContractManager
             $allowed[] = $code;
         }
 
-        if ($this->shouldAutoGrantContractAssign($actor, $entity, $targetType)) {
+        if ($autoGrant && $this->shouldAutoGrantContractAssign($actor, $entity, $targetType)) {
             $allowed[] = PermissionCode::ContractAssign->value;
         }
 
-        if ($this->shouldAutoGrantContractRevoke($actor, $entity, $targetType)) {
+        if ($autoGrant && $this->shouldAutoGrantContractRevoke($actor, $entity, $targetType)) {
             $allowed[] = PermissionCode::ContractRevoke->value;
         }
 

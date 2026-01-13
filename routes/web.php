@@ -65,6 +65,9 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/contracts', [VenuesController::class, 'assignContract'])
         ->middleware('auth')
         ->name('venues.contracts.assign');
+    Route::patch('/{type}/{venue}/contracts/{contract}/permissions', [VenuesController::class, 'updateContractPermissions'])
+        ->middleware('auth')
+        ->name('venues.contracts.permissions.update');
     Route::post('/{type}/{venue}/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
         ->middleware('auth')
         ->name('venues.contracts.revoke');

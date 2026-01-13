@@ -41,6 +41,7 @@ class Contract extends Model
     public function permissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class, 'contract_permissions')
+            ->withPivot('is_active')
             ->withTimestamps();
     }
 

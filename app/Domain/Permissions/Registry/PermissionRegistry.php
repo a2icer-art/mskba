@@ -108,6 +108,12 @@ class PermissionRegistry
                 'target_model' => Venue::class,
             ],
             [
+                'code' => PermissionCode::ContractPermissionsUpdate,
+                'label' => 'Редактирование прав контрактов',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
                 'code' => PermissionCode::ArticleCreate,
                 'label' => 'Создание статьи',
                 'scope' => PermissionScope::Resource,
