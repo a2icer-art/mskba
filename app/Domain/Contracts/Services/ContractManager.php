@@ -117,19 +117,22 @@ class ContractManager
             return true;
         }
 
+        if ($contract->created_by !== $actor->id) {
+            return false;
+        }
+
         $actorType = $this->resolveActorContractType($actor, $entity);
+        $targetType = $contract->contract_type;
 
-        if (in_array($actorType, [ContractType::Creator, ContractType::Owner], true)) {
-            return true;
+        if (!$actorType || !$targetType) {
+            return false;
         }
 
-        if ($actorType === ContractType::Manager) {
-            $targetType = $contract->contract_type;
-
-            return $targetType && $actorType->level() > $targetType->level();
+        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Manager], true)) {
+            return false;
         }
 
-        return false;
+        return $actorType->level() > $targetType->level();
     }
 
     public function getAssignableTypes(User $actor, Model $entity): array
