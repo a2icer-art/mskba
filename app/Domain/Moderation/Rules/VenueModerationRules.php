@@ -4,6 +4,8 @@ namespace App\Domain\Moderation\Rules;
 
 use App\Domain\Moderation\Contracts\ModerationRulesContract;
 use App\Domain\Moderation\Requirements\VenueModerationRequirements;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
@@ -19,8 +21,9 @@ class VenueModerationRules implements ModerationRulesContract
 
         $missing = [];
 
-        if ($entity->created_by && $actor->id !== $entity->created_by) {
-            $missing[] = 'Запрос может отправить только владелец площадки.';
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($actor, PermissionCode::VenueSubmitForModeration, $entity)) {
+            $missing[] = 'Недостаточно прав для отправки площадки на модерацию.';
         }
 
         if ($actor->status?->value !== UserStatus::Confirmed->value) {
