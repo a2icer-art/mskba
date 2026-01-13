@@ -175,15 +175,19 @@ class VenuesController extends Controller
             ->values()
             ->all();
 
+        $currentUserId = $user?->id;
         $contracts = Contract::query()
             ->where('entity_type', $venue->getMorphClass())
             ->where('entity_id', $venue->getKey())
             ->with(['user:id,login', 'permissions:id,code,label'])
             ->orderByDesc('created_at')
             ->get()
-            ->map(function (Contract $contract) use ($manager, $user, $venue): array {
+            ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId): array {
+                $contractUserId = $contract->user?->id;
+
                 return [
                     'id' => $contract->id,
+                    'user_id' => $contractUserId,
                     'name' => $contract->name,
                     'contract_type' => $contract->contract_type?->value,
                     'status' => $contract->status?->value,
@@ -191,6 +195,8 @@ class VenuesController extends Controller
                     'ends_at' => $contract->ends_at?->toDateTimeString(),
                     'comment' => $contract->comment,
                     'created_by' => $contract->created_by,
+                    'created_at' => $contract->created_at?->timestamp,
+                    'is_current_user' => $currentUserId !== null && $contractUserId === $currentUserId,
                     'can_revoke' => $manager->canRevoke($user, $contract, $venue),
                     'user' => $contract->user
                         ? [
@@ -206,6 +212,24 @@ class VenuesController extends Controller
                         ->all(),
                 ];
             })
+            ->sortBy(function (array $contract) use ($currentUserId): array {
+                $type = $contract['contract_type'] ?? null;
+
+                if ($type === ContractType::Creator->value) {
+                    $group = 0;
+                } elseif ($type === ContractType::Owner->value) {
+                    $group = 1;
+                } elseif ($currentUserId && ($contract['user_id'] ?? null) === $currentUserId) {
+                    $group = 2;
+                } else {
+                    $group = 3;
+                }
+
+                $createdAt = $contract['created_at'] ?? 0;
+
+                return [$group, -$createdAt];
+            })
+            ->values()
             ->all();
 
         return Inertia::render('VenueContracts', [

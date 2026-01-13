@@ -270,7 +270,8 @@ const formatDate = (value) => {
                         <article
                             v-for="contract in contracts"
                             :key="contract.id"
-                            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            class="rounded-2xl border bg-slate-50 p-4"
+                            :class="contract.is_current_user ? 'border-emerald-300' : 'border-slate-200'"
                         >
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div>
