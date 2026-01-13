@@ -44,3 +44,5 @@
 - Введены контракты с типом (enum) и привязкой к сущности (`entity_type`, `entity_id`).
 - Добавлена связь прав через `contract_permissions` и проверки на уровне PermissionChecker.
 - Реализованы правила делегирования типов/прав и ограничения по активным контрактам.
+- Добавлено редактирование прав контрактов через `contract.permissions.update` и флаг `is_active` в `contract_permissions`.
+- Для тестирования добавлены сидеры `MariqSeeder` и `MariqV1oSeeder`.
