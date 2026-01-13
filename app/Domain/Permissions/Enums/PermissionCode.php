@@ -14,6 +14,7 @@ enum PermissionCode: string
     case RatingCreate = 'rating.create';
 
     case VenueUpdate = 'venue.update';
+    case VenueSubmitForModeration = 'venue.submit_for_moderation';
     case VenueScheduleManage = 'venue.schedule.manage';
     case VenueActivate = 'venue.activate';
     case VenueDeactivate = 'venue.deactivate';

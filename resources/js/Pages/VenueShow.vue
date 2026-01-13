@@ -302,7 +302,7 @@ const submitModerationRequest = () => {
     moderationErrors.value = [];
 
     if (!canSubmitModeration.value) {
-        moderationErrors.value = ['Отправить на модерацию может только владелец подтвержденного аккаунта.'];
+        moderationErrors.value = ['Недостаточно прав для отправки на модерацию.'];
         return;
     }
 

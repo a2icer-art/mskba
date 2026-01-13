@@ -426,7 +426,19 @@ class VenuesController extends Controller
 
     public function submitModerationRequest(Request $request, string $type, Venue $venue, SubmitModerationRequest $useCase)
     {
-        $result = $useCase->execute($request->user(), ModerationEntityType::Venue, $venue);
+        $user = $request->user();
+        $checker = app(PermissionChecker::class);
+        $canSubmitModeration = $user
+            && $user->status?->value === UserStatus::Confirmed->value
+            && $checker->can($user, PermissionCode::VenueSubmitForModeration, $venue);
+
+        if (!$canSubmitModeration) {
+            return back()->withErrors([
+                'moderation' => 'Недостаточно прав для отправки на модерацию.',
+            ]);
+        }
+
+        $result = $useCase->execute($user, ModerationEntityType::Venue, $venue);
 
         if (!$result->success) {
             return back()->withErrors([

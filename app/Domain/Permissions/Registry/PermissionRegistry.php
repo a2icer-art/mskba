@@ -60,6 +60,12 @@ class PermissionRegistry
                 'target_model' => Venue::class,
             ],
             [
+                'code' => PermissionCode::VenueSubmitForModeration,
+                'label' => 'Отправка площадки на модерацию',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
                 'code' => PermissionCode::VenueScheduleManage,
                 'label' => 'Управление расписанием площадки',
                 'scope' => PermissionScope::Resource,

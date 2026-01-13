@@ -7,6 +7,8 @@ use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueEditPolicy;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Permissions\Services\PermissionChecker;
 use App\Presentation\BasePresenter;
 use App\Support\DateFormatter;
 
@@ -20,7 +22,10 @@ class VenueShowPresenter extends BasePresenter
         $typeSlug = $ctx['typeSlug'] ?? '';
 
         $isOwner = $user && $venue->created_by === $user->id;
-        $canSubmitModeration = $isOwner && $user?->status?->value === UserStatus::Confirmed->value;
+        $checker = app(PermissionChecker::class);
+        $canSubmitModeration = $user
+            && $user->status?->value === UserStatus::Confirmed->value
+            && $checker->can($user, PermissionCode::VenueSubmitForModeration, $venue);
         $editPolicy = app(VenueEditPolicy::class);
         $editableFields = $isOwner ? $editPolicy->getEditableFields($venue) : [];
 

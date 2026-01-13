@@ -88,6 +88,7 @@
   - Policy для ресурсных прав (например, `VenuePolicy`).
   - Gate для глобальных прав (`admin.access`, `moderation.access`, `logs.view`).
   - Доступы в UI и маршрутах должны опираться на permissions (например, `can:venue.create`).
+  - Отправка площадки на модерацию контролируется ресурсным правом `venue.submit_for_moderation`.
 
 ## Домен Contracts
 
@@ -102,6 +103,13 @@
 
 - `AdminNavigationService` (app/Domain/Admin/Services/AdminNavigationService)
   - Формирует меню разделов панели управления на основе уровня роли.
+
+## Сидеры (локальное тестирование)
+
+- `MariqSeeder` (database/seeders/MariqSeeder.php)
+  - Создает пользователя `mariq` для тестирования модерации.
+  - Заполняет профиль и подтверждает email `mariq@mskba.ru`.
+  - Назначает роль участника `player` (ParticipantRoleAssignment + PlayerProfile).
 
 ## Связи между доменами
 
