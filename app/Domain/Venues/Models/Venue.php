@@ -65,6 +65,11 @@ class Venue extends Model
         return $this->hasOne(Address::class)->latestOfMany();
     }
 
+    public function schedule(): HasOne
+    {
+        return $this->hasOne(VenueSchedule::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

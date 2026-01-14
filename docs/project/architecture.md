@@ -64,6 +64,8 @@
 - `VenueCatalogService` (app/Domain/Venues/Services/VenueCatalogService)
   - Сервис формирования навигации и списка площадок для витрины.
 - `VenueStatus` enum
+- `VenueSchedule` (проектируется, задача: `docs/tasks/051`)
+  - Одно расписание на площадку, таймзона UTC+3, недельные интервалы и исключения по датам.
 
 ## Домен Participants
 
