@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
@@ -327,7 +327,7 @@ const submitModerationRequest = () => {
 </script>
 
 <template>
-    <main class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
+    <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
 
@@ -339,7 +339,7 @@ const submitModerationRequest = () => {
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <section class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
@@ -463,7 +463,7 @@ const submitModerationRequest = () => {
                         </div>
                     </div>
                 </div>
-            </section>
+            </main>
 
             <MainFooter :app-name="appName" />
         </div>
@@ -635,5 +635,6 @@ const submitModerationRequest = () => {
             :initial-mode="authMode"
             @close="showAuthModal = false"
         />
-    </main>
+    </div>
 </template>
+
