@@ -67,6 +67,17 @@
 - `VenueSchedule` (проектируется, задача: `docs/tasks/051`)
   - Одно расписание на площадку, таймзона UTC+3, недельные интервалы и исключения по датам.
 
+## Домен Events
+
+- `EventType` (справочник типов событий)
+  - Базовые типы: game, training, game_training.
+- `Event`
+  - Базовая сущность события: тип, организатор, статус, тайминг, timezone (UTC+3).
+- `Tournament`
+  - Коллекция событий типа game.
+- `EventBooking` (или EventSlot)
+  - Связь события с площадкой и интервалом времени, статус бронирования.
+
 ## Домен Participants
 
 - `ParticipantRole` (app/Domain/Participants/Models/ParticipantRole)

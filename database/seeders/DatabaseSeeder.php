@@ -17,6 +17,7 @@ use App\Models\User;
 use Database\Factories\RoleFactory;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\EventTypeSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -74,6 +75,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PermissionSeeder::class,
             RolePermissionSeeder::class,
+            EventTypeSeeder::class,
         ]);
 
         $participantRoles = [
