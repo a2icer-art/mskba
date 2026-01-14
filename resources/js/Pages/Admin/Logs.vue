@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import Breadcrumbs from '../../Components/Breadcrumbs.vue';
 import MainFooter from '../../Components/MainFooter.vue';
 import MainHeader from '../../Components/MainHeader.vue';
 import MainSidebar from '../../Components/MainSidebar.vue';
@@ -29,6 +30,10 @@ const props = defineProps({
     logs: {
         type: Object,
         default: () => ({ data: [], links: [] }),
+    },
+    breadcrumbs: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -89,8 +94,8 @@ const formatValue = (value) => {
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Admin</p>
-                    <h1 class="mt-2 text-3xl font-semibold text-slate-900">Логи</h1>
+                    <Breadcrumbs :items="breadcrumbs" />
+                    <h1 class="text-3xl font-semibold text-slate-900">Логи</h1>
                     <p class="mt-4 text-sm text-slate-600">
                         Выберите сущность, чтобы просмотреть журнал изменений.
                     </p>
@@ -220,4 +225,3 @@ const formatValue = (value) => {
         </div>
     </div>
 </template>
-

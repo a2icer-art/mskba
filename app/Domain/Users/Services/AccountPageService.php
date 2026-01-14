@@ -11,6 +11,7 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Resources\UserProfileViewResource;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
+use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
 use App\Support\DateFormatter;
 
@@ -24,6 +25,10 @@ class AccountPageService
         $navigation = app(AccountNavigationPresenter::class)->present([
             'participantRoles' => $participantRoles,
         ]);
+        $breadcrumbs = app(AccountBreadcrumbsPresenter::class)->present([
+            'activeTab' => $activeTab,
+            'participantRoles' => $participantRoles,
+        ])['data'];
 
         return [
             'activeTab' => $activeTab,
@@ -66,6 +71,7 @@ class AccountPageService
             'moderationRequest' => $this->getModerationRequest($user),
             'permissions' => $this->resolveUserPermissions($user),
             'navigation' => $navigation,
+            'breadcrumbs' => $breadcrumbs,
         ];
     }
 

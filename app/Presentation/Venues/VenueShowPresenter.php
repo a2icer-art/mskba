@@ -9,6 +9,7 @@ use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Presentation\Breadcrumbs\VenueBreadcrumbsPresenter;
 use App\Presentation\BasePresenter;
 use App\Support\DateFormatter;
 
@@ -77,6 +78,10 @@ class VenueShowPresenter extends BasePresenter
                 'venue' => $venue,
                 'user' => $user,
             ]),
+            'breadcrumbs' => app(VenueBreadcrumbsPresenter::class)->present([
+                'venue' => $venue,
+                'typeSlug' => $typeSlug,
+            ])['data'],
             'activeTypeSlug' => $typeSlug,
             'types' => app(VenueTypeOptionsPresenter::class)->present()['data'],
             'editableFields' => $editableFields,

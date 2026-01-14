@@ -9,6 +9,7 @@ use App\Domain\Permissions\Enums\PermissionScope;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Models\User;
+use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
@@ -28,6 +29,10 @@ class AdminUsersModerationController extends Controller
         $navigation = app(AdminNavigationPresenter::class)->present([
             'user' => $request->user(),
         ]);
+        $breadcrumbs = app(AdminBreadcrumbsPresenter::class)->present([
+            'user' => $request->user(),
+            'currentHref' => '/admin/users-moderation',
+        ])['data'];
 
         $status = $request->string('status')->toString();
         $sort = $request->string('sort', 'submitted_at_desc')->toString();
@@ -111,6 +116,7 @@ class AdminUsersModerationController extends Controller
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => '/admin/users-moderation',
+            'breadcrumbs' => $breadcrumbs,
             'filters' => [
                 'status' => $status,
                 'sort' => $sort,

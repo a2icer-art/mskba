@@ -20,6 +20,7 @@ use App\Domain\Venues\UseCases\CreateVenue;
 use App\Domain\Venues\UseCases\UpdateVenue;
 use App\Domain\Users\Enums\UserStatus;
 use App\Http\Requests\Venues\StoreVenueRequest;
+use App\Presentation\Breadcrumbs\VenueBreadcrumbsPresenter;
 use App\Presentation\Navigation\VenueNavigationPresenter;
 use App\Presentation\Venues\MetroOptionsPresenter;
 use App\Presentation\Venues\VenueShowPresenter;
@@ -45,6 +46,7 @@ class VenuesController extends Controller
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $catalog = app(VenueCatalogService::class);
         $catalogData = $catalog->getHallsList(null, $user);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present()['data'];
 
         return Inertia::render('Venues', [
             'appName' => config('app.name'),
@@ -54,6 +56,7 @@ class VenuesController extends Controller
             'navigation' => $navigation,
             'types' => $types,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 
@@ -67,6 +70,9 @@ class VenuesController extends Controller
         $catalog = app(VenueCatalogService::class);
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $catalogData = $catalog->getHallsList($type, $user);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'typeSlug' => $type,
+        ])['data'];
 
         if (!$catalogData) {
             abort(404);
@@ -80,6 +86,7 @@ class VenuesController extends Controller
             'navigation' => $navigation,
             'types' => $types,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 
@@ -90,7 +97,7 @@ class VenuesController extends Controller
             ->visibleFor($user)
             ->whereKey($venue->id)
             ->firstOrFail();
-        $venue->load(['venueType:id,name,alias', 'creator:id,login', 'latestAddress.metro:id,name,line_name,line_color,city']);
+        $venue->load(['venueType:id,name,plural_name,alias', 'creator:id,login', 'latestAddress.metro:id,name,line_name,line_color,city']);
 
         $data = app(VenueShowPresenter::class)->present([
             'user' => $user,
@@ -112,6 +119,7 @@ class VenuesController extends Controller
             ->visibleFor($user)
             ->whereKey($venue->id)
             ->firstOrFail();
+        $venue->loadMissing(['venueType:id,name,plural_name,alias']);
 
         if (!$this->canViewContracts($user, $venue)) {
             abort(403);
@@ -128,6 +136,11 @@ class VenuesController extends Controller
             'venue' => $venue,
             'user' => $user,
         ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Контракты',
+        ])['data'];
 
         $this->ensureContractPermissions();
 
@@ -253,6 +266,7 @@ class VenuesController extends Controller
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/contracts",
             'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 

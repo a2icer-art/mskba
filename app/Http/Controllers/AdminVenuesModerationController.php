@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
@@ -25,6 +26,10 @@ class AdminVenuesModerationController extends Controller
         $navigation = app(AdminNavigationPresenter::class)->present([
             'user' => $request->user(),
         ]);
+        $breadcrumbs = app(AdminBreadcrumbsPresenter::class)->present([
+            'user' => $request->user(),
+            'currentHref' => '/admin/venues-moderation',
+        ])['data'];
 
         $status = $request->string('status')->toString();
         $sort = $request->string('sort', 'submitted_at_desc')->toString();
@@ -101,6 +106,7 @@ class AdminVenuesModerationController extends Controller
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => '/admin/venues-moderation',
+            'breadcrumbs' => $breadcrumbs,
             'filters' => [
                 'status' => $status,
                 'sort' => $sort,

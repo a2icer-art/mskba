@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import Breadcrumbs from '../../Components/Breadcrumbs.vue';
 import MainFooter from '../../Components/MainFooter.vue';
 import MainHeader from '../../Components/MainHeader.vue';
 import MainSidebar from '../../Components/MainSidebar.vue';
@@ -33,6 +34,10 @@ const props = defineProps({
     requests: {
         type: Object,
         default: () => ({ data: [], links: [] }),
+    },
+    breadcrumbs: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -279,8 +284,8 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Admin</p>
-                    <h1 class="mt-2 text-3xl font-semibold text-slate-900">Модерация площадок</h1>
+                    <Breadcrumbs :items="breadcrumbs" />
+                    <h1 class="text-3xl font-semibold text-slate-900">Модерация площадок</h1>
 
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div class="flex flex-wrap items-center gap-4">
@@ -588,4 +593,3 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
     </div>
 </template>
-

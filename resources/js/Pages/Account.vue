@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, ref, nextTick, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
+import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -53,6 +54,10 @@ const props = defineProps({
     navigation: {
         type: Object,
         default: () => ({ title: 'Аккаунт', data: [] }),
+    },
+    breadcrumbs: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -862,10 +867,10 @@ const logout = () => {
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
+                    <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Аккаунт</p>
-                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">Профиль пользователя</h1>
+                            <h1 class="text-3xl font-semibold text-slate-900">Профиль пользователя</h1>
                         </div>
                         <button
                             v-if="activeTab === 'profile'"
@@ -1500,4 +1505,3 @@ const logout = () => {
         </div>
     </div>
 </template>
-

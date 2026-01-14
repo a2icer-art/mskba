@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -41,6 +42,10 @@ const props = defineProps({
     activeTypeSlug: {
         type: String,
         default: '',
+    },
+    breadcrumbs: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -285,10 +290,10 @@ const formatDate = (value) => {
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
+                    <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Администрация</p>
-                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">Контракты</h1>
+                            <h1 class="text-3xl font-semibold text-slate-900">Контракты</h1>
                             <p class="mt-2 text-sm text-slate-600">
                                 Площадка: {{ venue?.name || '—' }}
                             </p>
@@ -619,4 +624,3 @@ const formatDate = (value) => {
         </div>
     </div>
 </template>
-

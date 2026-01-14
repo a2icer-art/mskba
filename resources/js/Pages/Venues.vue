@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
+import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -32,6 +33,10 @@ const props = defineProps({
         default: () => [],
     },
     metros: {
+        type: Array,
+        default: () => [],
+    },
+    breadcrumbs: {
         type: Array,
         default: () => [],
     },
@@ -390,10 +395,10 @@ const applyAddressSuggestion = (suggestion) => {
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
+                    <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Площадки</p>
-                            <h1 class="mt-2 text-3xl font-semibold text-slate-900">Список площадок</h1>
+                            <h1 class="text-3xl font-semibold text-slate-900">Список площадок</h1>
                             <p class="mt-3 max-w-2xl text-sm text-slate-600">
                                 Выберите тип площадки, адрес или метро, чтобы быстро найти подходящее место.
                             </p>
@@ -692,4 +697,3 @@ const applyAddressSuggestion = (suggestion) => {
         </div>
     </div>
 </template>
-

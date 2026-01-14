@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,11 +17,16 @@ class AdminController extends Controller
         $navigation = app(AdminNavigationPresenter::class)->present([
             'user' => $request->user(),
         ]);
+        $breadcrumbs = app(AdminBreadcrumbsPresenter::class)->present([
+            'user' => $request->user(),
+            'currentHref' => '/admin',
+        ])['data'];
 
         return Inertia::render('Admin/Index', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => $this->resolveActiveHref($navigation),
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 

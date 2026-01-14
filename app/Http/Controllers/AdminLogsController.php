@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Admin\Services\AdminLogsService;
+use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use App\Support\DateFormatter;
 use Illuminate\Http\Request;
@@ -51,11 +52,16 @@ class AdminLogsController extends Controller
             'user' => $request->user(),
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
+        $breadcrumbs = app(AdminBreadcrumbsPresenter::class)->present([
+            'user' => $request->user(),
+            'currentHref' => '/admin/logs',
+        ])['data'];
 
         return Inertia::render('Admin/Logs', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => '/admin/logs',
+            'breadcrumbs' => $breadcrumbs,
             'entities' => $entities,
             'activeEntity' => [
                 'key' => 'all',
@@ -112,11 +118,17 @@ class AdminLogsController extends Controller
             'user' => $request->user(),
         ]);
         $entities = $this->getEntitiesWithAll($logsService);
+        $breadcrumbs = app(AdminBreadcrumbsPresenter::class)->present([
+            'user' => $request->user(),
+            'currentHref' => '/admin/logs',
+            'childLabel' => $entityData['label'] ?? null,
+        ])['data'];
 
         return Inertia::render('Admin/Logs', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
             'activeHref' => $entityData['href'],
+            'breadcrumbs' => $breadcrumbs,
             'entities' => $entities,
             'activeEntity' => $entityData,
             'logs' => $logs,
