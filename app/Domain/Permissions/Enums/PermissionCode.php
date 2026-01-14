@@ -17,6 +17,8 @@ enum PermissionCode: string
     case VenueUpdate = 'venue.update';
     case VenueSubmitForModeration = 'venue.submit_for_moderation';
     case VenueScheduleManage = 'venue.schedule.manage';
+    case VenueBookingConfirm = 'venue.booking.confirm';
+    case VenueBookingCancel = 'venue.booking.cancel';
     case VenueActivate = 'venue.activate';
     case VenueDeactivate = 'venue.deactivate';
     case VenueBlock = 'venue.block';

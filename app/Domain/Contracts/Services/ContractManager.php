@@ -106,10 +106,6 @@ class ContractManager
             return new ContractResult(false, null, 'Недостаточно прав для редактирования контракта.');
         }
 
-        if ($contract->contract_type?->value === ContractType::Creator->value) {
-            return new ContractResult(false, null, 'Нельзя редактировать контракт создателя.');
-        }
-
         $targetType = $contract->contract_type;
         if (!$targetType) {
             return new ContractResult(false, null, 'Тип контракта не определен.');

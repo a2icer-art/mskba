@@ -3,6 +3,7 @@
 namespace App\Presentation\Navigation;
 
 use App\Domain\Admin\Services\AdminNavigationService;
+use App\Domain\Users\Enums\UserStatus;
 
 class AdminNavigationPresenter extends NavigationPresenter
 {
@@ -19,6 +20,10 @@ class AdminNavigationPresenter extends NavigationPresenter
     {
         $user = $ctx['user'] ?? null;
         if (!$user) {
+            return [];
+        }
+
+        if ($user->status?->value !== UserStatus::Confirmed->value) {
             return [];
         }
 

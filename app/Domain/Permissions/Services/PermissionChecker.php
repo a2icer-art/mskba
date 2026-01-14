@@ -14,7 +14,7 @@ class PermissionChecker
 {
     public function can(User $user, PermissionCode|string $code, ?Model $resource = null): bool
     {
-        if ($user->status?->value === UserStatus::Blocked->value) {
+        if ($user->status?->value !== UserStatus::Confirmed->value) {
             return false;
         }
 

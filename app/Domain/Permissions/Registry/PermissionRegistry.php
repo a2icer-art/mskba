@@ -78,6 +78,18 @@ class PermissionRegistry
                 'target_model' => Venue::class,
             ],
             [
+                'code' => PermissionCode::VenueBookingConfirm,
+                'label' => 'Подтверждение бронирования площадки',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
+                'code' => PermissionCode::VenueBookingCancel,
+                'label' => 'Отмена бронирования площадки',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
                 'code' => PermissionCode::VenueActivate,
                 'label' => 'Активация площадки',
                 'scope' => PermissionScope::Resource,

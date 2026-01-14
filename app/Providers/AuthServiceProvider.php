@@ -26,6 +26,8 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define(PermissionCode::LogsView->value, fn ($user) => $checker->can($user, PermissionCode::LogsView));
         Gate::define(PermissionCode::VenueCreate->value, fn ($user) => $checker->can($user, PermissionCode::VenueCreate));
         Gate::define(PermissionCode::VenueBooking->value, fn ($user) => $checker->can($user, PermissionCode::VenueBooking));
+        Gate::define(PermissionCode::VenueBookingConfirm->value, fn ($user) => $checker->can($user, PermissionCode::VenueBookingConfirm));
+        Gate::define(PermissionCode::VenueBookingCancel->value, fn ($user) => $checker->can($user, PermissionCode::VenueBookingCancel));
         Gate::define(PermissionCode::EventCreate->value, fn ($user) => $checker->can($user, PermissionCode::EventCreate));
         Gate::define(PermissionCode::CommentCreate->value, fn ($user) => $checker->can($user, PermissionCode::CommentCreate));
         Gate::define(PermissionCode::RatingCreate->value, fn ($user) => $checker->can($user, PermissionCode::RatingCreate));

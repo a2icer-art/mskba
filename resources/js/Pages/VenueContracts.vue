@@ -90,9 +90,12 @@ const isAssignDisabled = computed(() => {
     }
     return !assignForm.starts_at;
 });
-const filterPermissionsByType = (contractType) => {
+const filterPermissionsByType = (contractType, options = {}) => {
     if (!contractType) {
         return [];
+    }
+    if (options.ignoreTypeWhenCreator && contractType === 'creator') {
+        return props.availablePermissions;
     }
     return props.availablePermissions.filter((permission) => {
         if (!permission.allowed_types) {
@@ -103,7 +106,7 @@ const filterPermissionsByType = (contractType) => {
 };
 const allowedPermissions = computed(() => filterPermissionsByType(assignForm.contract_type));
 const editAllowedPermissions = computed(() =>
-    filterPermissionsByType(editTarget.value?.contract_type)
+    filterPermissionsByType(editTarget.value?.contract_type, { ignoreTypeWhenCreator: true })
 );
 const isEditDisabled = computed(() => {
     if (editForm.processing) {
@@ -298,17 +301,8 @@ const formatDate = (value) => {
                                 Площадка: {{ venue?.name || '—' }}
                             </p>
                         </div>
-                        <Link
-                            v-if="venue?.alias && activeTypeSlug"
-                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                            :href="`/venues/${activeTypeSlug}/${venue.alias}`"
-                        >
-                            Вернуться
-                        </Link>
-                    </div>
-
-                    <div v-if="canAssignContracts" class="mt-6 flex justify-end">
                         <button
+                            v-if="canAssignContracts"
                             class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                             type="button"
                             @click="openAssign"
@@ -341,7 +335,7 @@ const formatDate = (value) => {
                                         {{ contract.status === 'active' ? 'Активен' : 'Неактивен' }}
                                     </span>
                                     <button
-                                        v-if="contract.can_update_permissions && contract.status === 'active' && contract.contract_type !== 'creator'"
+                                        v-if="contract.can_update_permissions && contract.status === 'active'"
                                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
                                         type="button"
                                         :disabled="editForm.processing"
@@ -644,4 +638,3 @@ const formatDate = (value) => {
         </div>
     </div>
 </template>
-

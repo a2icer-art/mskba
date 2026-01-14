@@ -144,15 +144,16 @@ class VenuesController extends Controller
 
         $this->ensureContractPermissions();
 
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
         $availablePermissions = Permission::query()
             ->where('scope', PermissionScope::Resource)
             ->where('target_model', Venue::class)
             ->orderBy('label')
             ->get(['code', 'label'])
-            ->map(function (Permission $permission) use ($checker, $user, $venue, $manager, $assignableTypes, $assignableTypeValues) {
+            ->map(function (Permission $permission) use ($checker, $isAdmin, $user, $venue, $manager, $assignableTypes, $assignableTypeValues) {
                 $code = $permission->code;
 
-                if (!$checker->can($user, $code, $venue)) {
+                if (!$isAdmin && !$checker->can($user, $code, $venue)) {
                     return null;
                 }
 

@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Permissions\Models\Permission;
+use App\Domain\Users\Enums\UserStatus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -50,6 +51,9 @@ class HandleInertiaRequests extends Middleware
                 ->all();
             $userPermissions = $user->permissions()->pluck('code')->all();
             $permissionCodes = array_values(array_unique(array_merge($rolePermissions, $userPermissions)));
+            if ($user->status?->value !== UserStatus::Confirmed->value) {
+                $permissionCodes = [];
+            }
         }
 
         return [
