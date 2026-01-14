@@ -9,6 +9,7 @@ enum PermissionCode: string
     case LogsView = 'logs.view';
 
     case VenueCreate = 'venue.create';
+    case VenueBooking = 'venue.booking';
     case EventCreate = 'event.create';
     case CommentCreate = 'comment.create';
     case RatingCreate = 'rating.create';

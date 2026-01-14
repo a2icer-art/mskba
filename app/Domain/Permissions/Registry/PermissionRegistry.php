@@ -36,6 +36,12 @@ class PermissionRegistry
                 'target_model' => null,
             ],
             [
+                'code' => PermissionCode::VenueBooking,
+                'label' => 'Бронирование площадки',
+                'scope' => PermissionScope::Global,
+                'target_model' => null,
+            ],
+            [
                 'code' => PermissionCode::EventCreate,
                 'label' => 'Создание события',
                 'scope' => PermissionScope::Global,
