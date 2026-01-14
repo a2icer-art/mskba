@@ -434,105 +434,141 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
 
         <div v-if="rejectOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: rejectForm.processing }" @submit.prevent="submitReject">
-                <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Вы можете указать причину отклонения. Она будет показана владельцу площадки.
-                </p>
-                <textarea
-                    v-model="rejectForm.reason"
-                    class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    placeholder="Причина отклонения (необязательно)"
-                ></textarea>
-                <div v-if="rejectForm.errors.reason" class="mt-2 text-xs text-rose-700">
-                    {{ rejectForm.errors.reason }}
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="rejectForm.processing"
-                        @click="closeReject"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="submit"
-                        :disabled="rejectForm.processing"
-                    >
-                        Отклонить
-                    </button>
-                </div>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeReject"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Вы можете указать причину отклонения. Она будет показана владельцу площадки.
+                        </p>
+                        <textarea
+                            v-model="rejectForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина отклонения (необязательно)"
+                        ></textarea>
+                        <div v-if="rejectForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ rejectForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="rejectForm.processing"
+                            @click="closeReject"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
+                            type="submit"
+                            :disabled="rejectForm.processing"
+                        >
+                            Отклонить
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <div v-if="blockOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: blockForm.processing }" @submit.prevent="submitBlock">
-                <h2 class="text-lg font-semibold text-slate-900">Заблокировать площадку</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с владельцем.
-                </p>
-                <textarea
-                    v-model="blockForm.reason"
-                    class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    placeholder="Причина блокировки (необязательно)"
-                ></textarea>
-                <div v-if="blockForm.errors.reason" class="mt-2 text-xs text-rose-700">
-                    {{ blockForm.errors.reason }}
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="blockForm.processing"
-                        @click="closeBlock"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="submit"
-                        :disabled="blockForm.processing"
-                    >
-                        Заблокировать
-                    </button>
-                </div>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Заблокировать площадку</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeBlock"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с владельцем.
+                        </p>
+                        <textarea
+                            v-model="blockForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина блокировки (необязательно)"
+                        ></textarea>
+                        <div v-if="blockForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ blockForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="blockForm.processing"
+                            @click="closeBlock"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
+                            type="submit"
+                            :disabled="blockForm.processing"
+                        >
+                            Заблокировать
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <div v-if="viewOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <h2 class="text-lg font-semibold text-slate-900">Данные площадки</h2>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
-                        <span class="font-semibold">{{ viewTarget?.venue?.name || '—' }}</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
-                            <span>{{ viewTarget?.type?.name || '—' }}</span>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Данные площадки</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeView"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
+                            <span class="font-semibold">{{ viewTarget?.venue?.name || '—' }}</span>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span>{{ viewTarget?.venue?.address || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
-                            <span>{{ viewTarget?.creator?.login || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создана</span>
-                            <span>{{ viewTarget?.venue?.created_at || '—' }}</span>
+                        <div class="mt-3 grid gap-2 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
+                                <span>{{ viewTarget?.type?.name || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
+                                <span>{{ viewTarget?.venue?.address || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
+                                <span>{{ viewTarget?.creator?.login || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создана</span>
+                                <span>{{ viewTarget?.venue?.created_at || '—' }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -545,51 +581,64 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
 
         <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
-                <h2 class="text-lg font-semibold text-slate-900">Подтвердить площадку</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Площадка будет подтверждена, а заявка переведена в статус "Подтверждено".
-                </p>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
-                        <span class="font-semibold">{{ approveTarget?.venue?.name || '—' }}</span>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Подтвердить площадку</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeApprove"
+                        >
+                            x
+                        </button>
                     </div>
-                    <div class="mt-3 grid gap-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
-                            <span>{{ approveTarget?.type?.name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
-                            <span>{{ approveTarget?.venue?.address || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
-                            <span>{{ approveTarget?.creator?.login || '—' }}</span>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Площадка будет подтверждена, а заявка переведена в статус "Подтверждено".
+                        </p>
+                        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
+                                <span class="font-semibold">{{ approveTarget?.venue?.name || '—' }}</span>
+                            </div>
+                            <div class="mt-3 grid gap-2 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Тип</span>
+                                    <span>{{ approveTarget?.type?.name || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Адрес</span>
+                                    <span>{{ approveTarget?.venue?.address || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Создатель</span>
+                                    <span>{{ approveTarget?.creator?.login || '—' }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="approveForm.processing"
-                        @click="closeApprove"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                        type="submit"
-                        :disabled="approveForm.processing"
-                    >
-                        Подтвердить
-                    </button>
-                </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="approveForm.processing"
+                            @click="closeApprove"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                            type="submit"
+                            :disabled="approveForm.processing"
+                        >
+                            Подтвердить
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </template>
+

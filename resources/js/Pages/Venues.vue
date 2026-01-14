@@ -582,118 +582,122 @@ const applyAddressSuggestion = (suggestion) => {
         />
 
         <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeCreate">
-            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <button
-                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                    type="button"
-                    aria-label="Закрыть"
-                    @click="closeCreate"
-                >
-                    x
-                </button>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: createForm.processing }" @submit.prevent="submitCreate">
-                <h2 class="text-lg font-semibold text-slate-900">Новая площадка</h2>
-                <p class="mt-2 text-sm text-slate-600">Заполните обязательные поля для создания площадки.</p>
-
-                <div class="mt-4 flex flex-col gap-3">
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Тип
-                        <select
-                            v-model="createForm.venue_type_id"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            :disabled="Boolean(activeTypeOption)"
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Новая площадка</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeCreate"
                         >
-                            <option value="">Выберите тип</option>
-                            <option v-for="type in availableTypes" :key="type.id" :value="type.id">
-                                {{ type.name }}
-                            </option>
-                        </select>
-                        <input v-if="activeTypeOption" type="hidden" :value="activeTypeOption.id" />
-                    </label>
-                    <div v-if="createForm.errors.venue_type_id" class="text-xs text-rose-700">
-                        {{ createForm.errors.venue_type_id }}
+                            x
+                        </button>
                     </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">Заполните обязательные поля для создания площадки.</p>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Название
-                        <input
-                            v-model="createForm.name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Например, Арена 11"
-                        />
-                    </label>
-                    <div v-if="createForm.errors.name" class="text-xs text-rose-700">
-                        {{ createForm.errors.name }}
-                    </div>
+                        <div class="mt-4 flex flex-col gap-3">
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Тип
+                                <select
+                                    v-model="createForm.venue_type_id"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    :disabled="Boolean(activeTypeOption)"
+                                >
+                                    <option value="">Выберите тип</option>
+                                    <option v-for="type in availableTypes" :key="type.id" :value="type.id">
+                                        {{ type.name }}
+                                    </option>
+                                </select>
+                                <input v-if="activeTypeOption" type="hidden" :value="activeTypeOption.id" />
+                            </label>
+                            <div v-if="createForm.errors.venue_type_id" class="text-xs text-rose-700">
+                                {{ createForm.errors.venue_type_id }}
+                            </div>
 
-                    <div class="relative">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес
-                            <input
-                                v-model="addressQuery"
-                                @input="scheduleAddressSuggest($event.target.value)"
-                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                :class="{ 'is-loading': addressSuggestLoading }"
-                                type="text"
-                                placeholder="Начните вводить адрес"
-                            />
-                        </label>
-                        <input v-model="createForm.city" type="hidden" />
-                        <input v-model="createForm.metro_id" type="hidden" />
-                        <input v-model="createForm.street" type="hidden" />
-                        <input v-model="createForm.building" type="hidden" />
-                        <input v-model="createForm.str_address" type="hidden" />
-                        <div v-if="addressSuggestError" class="text-xs text-rose-700">
-                            {{ addressSuggestError }}
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Название
+                                <input
+                                    v-model="createForm.name"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    type="text"
+                                    placeholder="Например, Арена 11"
+                                />
+                            </label>
+                            <div v-if="createForm.errors.name" class="text-xs text-rose-700">
+                                {{ createForm.errors.name }}
+                            </div>
+
+                            <div class="relative">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Адрес
+                                    <input
+                                        v-model="addressQuery"
+                                        @input="scheduleAddressSuggest($event.target.value)"
+                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        :class="{ 'is-loading': addressSuggestLoading }"
+                                        type="text"
+                                        placeholder="Начните вводить адрес"
+                                    />
+                                </label>
+                                <input v-model="createForm.city" type="hidden" />
+                                <input v-model="createForm.metro_id" type="hidden" />
+                                <input v-model="createForm.street" type="hidden" />
+                                <input v-model="createForm.building" type="hidden" />
+                                <input v-model="createForm.str_address" type="hidden" />
+                                <div v-if="addressSuggestError" class="text-xs text-rose-700">
+                                    {{ addressSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!addressSuggestLoading && addressSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in addressSuggestions"
+                                        :key="`${suggestion.label}-${index}`"
+                                        class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                                        type="button"
+                                        :disabled="!suggestion.has_house"
+                                        @click="applyAddressSuggestion(suggestion)"
+                                    >
+                                        {{ suggestion.label }}
+                                    </button>
+                                </div>
+                                <div v-if="createForm.errors.city || createForm.errors.street || createForm.errors.building" class="text-xs text-rose-700">
+                                    {{ createForm.errors.city || createForm.errors.street || createForm.errors.building }}
+                                </div>
+                            </div>
                         </div>
-                        <div
-                            v-else-if="!addressSuggestLoading && addressSuggestions.length"
-                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+
+                        <div v-if="createForm.errors.venue" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                            {{ createForm.errors.venue }}
+                        </div>
+                        <div v-else-if="createNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            {{ createNotice }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="createForm.processing"
+                            @click="closeCreate"
                         >
-                            <button
-                                v-for="(suggestion, index) in addressSuggestions"
-                                :key="`${suggestion.label}-${index}`"
-                                class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                                type="button"
-                                :disabled="!suggestion.has_house"
-                                @click="applyAddressSuggestion(suggestion)"
-                            >
-                                {{ suggestion.label }}
-                            </button>
-                        </div>
-                        <div v-if="createForm.errors.city || createForm.errors.street || createForm.errors.building" class="text-xs text-rose-700">
-                            {{ createForm.errors.city || createForm.errors.street || createForm.errors.building }}
-                        </div>
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="createForm.processing || !canSubmitCreate"
+                        >
+                            Создать
+                        </button>
                     </div>
-                </div>
-
-                <div v-if="createForm.errors.venue" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                    {{ createForm.errors.venue }}
-                </div>
-                <div v-else-if="createNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                    {{ createNotice }}
-                </div>
-
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="createForm.processing"
-                        @click="closeCreate"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                        type="submit"
-                        :disabled="createForm.processing || !canSubmitCreate"
-                    >
-                        Создать
-                    </button>
-                </div>
                 </form>
             </div>
         </div>
     </div>
 </template>
+

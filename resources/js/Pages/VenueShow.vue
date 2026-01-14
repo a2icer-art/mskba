@@ -474,161 +474,164 @@ const submitModerationRequest = () => {
         </div>
 
         <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeEdit">
-            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <button
-                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                    type="button"
-                    aria-label="Закрыть"
-                    @click="closeEdit"
-                >
-                    x
-                </button>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: editForm.processing }" @submit.prevent="submitEdit">
-                <h2 class="text-lg font-semibold text-slate-900">Редактировать площадку</h2>
-                <p class="mt-2 text-sm text-slate-600">Заполните доступные поля площадки.</p>
-                <div
-                    v-if="isVenueConfirmed || isVenueOnModeration"
-                    class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
-                >
-                    <p class="font-semibold text-slate-700">
-                        {{ isVenueConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
-                    </p>
-                    <div v-if="nonEditableItems.length" class="mt-2 space-y-2">
-                        <div v-for="item in nonEditableItems" :key="item.key" class="flex items-center justify-between gap-3">
-                            <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
-                            <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-4 flex flex-col gap-3" v-if="editableFields.length">
-                    <div v-if="editableFields.includes('venue_type_id')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Тип
-                            <select
-                                v-model="editForm.venue_type_id"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            >
-                                <option value="">Выберите тип</option>
-                                <option v-for="type in availableTypes" :key="type.id" :value="type.id">
-                                    {{ type.name }}
-                                </option>
-                            </select>
-                        </label>
-                        <div v-if="editForm.errors.venue_type_id" class="text-xs text-rose-700">
-                            {{ editForm.errors.venue_type_id }}
-                        </div>
-                    </div>
-
-                    <div v-if="editableFields.includes('name')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Название
-                            <input
-                                v-model="editForm.name"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="text"
-                                placeholder="Например, Арена 11"
-                            />
-                        </label>
-                        <div v-if="editForm.errors.name" class="text-xs text-rose-700">
-                            {{ editForm.errors.name }}
-                        </div>
-                    </div>
-
-                    <div v-if="addressEditable && !isVenueConfirmed && !isVenueOnModeration" class="relative">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес
-                            <input
-                                v-model="editAddressQuery"
-                                @input="scheduleEditAddressSuggest($event.target.value)"
-                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                :class="{ 'is-loading': editAddressSuggestLoading }"
-                                type="text"
-                                placeholder="Начните вводить адрес"
-                            />
-                        </label>
-                        <input v-model="editForm.city" type="hidden" />
-                        <input v-model="editForm.metro_id" type="hidden" />
-                        <input v-model="editForm.street" type="hidden" />
-                        <input v-model="editForm.building" type="hidden" />
-                        <input v-model="editForm.str_address" type="hidden" />
-                        <div v-if="editAddressSuggestError" class="text-xs text-rose-700">
-                            {{ editAddressSuggestError }}
-                        </div>
-                        <div
-                            v-else-if="!editAddressSuggestLoading && editAddressSuggestions.length"
-                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Редактировать площадку</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeEdit"
                         >
-                            <button
-                                v-for="(suggestion, index) in editAddressSuggestions"
-                                :key="`${suggestion.label}-${index}`"
-                                class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                                type="button"
-                                :disabled="!suggestion.has_house"
-                                @click="applyEditAddressSuggestion(suggestion)"
-                            >
-                                {{ suggestion.label }}
-                            </button>
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">Заполните доступные поля площадки.</p>
+                        <div
+                            v-if="isVenueConfirmed || isVenueOnModeration"
+                            class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                        >
+                            <p class="font-semibold text-slate-700">
+                                {{ isVenueConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
+                            </p>
+                            <div v-if="nonEditableItems.length" class="mt-2 space-y-2">
+                                <div v-for="item in nonEditableItems" :key="item.key" class="flex items-center justify-between gap-3">
+                                    <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                                    <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div v-if="editForm.errors.city || editForm.errors.street || editForm.errors.building" class="text-xs text-rose-700">
-                            {{ editForm.errors.city || editForm.errors.street || editForm.errors.building }}
+
+                        <div class="mt-4 flex flex-col gap-3" v-if="editableFields.length">
+                            <div v-if="editableFields.includes('venue_type_id')">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Тип
+                                    <select
+                                        v-model="editForm.venue_type_id"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    >
+                                        <option value="">Выберите тип</option>
+                                        <option v-for="type in availableTypes" :key="type.id" :value="type.id">
+                                            {{ type.name }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <div v-if="editForm.errors.venue_type_id" class="text-xs text-rose-700">
+                                    {{ editForm.errors.venue_type_id }}
+                                </div>
+                            </div>
+
+                            <div v-if="editableFields.includes('name')">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Название
+                                    <input
+                                        v-model="editForm.name"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="text"
+                                        placeholder="Например, Арена 11"
+                                    />
+                                </label>
+                                <div v-if="editForm.errors.name" class="text-xs text-rose-700">
+                                    {{ editForm.errors.name }}
+                                </div>
+                            </div>
+
+                            <div v-if="addressEditable && !isVenueConfirmed && !isVenueOnModeration" class="relative">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Адрес
+                                    <input
+                                        v-model="editAddressQuery"
+                                        @input="scheduleEditAddressSuggest($event.target.value)"
+                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        :class="{ 'is-loading': editAddressSuggestLoading }"
+                                        type="text"
+                                        placeholder="Начните вводить адрес"
+                                    />
+                                </label>
+                                <input v-model="editForm.city" type="hidden" />
+                                <input v-model="editForm.metro_id" type="hidden" />
+                                <input v-model="editForm.street" type="hidden" />
+                                <input v-model="editForm.building" type="hidden" />
+                                <input v-model="editForm.str_address" type="hidden" />
+                                <div v-if="editAddressSuggestError" class="text-xs text-rose-700">
+                                    {{ editAddressSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!editAddressSuggestLoading && editAddressSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in editAddressSuggestions"
+                                        :key="`${suggestion.label}-${index}`"
+                                        class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                                        type="button"
+                                        :disabled="!suggestion.has_house"
+                                        @click="applyEditAddressSuggestion(suggestion)"
+                                    >
+                                        {{ suggestion.label }}
+                                    </button>
+                                </div>
+                                <div v-if="editForm.errors.city || editForm.errors.street || editForm.errors.building" class="text-xs text-rose-700">
+                                    {{ editForm.errors.city || editForm.errors.street || editForm.errors.building }}
+                                </div>
+                            </div>
+
+                            <div v-if="editableFields.includes('str_address') && (isVenueConfirmed || isVenueOnModeration)">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Адрес (строкой)
+                                    <input
+                                        v-model="editForm.str_address"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="text"
+                                        placeholder="Например, Россия, Москва, Тверская, 1"
+                                    />
+                                </label>
+                                <div v-if="editForm.errors.str_address" class="text-xs text-rose-700">
+                                    {{ editForm.errors.str_address }}
+                                </div>
+                            </div>
+
+                            <div v-if="editableFields.includes('commentary')">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Комментарий
+                                    <textarea
+                                        v-model="editForm.commentary"
+                                        class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        placeholder="Дополнительная информация"
+                                    ></textarea>
+                                </label>
+                                <div v-if="editForm.errors.commentary" class="text-xs text-rose-700">
+                                    {{ editForm.errors.commentary }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="editForm.errors.venue" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                            {{ editForm.errors.venue }}
+                        </div>
+                        <div v-else-if="editNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            {{ editNotice }}
                         </div>
                     </div>
-
-                    <div v-if="editableFields.includes('str_address') && (isVenueConfirmed || isVenueOnModeration)">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес (строкой)
-                            <input
-                                v-model="editForm.str_address"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="text"
-                                placeholder="Например, Россия, Москва, Тверская, 1"
-                            />
-                        </label>
-                        <div v-if="editForm.errors.str_address" class="text-xs text-rose-700">
-                            {{ editForm.errors.str_address }}
-                        </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="editForm.processing"
+                            @click="closeEdit"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="submit"
+                            :disabled="editForm.processing || !editableFields.length"
+                        >
+                            Сохранить
+                        </button>
                     </div>
-
-                    <div v-if="editableFields.includes('commentary')">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Комментарий
-                            <textarea
-                                v-model="editForm.commentary"
-                                class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                placeholder="Дополнительная информация"
-                            ></textarea>
-                        </label>
-                        <div v-if="editForm.errors.commentary" class="text-xs text-rose-700">
-                            {{ editForm.errors.commentary }}
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="editForm.errors.venue" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                    {{ editForm.errors.venue }}
-                </div>
-                <div v-else-if="editNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                    {{ editNotice }}
-                </div>
-
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="editForm.processing"
-                        @click="closeEdit"
-                    >
-                        Закрыть
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="submit"
-                        :disabled="editForm.processing || !editableFields.length"
-                    >
-                        Сохранить
-                    </button>
-                </div>
                 </form>
             </div>
         </div>
@@ -642,3 +645,4 @@ const submitModerationRequest = () => {
         />
     </div>
 </template>
+

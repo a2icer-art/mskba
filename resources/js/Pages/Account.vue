@@ -1334,174 +1334,181 @@ const logout = () => {
         </div>
 
         <div v-if="profileEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeProfileEdit">
-            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <button
-                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                    type="button"
-                    aria-label="Закрыть"
-                    @click="closeProfileEdit"
-                >
-                    x
-                </button>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: profileForm.processing }" @submit.prevent="submitProfileUpdate">
-                <h2 class="text-lg font-semibold text-slate-900">Редактирование профиля</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Заполните доступные поля профиля и сохраните изменения.
-                </p>
-                <div
-                    v-if="isProfileRestricted"
-                    class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
-                >
-                    <p class="font-semibold text-slate-700">
-                        {{ isProfileConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
-                    </p>
-                    <div v-if="nonEditableProfileItems.length" class="mt-2 space-y-2">
-                        <div v-for="item in nonEditableProfileItems" :key="item.key" class="flex items-center justify-between gap-3">
-                            <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
-                            <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Редактирование профиля</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeProfileEdit"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Заполните доступные поля профиля и сохраните изменения.
+                        </p>
+                        <div
+                            v-if="isProfileRestricted"
+                            class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                        >
+                            <p class="font-semibold text-slate-700">
+                                {{ isProfileConfirmed ? 'Подтвержденная информация' : 'Данная информация на модерации' }}
+                            </p>
+                            <div v-if="nonEditableProfileItems.length" class="mt-2 space-y-2">
+                                <div v-for="item in nonEditableProfileItems" :key="item.key" class="flex items-center justify-between gap-3">
+                                    <span class="text-[10px] uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
+                                    <span class="text-xs font-medium text-slate-800">{{ item.value }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex flex-col gap-3">
+                            <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Имя
+                                <input
+                                    v-model="profileForm.first_name"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                                    type="text"
+                                />
+                            </label>
+                            <div v-if="!isProfileRestricted && profileForm.errors.first_name" class="text-xs text-rose-700">
+                                {{ profileForm.errors.first_name }}
+                            </div>
+
+                            <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Фамилия
+                                <input
+                                    v-model="profileForm.last_name"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                                    type="text"
+                                />
+                            </label>
+                            <div v-if="!isProfileRestricted && profileForm.errors.last_name" class="text-xs text-rose-700">
+                                {{ profileForm.errors.last_name }}
+                            </div>
+
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Отчество
+                                <input
+                                    v-model="profileForm.middle_name"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    type="text"
+                                />
+                            </label>
+                            <div v-if="profileForm.errors.middle_name" class="text-xs text-rose-700">
+                                {{ profileForm.errors.middle_name }}
+                            </div>
+
+                            <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Пол
+                                <select
+                                    v-model="profileForm.gender"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                                >
+                                    <option value="">Не определен</option>
+                                    <option value="male">Мужской</option>
+                                    <option value="female">Женский</option>
+                                </select>
+                            </label>
+                            <div v-if="!isProfileRestricted && profileForm.errors.gender" class="text-xs text-rose-700">
+                                {{ profileForm.errors.gender }}
+                            </div>
+
+                            <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Дата рождения
+                                <input
+                                    v-model="profileForm.birth_date"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                                    type="date"
+                                />
+                            </label>
+                            <div v-if="!isProfileRestricted && profileForm.errors.birth_date" class="text-xs text-rose-700">
+                                {{ profileForm.errors.birth_date }}
+                            </div>
+                        </div>
+
+                        <div v-if="profileNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            {{ profileNotice }}
                         </div>
                     </div>
-                </div>
-
-                <div class="mt-4 flex flex-col gap-3">
-                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Имя
-                        <input
-                            v-model="profileForm.first_name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
-                            type="text"
-                        />
-                    </label>
-                    <div v-if="!isProfileRestricted && profileForm.errors.first_name" class="text-xs text-rose-700">
-                        {{ profileForm.errors.first_name }}
-                    </div>
-
-                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Фамилия
-                        <input
-                            v-model="profileForm.last_name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
-                            type="text"
-                        />
-                    </label>
-                    <div v-if="!isProfileRestricted && profileForm.errors.last_name" class="text-xs text-rose-700">
-                        {{ profileForm.errors.last_name }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Отчество
-                        <input
-                            v-model="profileForm.middle_name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                        />
-                    </label>
-                    <div v-if="profileForm.errors.middle_name" class="text-xs text-rose-700">
-                        {{ profileForm.errors.middle_name }}
-                    </div>
-
-                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Пол
-                        <select
-                            v-model="profileForm.gender"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="profileForm.processing"
+                            @click="closeProfileEdit"
                         >
-                            <option value="">Не определен</option>
-                            <option value="male">Мужской</option>
-                            <option value="female">Женский</option>
-                        </select>
-                    </label>
-                    <div v-if="!isProfileRestricted && profileForm.errors.gender" class="text-xs text-rose-700">
-                        {{ profileForm.errors.gender }}
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="submit"
+                            :disabled="profileForm.processing"
+                        >
+                            Сохранить
+                        </button>
                     </div>
-
-                    <label v-if="!isProfileRestricted" class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Дата рождения
-                        <input
-                            v-model="profileForm.birth_date"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
-                            type="date"
-                        />
-                    </label>
-                    <div v-if="!isProfileRestricted && profileForm.errors.birth_date" class="text-xs text-rose-700">
-                        {{ profileForm.errors.birth_date }}
-                    </div>
-                </div>
-
-                <div v-if="profileNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                    {{ profileNotice }}
-                </div>
-
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="profileForm.processing"
-                        @click="closeProfileEdit"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="submit"
-                        :disabled="profileForm.processing"
-                    >
-                        Сохранить
-                    </button>
-                </div>
                 </form>
             </div>
         </div>
 
         <div v-if="passwordEditOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closePasswordEdit">
-            <div class="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <button
-                    class="absolute right-5 top-5 rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                    type="button"
-                    aria-label="Закрыть"
-                    @click="closePasswordEdit"
-                >
-                    x
-                </button>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: passwordForm.processing }" @submit.prevent="submitPasswordUpdate">
-                <h2 class="text-lg font-semibold text-slate-900">Изменить пароль</h2>
-                <p class="mt-2 text-sm text-slate-600">Укажите новый пароль для вашей учетной записи.</p>
-                <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                    Новый пароль
-                    <input
-                        v-model="passwordForm.password"
-                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                        type="password"
-                        autocomplete="new-password"
-                    />
-                </label>
-                <div v-if="passwordForm.errors.password" class="text-xs text-rose-700">
-                    {{ passwordForm.errors.password }}
-                </div>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Изменить пароль</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closePasswordEdit"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">Укажите новый пароль для вашей учетной записи.</p>
+                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Новый пароль
+                            <input
+                                v-model="passwordForm.password"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="password"
+                                autocomplete="new-password"
+                            />
+                        </label>
+                        <div v-if="passwordForm.errors.password" class="text-xs text-rose-700">
+                            {{ passwordForm.errors.password }}
+                        </div>
 
-                <div v-if="passwordNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                    {{ passwordNotice }}
-                </div>
-
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="passwordForm.processing"
-                        @click="closePasswordEdit"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                        type="submit"
-                        :disabled="passwordForm.processing"
-                    >
-                        Сохранить
-                    </button>
-                </div>
+                        <div v-if="passwordNotice" class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            {{ passwordNotice }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="passwordForm.processing"
+                            @click="closePasswordEdit"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            type="submit"
+                            :disabled="passwordForm.processing"
+                        >
+                            Сохранить
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </template>
+

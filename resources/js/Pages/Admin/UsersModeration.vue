@@ -484,259 +484,307 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
 
         <div v-if="rejectOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: rejectForm.processing }" @submit.prevent="submitReject">
-                <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Вы можете указать причину отклонения. Она будет показана пользователю.
-                </p>
-                <textarea
-                    v-model="rejectForm.reason"
-                    class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    placeholder="Причина отклонения (необязательно)"
-                ></textarea>
-                <div v-if="rejectForm.errors.reason" class="mt-2 text-xs text-rose-700">
-                    {{ rejectForm.errors.reason }}
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="rejectForm.processing"
-                        @click="closeReject"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="submit"
-                        :disabled="rejectForm.processing"
-                    >
-                        Отклонить
-                    </button>
-                </div>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeReject"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Вы можете указать причину отклонения. Она будет показана пользователю.
+                        </p>
+                        <textarea
+                            v-model="rejectForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина отклонения (необязательно)"
+                        ></textarea>
+                        <div v-if="rejectForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ rejectForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="rejectForm.processing"
+                            @click="closeReject"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
+                            type="submit"
+                            :disabled="rejectForm.processing"
+                        >
+                            Отклонить
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
-                <h2 class="text-lg font-semibold text-slate-900">Подтвердить пользователя</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Пользователь будет подтвержден, а заявка переведена в статус "Подтверждено".
-                </p>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
-                        <span class="font-semibold">{{ approveTarget?.user?.login || '—' }}</span>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Подтвердить пользователя</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeApprove"
+                        >
+                            x
+                        </button>
                     </div>
-                    <div class="mt-3 grid gap-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
-                            <span>{{ approveTarget?.profile?.last_name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
-                            <span>{{ approveTarget?.profile?.first_name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
-                            <span>{{ approveTarget?.profile?.gender || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
-                            <span>{{ approveTarget?.profile?.birth_date || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
-                            <span class="flex items-center gap-2">
-                                {{ approveTarget?.contact?.value || '—' }}
-                                <span
-                                    v-if="approveTarget?.contact?.confirmed_at"
-                                    class="text-emerald-600"
-                                    :title="formatDate(approveTarget?.contact?.confirmed_at)"
-                                >
-                                    ✓
-                                </span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права после подтверждения</p>
-                    <p class="mt-2 text-xs text-slate-500">
-                        Выберите права, которые будут назначены пользователю после подтверждения.
-                    </p>
-                    <div v-if="permissionGroups.length" class="mt-3 max-h-[300px] overflow-y-auto pr-2">
-                        <div class="grid gap-4">
-                        <div v-for="group in permissionGroups" :key="group.key" class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                            <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
-                            <div class="mt-3 grid gap-2">
-                                <label
-                                    v-for="permission in group.items"
-                                    :key="permission.code"
-                                    class="flex items-start gap-2 text-sm text-slate-700"
-                                >
-                                    <input
-                                        v-model="approveForm.permissions"
-                                        type="checkbox"
-                                        class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
-                                        :value="permission.code"
-                                    />
-                                    <span>{{ permission.label }}</span>
-                                </label>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Пользователь будет подтвержден, а заявка переведена в статус "Подтверждено".
+                        </p>
+                        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                                <span class="font-semibold">{{ approveTarget?.user?.login || '—' }}</span>
+                            </div>
+                            <div class="mt-3 grid gap-2 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
+                                    <span>{{ approveTarget?.profile?.last_name || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
+                                    <span>{{ approveTarget?.profile?.first_name || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
+                                    <span>{{ approveTarget?.profile?.gender || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
+                                    <span>{{ approveTarget?.profile?.birth_date || '—' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
+                                    <span class="flex items-center gap-2">
+                                        {{ approveTarget?.contact?.value || '—' }}
+                                        <span
+                                            v-if="approveTarget?.contact?.confirmed_at"
+                                            class="text-emerald-600"
+                                            :title="formatDate(approveTarget?.contact?.confirmed_at)"
+                                        >
+                                            ✓
+                                        </span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
+                        <div class="mt-4">
+                            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права после подтверждения</p>
+                            <p class="mt-2 text-xs text-slate-500">
+                                Выберите права, которые будут назначены пользователю после подтверждения.
+                            </p>
+                            <div v-if="permissionGroups.length" class="mt-3 max-h-[300px] overflow-y-auto pr-2">
+                                <div class="grid gap-4">
+                                <div v-for="group in permissionGroups" :key="group.key" class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                    <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
+                                    <div class="mt-3 grid gap-2">
+                                        <label
+                                            v-for="permission in group.items"
+                                            :key="permission.code"
+                                            class="flex items-start gap-2 text-sm text-slate-700"
+                                        >
+                                            <input
+                                                v-model="approveForm.permissions"
+                                                type="checkbox"
+                                                class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                                                :value="permission.code"
+                                            />
+                                            <span>{{ permission.label }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                            <div v-else class="mt-2 text-sm text-slate-500">
+                                Права не загружены.
+                            </div>
+                            <div v-if="approveForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                                {{ approveForm.errors.permissions }}
+                            </div>
                         </div>
                     </div>
-                    <div v-else class="mt-2 text-sm text-slate-500">
-                        Права не загружены.
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="approveForm.processing"
+                            @click="closeApprove"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                            type="submit"
+                            :disabled="approveForm.processing"
+                        >
+                            Подтвердить
+                        </button>
                     </div>
-                    <div v-if="approveForm.errors.permissions" class="mt-2 text-xs text-rose-700">
-                        {{ approveForm.errors.permissions }}
-                    </div>
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="approveForm.processing"
-                        @click="closeApprove"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                        type="submit"
-                        :disabled="approveForm.processing"
-                    >
-                        Подтвердить
-                    </button>
-                </div>
                 </form>
             </div>
         </div>
 
         <div v-if="blockOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: blockForm.processing }" @submit.prevent="submitBlock">
-                <h2 class="text-lg font-semibold text-slate-900">Заблокировать пользователя</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с пользователем.
-                </p>
-                <textarea
-                    v-model="blockForm.reason"
-                    class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    placeholder="Причина блокировки (необязательно)"
-                ></textarea>
-                <div v-if="blockForm.errors.reason" class="mt-2 text-xs text-rose-700">
-                    {{ blockForm.errors.reason }}
-                </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="blockForm.processing"
-                        @click="closeBlock"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
-                        type="submit"
-                        :disabled="blockForm.processing"
-                    >
-                        Заблокировать
-                    </button>
-                </div>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Заблокировать пользователя</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeBlock"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с пользователем.
+                        </p>
+                        <textarea
+                            v-model="blockForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина блокировки (необязательно)"
+                        ></textarea>
+                        <div v-if="blockForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ blockForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="blockForm.processing"
+                            @click="closeBlock"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700"
+                            type="submit"
+                            :disabled="blockForm.processing"
+                        >
+                            Заблокировать
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
 
         <div v-if="viewOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-                <h2 class="text-lg font-semibold text-slate-900">Данные пользователя</h2>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
-                        <span class="font-semibold">{{ viewTarget?.user?.login || '—' }}</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
-                            <span>{{ viewTarget?.profile?.last_name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
-                            <span>{{ viewTarget?.profile?.first_name || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
-                            <span>{{ viewTarget?.profile?.gender || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
-                            <span>{{ viewTarget?.profile?.birth_date || '—' }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
-                            <span class="flex items-center gap-2">
-                                {{ viewTarget?.contact?.value || '—' }}
-                                <span
-                                    v-if="viewTarget?.contact?.confirmed_at"
-                                    class="text-emerald-600"
-                                    :title="formatDate(viewTarget?.contact?.confirmed_at)"
-                                >
-                                    ✓
-                                </span>
-                            </span>
-                        </div>
-                    </div>
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Данные пользователя</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeView"
+                    >
+                        x
+                    </button>
                 </div>
-                <div class="mt-4">
-                    <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права пользователя</p>
-                    <div v-if="permissionGroups.length" class="mt-2 max-h-[240px] overflow-y-auto pr-2">
-                        <div class="grid gap-4">
-                            <div
-                                v-for="group in permissionGroups"
-                                :key="group.key"
-                                class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                            >
-                                <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
-                                <div class="mt-3 grid gap-2">
-                                    <label
-                                        v-for="permission in group.items"
-                                        :key="permission.code"
-                                        class="flex items-start gap-2 text-sm text-slate-700"
+                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                            <span class="font-semibold">{{ viewTarget?.user?.login || '—' }}</span>
+                        </div>
+                        <div class="mt-3 grid gap-2 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Фамилия</span>
+                                <span>{{ viewTarget?.profile?.last_name || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Имя</span>
+                                <span>{{ viewTarget?.profile?.first_name || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пол</span>
+                                <span>{{ viewTarget?.profile?.gender || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата рождения</span>
+                                <span>{{ viewTarget?.profile?.birth_date || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакт</span>
+                                <span class="flex items-center gap-2">
+                                    {{ viewTarget?.contact?.value || '—' }}
+                                    <span
+                                        v-if="viewTarget?.contact?.confirmed_at"
+                                        class="text-emerald-600"
+                                        :title="formatDate(viewTarget?.contact?.confirmed_at)"
                                     >
-                                        <input
-                                            v-model="viewPermissionsForm.permissions"
-                                            type="checkbox"
-                                            class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
-                                            :value="permission.code"
-                                        />
-                                        <span>{{ permission.label }}</span>
-                                    </label>
-                                </div>
+                                        ✓
+                                    </span>
+                                </span>
                             </div>
                         </div>
                     </div>
-                    <div v-else class="mt-2 text-sm text-slate-500">
-                        Права не загружены.
-                    </div>
-                    <div v-if="viewPermissionsForm.errors.permissions" class="mt-2 text-xs text-rose-700">
-                        {{ viewPermissionsForm.errors.permissions }}
+                    <div class="mt-4">
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права пользователя</p>
+                        <div v-if="permissionGroups.length" class="mt-2 max-h-[240px] overflow-y-auto pr-2">
+                            <div class="grid gap-4">
+                                <div
+                                    v-for="group in permissionGroups"
+                                    :key="group.key"
+                                    class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                                >
+                                    <p class="text-sm font-semibold text-slate-800">{{ group.title }}</p>
+                                    <div class="mt-3 grid gap-2">
+                                        <label
+                                            v-for="permission in group.items"
+                                            :key="permission.code"
+                                            class="flex items-start gap-2 text-sm text-slate-700"
+                                        >
+                                            <input
+                                                v-model="viewPermissionsForm.permissions"
+                                                type="checkbox"
+                                                class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                                                :value="permission.code"
+                                            />
+                                            <span>{{ permission.label }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="mt-2 text-sm text-slate-500">
+                            Права не загружены.
+                        </div>
+                        <div v-if="viewPermissionsForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                            {{ viewPermissionsForm.errors.permissions }}
+                        </div>
                     </div>
                 </div>
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
                         :disabled="viewPermissionsForm.processing"
                         @click="closeView"
                     >
-                        Отмена
+                        Закрыть
                     </button>
                     <button
                         class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
@@ -751,3 +799,4 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
     </div>
 </template>
+

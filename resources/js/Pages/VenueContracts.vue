@@ -405,222 +405,243 @@ const formatDate = (value) => {
         </div>
 
         <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: editForm.processing }" @submit.prevent="submitEditPermissions">
-                <h2 class="text-lg font-semibold text-slate-900">Редактировать права</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Права для контракта: {{ editTarget?.name || 'Контракт' }}
-                </p>
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Редактировать права</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeEdit"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Права для контракта: {{ editTarget?.name || 'Контракт' }}
+                        </p>
 
-                <div class="mt-4 grid gap-3">
-                    <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</div>
-                    <div
-                        class="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3"
-                    >
-                        <div v-if="editAllowedPermissions.length" class="grid gap-2 text-sm text-slate-700">
-                            <label
-                                v-for="permission in editAllowedPermissions"
-                                :key="permission.code"
-                                class="flex items-center gap-2"
-                            >
-                                <input
-                                    v-model="editForm.permissions"
-                                    :value="permission.code"
-                                    type="checkbox"
-                                    class="h-4 w-4 rounded border-slate-300 text-slate-900"
-                                />
-                                <span>{{ permission.label }}</span>
-                            </label>
+                        <div class="mt-4 grid gap-3">
+                            <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</div>
+                            <div class="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3">
+                                <div v-if="editAllowedPermissions.length" class="grid gap-2 text-sm text-slate-700">
+                                    <label
+                                        v-for="permission in editAllowedPermissions"
+                                        :key="permission.code"
+                                        class="flex items-center gap-2"
+                                    >
+                                        <input
+                                            v-model="editForm.permissions"
+                                            :value="permission.code"
+                                            type="checkbox"
+                                            class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                        />
+                                        <span>{{ permission.label }}</span>
+                                    </label>
+                                </div>
+                                <p v-else class="text-sm text-slate-500">Нет доступных прав для редактирования.</p>
+                            </div>
+                            <div v-if="editForm.errors.permissions" class="text-xs text-rose-700">
+                                {{ editForm.errors.permissions }}
+                            </div>
+                            <div v-if="actionError" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                {{ actionError }}
+                            </div>
                         </div>
-                        <p v-else class="text-sm text-slate-500">Нет доступных прав для редактирования.</p>
                     </div>
-                    <div v-if="editForm.errors.permissions" class="text-xs text-rose-700">
-                        {{ editForm.errors.permissions }}
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="editForm.processing"
+                            @click="closeEdit"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="isEditDisabled"
+                        >
+                            Сохранить
+                        </button>
                     </div>
-                    <div v-if="actionError" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                        {{ actionError }}
-                    </div>
-                </div>
-
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="editForm.processing"
-                        @click="closeEdit"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                        type="submit"
-                        :disabled="isEditDisabled"
-                    >
-                        Сохранить
-                    </button>
-                </div>
                 </form>
             </div>
         </div>
 
         <div v-if="assignOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: assignForm.processing }" @submit.prevent="submitAssign">
-                <h2 class="text-lg font-semibold text-slate-900">Назначить контракт</h2>
-                <p class="mt-2 text-sm text-slate-600">
-                    Укажите пользователя, тип контракта и права для данной площадки.
-                </p>
-
-                <div class="mt-4 grid gap-3">
-                    <div class="relative">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Логин пользователя
-                            <input
-                                v-model="assignForm.login"
-                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                :class="{ 'is-loading': userSuggestLoading }"
-                                type="text"
-                                placeholder="login"
-                                @input="scheduleUserSuggestions($event.target.value)"
-                            />
-                        </label>
-                        <input v-model="assignForm.user_id" type="hidden" />
-                        <div v-if="assignForm.errors.login" class="text-xs text-rose-700">
-                            {{ assignForm.errors.login }}
-                        </div>
-                        <div v-if="assignForm.errors.user_id" class="text-xs text-rose-700">
-                            {{ assignForm.errors.user_id }}
-                        </div>
-                        <div v-if="userSuggestError" class="text-xs text-rose-700">
-                            {{ userSuggestError }}
-                        </div>
-                        <div
-                            v-else-if="!userSuggestLoading && userSuggestions.length"
-                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Назначить контракт</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeAssign"
                         >
-                            <button
-                                v-for="(suggestion, index) in userSuggestions"
-                                :key="`${suggestion.id}-${index}`"
-                                class="flex w-full items-start gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
-                                type="button"
-                                @click="applyUserSuggestion(suggestion)"
-                            >
-                                <span class="font-semibold">{{ suggestion.login }}</span>
-                                <span v-if="suggestion.email" class="text-xs text-slate-500">{{ suggestion.email }}</span>
-                            </button>
-                        </div>
+                            x
+                        </button>
                     </div>
+                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                        <p class="text-sm text-slate-600">
+                            Укажите пользователя, тип контракта и права для данной площадки.
+                        </p>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Тип контракта
-                        <select
-                            v-model="assignForm.contract_type"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                        >
-                            <option value="">Выберите тип</option>
-                            <option
-                                v-for="type in contractTypes.filter((item) => item.value !== 'creator')"
-                                :key="type.value"
-                                :value="type.value"
-                            >
-                                {{ type.label }}
-                            </option>
-                        </select>
-                    </label>
-                    <div v-if="assignForm.errors.contract_type" class="text-xs text-rose-700">
-                        {{ assignForm.errors.contract_type }}
-                    </div>
+                        <div class="mt-4 grid gap-3">
+                            <div class="relative">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Логин пользователя
+                                    <input
+                                        v-model="assignForm.login"
+                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        :class="{ 'is-loading': userSuggestLoading }"
+                                        type="text"
+                                        placeholder="login"
+                                        @input="scheduleUserSuggestions($event.target.value)"
+                                    />
+                                </label>
+                                <input v-model="assignForm.user_id" type="hidden" />
+                                <div v-if="assignForm.errors.login" class="text-xs text-rose-700">
+                                    {{ assignForm.errors.login }}
+                                </div>
+                                <div v-if="assignForm.errors.user_id" class="text-xs text-rose-700">
+                                    {{ assignForm.errors.user_id }}
+                                </div>
+                                <div v-if="userSuggestError" class="text-xs text-rose-700">
+                                    {{ userSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!userSuggestLoading && userSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in userSuggestions"
+                                        :key="`${suggestion.id}-${index}`"
+                                        class="flex w-full items-start gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                        type="button"
+                                        @click="applyUserSuggestion(suggestion)"
+                                    >
+                                        <span class="font-semibold">{{ suggestion.login }}</span>
+                                        <span v-if="suggestion.email" class="text-xs text-slate-500">{{ suggestion.email }}</span>
+                                    </button>
+                                </div>
+                            </div>
 
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Название (опционально)
-                        <input
-                            v-model="assignForm.name"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            type="text"
-                            placeholder="Например, Менеджер смены"
-                        />
-                    </label>
-
-                    <div class="grid gap-3 md:grid-cols-2">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Начало
-                            <input
-                                v-model="assignForm.starts_at"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="date"
-                            />
-                        </label>
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Окончание
-                            <input
-                                v-model="assignForm.ends_at"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                type="date"
-                            />
-                        </label>
-                    </div>
-                    <div v-if="assignForm.errors.starts_at || assignForm.errors.ends_at" class="text-xs text-rose-700">
-                        {{ assignForm.errors.starts_at || assignForm.errors.ends_at }}
-                    </div>
-
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        Комментарий
-                        <textarea
-                            v-model="assignForm.comment"
-                            class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                        ></textarea>
-                    </label>
-
-                    <div>
-                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</p>
-                        <div v-if="allowedPermissions.length" class="mt-2 grid gap-2">
-                            <label
-                                v-for="permission in allowedPermissions"
-                                :key="permission.code"
-                                class="flex items-start gap-2 text-sm text-slate-700"
-                            >
-                                <input
-                                    v-model="assignForm.permissions"
-                                    type="checkbox"
-                                    class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
-                                    :value="permission.code"
-                                />
-                                <span>{{ permission.label }}</span>
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Тип контракта
+                                <select
+                                    v-model="assignForm.contract_type"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <option value="">Выберите тип</option>
+                                    <option
+                                        v-for="type in contractTypes.filter((item) => item.value !== 'creator')"
+                                        :key="type.value"
+                                        :value="type.value"
+                                    >
+                                        {{ type.label }}
+                                    </option>
+                                </select>
                             </label>
-                        </div>
-                        <p v-else class="mt-2 text-sm text-slate-500">Список прав пуст.</p>
-                        <div v-if="assignForm.errors.permissions" class="mt-2 text-xs text-rose-700">
-                            {{ assignForm.errors.permissions }}
-                        </div>
-                    </div>
+                            <div v-if="assignForm.errors.contract_type" class="text-xs text-rose-700">
+                                {{ assignForm.errors.contract_type }}
+                            </div>
 
-                    <div v-if="actionError" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                        {{ actionError }}
-                    </div>
-                    <div v-else-if="actionNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                        {{ actionNotice }}
-                    </div>
-                </div>
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Название (опционально)
+                                <input
+                                    v-model="assignForm.name"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    type="text"
+                                    placeholder="Например, Менеджер смены"
+                                />
+                            </label>
 
-                <div class="mt-6 flex flex-wrap justify-end gap-3">
-                    <button
-                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                        type="button"
-                        :disabled="assignForm.processing"
-                        @click="closeAssign"
-                    >
-                        Отмена
-                    </button>
-                    <button
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                        type="submit"
-                        :disabled="isAssignDisabled"
-                    >
-                        Назначить
-                    </button>
-                </div>
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Начало
+                                    <input
+                                        v-model="assignForm.starts_at"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="date"
+                                    />
+                                </label>
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Окончание
+                                    <input
+                                        v-model="assignForm.ends_at"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="date"
+                                    />
+                                </label>
+                            </div>
+                            <div v-if="assignForm.errors.starts_at || assignForm.errors.ends_at" class="text-xs text-rose-700">
+                                {{ assignForm.errors.starts_at || assignForm.errors.ends_at }}
+                            </div>
+
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Комментарий
+                                <textarea
+                                    v-model="assignForm.comment"
+                                    class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                ></textarea>
+                            </label>
+
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</p>
+                                <div v-if="allowedPermissions.length" class="mt-2 grid gap-2">
+                                    <label
+                                        v-for="permission in allowedPermissions"
+                                        :key="permission.code"
+                                        class="flex items-start gap-2 text-sm text-slate-700"
+                                    >
+                                        <input
+                                            v-model="assignForm.permissions"
+                                            type="checkbox"
+                                            class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                                            :value="permission.code"
+                                        />
+                                        <span>{{ permission.label }}</span>
+                                    </label>
+                                </div>
+                                <p v-else class="mt-2 text-sm text-slate-500">Список прав пуст.</p>
+                                <div v-if="assignForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                                    {{ assignForm.errors.permissions }}
+                                </div>
+                            </div>
+
+                            <div v-if="actionError" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                {{ actionError }}
+                            </div>
+                            <div v-else-if="actionNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                {{ actionNotice }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="assignForm.processing"
+                            @click="closeAssign"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="isAssignDisabled"
+                        >
+                            Назначить
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </template>
+
