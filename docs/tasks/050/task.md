@@ -2,7 +2,7 @@
 Централизованные проверки confirmed + role_level
 
 # task_status
-[ ]
+[x]
 
 # task_init_description
 сделай отдельную задачу под централизованные проверки confirmed + role_level
