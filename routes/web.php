@@ -59,6 +59,27 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/moderation-request', [VenuesController::class, 'submitModerationRequest'])
         ->middleware('auth')
         ->name('venues.moderation.request');
+    Route::get('/{type}/{venue}/schedule', [VenuesController::class, 'schedule'])
+        ->middleware('auth')
+        ->name('venues.schedule');
+    Route::post('/{type}/{venue}/schedule/intervals', [VenuesController::class, 'storeScheduleInterval'])
+        ->middleware('auth')
+        ->name('venues.schedule.intervals.store');
+    Route::patch('/{type}/{venue}/schedule/intervals/{interval}', [VenuesController::class, 'updateScheduleInterval'])
+        ->middleware('auth')
+        ->name('venues.schedule.intervals.update');
+    Route::delete('/{type}/{venue}/schedule/intervals/{interval}', [VenuesController::class, 'destroyScheduleInterval'])
+        ->middleware('auth')
+        ->name('venues.schedule.intervals.destroy');
+    Route::post('/{type}/{venue}/schedule/exceptions', [VenuesController::class, 'storeScheduleException'])
+        ->middleware('auth')
+        ->name('venues.schedule.exceptions.store');
+    Route::patch('/{type}/{venue}/schedule/exceptions/{exception}', [VenuesController::class, 'updateScheduleException'])
+        ->middleware('auth')
+        ->name('venues.schedule.exceptions.update');
+    Route::delete('/{type}/{venue}/schedule/exceptions/{exception}', [VenuesController::class, 'destroyScheduleException'])
+        ->middleware('auth')
+        ->name('venues.schedule.exceptions.destroy');
     Route::get('/{type}/{venue}/contracts', [VenuesController::class, 'contracts'])
         ->middleware('auth')
         ->name('venues.contracts');

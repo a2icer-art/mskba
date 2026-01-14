@@ -15,6 +15,10 @@ use App\Domain\Permissions\Registry\PermissionRegistry;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueSchedule;
+use App\Domain\Venues\Models\VenueScheduleException;
+use App\Domain\Venues\Models\VenueScheduleExceptionInterval;
+use App\Domain\Venues\Models\VenueScheduleInterval;
 use App\Domain\Venues\Services\VenueCatalogService;
 use App\Domain\Venues\UseCases\CreateVenue;
 use App\Domain\Venues\UseCases\UpdateVenue;
@@ -31,6 +35,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class VenuesController extends Controller
@@ -271,6 +276,367 @@ class VenuesController extends Controller
         ]);
     }
 
+    public function schedule(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+        $venue->loadMissing(['venueType:id,name,plural_name,alias']);
+
+        $schedule = VenueSchedule::query()
+            ->where('venue_id', $venue->id)
+            ->with(['intervals', 'exceptions.intervals'])
+            ->first();
+
+        $navigation = app(VenueSidebarPresenter::class)->present([
+            'title' => 'Площадки',
+            'typeSlug' => $type,
+            'venue' => $venue,
+            'user' => $user,
+        ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Расписание',
+        ])['data'];
+
+        $weeklyIntervals = [];
+        if ($schedule) {
+            $weeklyIntervals = $schedule->intervals
+                ->groupBy('day_of_week')
+                ->map(function ($items) {
+                    return $items
+                        ->sortBy('starts_at')
+                        ->map(fn (VenueScheduleInterval $interval) => [
+                            'id' => $interval->id,
+                            'day_of_week' => $interval->day_of_week,
+                            'starts_at' => $this->formatTime($interval->starts_at),
+                            'ends_at' => $this->formatTime($interval->ends_at),
+                        ])
+                        ->values()
+                        ->all();
+                })
+                ->all();
+        }
+
+        $exceptions = [];
+        if ($schedule) {
+            $exceptions = $schedule->exceptions
+                ->sortBy('date')
+                ->map(function (VenueScheduleException $exception) {
+                    return [
+                        'id' => $exception->id,
+                        'date' => $exception->date?->toDateString(),
+                        'is_closed' => (bool) $exception->is_closed,
+                        'comment' => $exception->comment,
+                        'intervals' => $exception->intervals
+                            ->sortBy('starts_at')
+                            ->map(fn (VenueScheduleExceptionInterval $interval) => [
+                                'id' => $interval->id,
+                                'starts_at' => $this->formatTime($interval->starts_at),
+                                'ends_at' => $this->formatTime($interval->ends_at),
+                            ])
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        $checker = app(PermissionChecker::class);
+        $canManage = $user
+            && $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
+
+        return Inertia::render('VenueSchedule', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'schedule' => $schedule
+                ? [
+                    'id' => $schedule->id,
+                    'timezone' => $schedule->timezone,
+                ]
+                : null,
+            'weeklyIntervals' => $weeklyIntervals,
+            'exceptions' => $exceptions,
+            'canManage' => $canManage,
+            'daysOfWeek' => $this->weekDays(),
+            'navigation' => $navigation,
+            'activeHref' => "/venues/{$type}/{$venue->alias}/schedule",
+            'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function storeScheduleInterval(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $data = $request->validate([
+            'day_of_week' => ['required', 'integer', 'between:1,7'],
+            'starts_at' => ['required', 'date_format:H:i'],
+            'ends_at' => ['required', 'date_format:H:i'],
+        ]);
+
+        $schedule = $this->resolveSchedule($venue);
+        $this->ensureIntervalValid($data['starts_at'], $data['ends_at']);
+        $this->ensureWeeklyIntervalAvailability($schedule, $data['day_of_week'], $data['starts_at'], $data['ends_at']);
+
+        $schedule->intervals()->create([
+            'day_of_week' => $data['day_of_week'],
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+        ]);
+
+        return back()->with('notice', 'Интервал добавлен.');
+    }
+
+    public function updateScheduleInterval(Request $request, string $type, Venue $venue, VenueScheduleInterval $interval)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $schedule = $interval->schedule;
+        if (!$schedule || $schedule->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'day_of_week' => ['required', 'integer', 'between:1,7'],
+            'starts_at' => ['required', 'date_format:H:i'],
+            'ends_at' => ['required', 'date_format:H:i'],
+        ]);
+
+        $this->ensureIntervalValid($data['starts_at'], $data['ends_at']);
+        $this->ensureWeeklyIntervalAvailability($schedule, $data['day_of_week'], $data['starts_at'], $data['ends_at'], $interval->id);
+
+        $interval->update([
+            'day_of_week' => $data['day_of_week'],
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+        ]);
+
+        return back()->with('notice', 'Интервал обновлен.');
+    }
+
+    public function destroyScheduleInterval(Request $request, string $type, Venue $venue, VenueScheduleInterval $interval)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $schedule = $interval->schedule;
+        if (!$schedule || $schedule->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        $interval->delete();
+
+        return back()->with('notice', 'Интервал удален.');
+    }
+
+    public function storeScheduleException(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'is_closed' => ['boolean'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'intervals' => ['array'],
+            'intervals.*.starts_at' => ['required_with:intervals', 'date_format:H:i'],
+            'intervals.*.ends_at' => ['required_with:intervals', 'date_format:H:i'],
+        ]);
+
+        $schedule = $this->resolveSchedule($venue);
+        $isClosed = (bool) ($data['is_closed'] ?? false);
+        $intervals = $data['intervals'] ?? [];
+
+        if ($isClosed && $intervals !== []) {
+            throw ValidationException::withMessages([
+                'intervals' => 'Для закрытой даты интервалы не задаются.',
+            ]);
+        }
+
+        if (!$isClosed && $intervals === []) {
+            throw ValidationException::withMessages([
+                'intervals' => 'Добавьте хотя бы один интервал.',
+            ]);
+        }
+
+        $this->ensureExceptionIntervalsValid($intervals);
+
+        $exists = VenueScheduleException::query()
+            ->where('schedule_id', $schedule->id)
+            ->where('date', $data['date'])
+            ->exists();
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'date' => 'Исключение для этой даты уже существует.',
+            ]);
+        }
+
+        $exception = $schedule->exceptions()->create([
+            'date' => $data['date'],
+            'is_closed' => $isClosed,
+            'comment' => $data['comment'] ?? null,
+        ]);
+
+        if (!$isClosed && $intervals !== []) {
+            foreach ($intervals as $interval) {
+                $exception->intervals()->create([
+                    'starts_at' => $interval['starts_at'],
+                    'ends_at' => $interval['ends_at'],
+                ]);
+            }
+        }
+
+        return back()->with('notice', 'Исключение добавлено.');
+    }
+
+    public function updateScheduleException(Request $request, string $type, Venue $venue, VenueScheduleException $exception)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $schedule = $exception->schedule;
+        if (!$schedule || $schedule->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'is_closed' => ['boolean'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'intervals' => ['array'],
+            'intervals.*.starts_at' => ['required_with:intervals', 'date_format:H:i'],
+            'intervals.*.ends_at' => ['required_with:intervals', 'date_format:H:i'],
+        ]);
+
+        $isClosed = (bool) ($data['is_closed'] ?? false);
+        $intervals = $data['intervals'] ?? [];
+
+        if ($isClosed && $intervals !== []) {
+            throw ValidationException::withMessages([
+                'intervals' => 'Для закрытой даты интервалы не задаются.',
+            ]);
+        }
+
+        if (!$isClosed && $intervals === []) {
+            throw ValidationException::withMessages([
+                'intervals' => 'Добавьте хотя бы один интервал.',
+            ]);
+        }
+
+        $this->ensureExceptionIntervalsValid($intervals);
+
+        $dateExists = VenueScheduleException::query()
+            ->where('schedule_id', $schedule->id)
+            ->where('date', $data['date'])
+            ->where('id', '!=', $exception->id)
+            ->exists();
+        if ($dateExists) {
+            throw ValidationException::withMessages([
+                'date' => 'Исключение для этой даты уже существует.',
+            ]);
+        }
+
+        $exception->update([
+            'date' => $data['date'],
+            'is_closed' => $isClosed,
+            'comment' => $data['comment'] ?? null,
+        ]);
+
+        $exception->intervals()->delete();
+
+        if (!$isClosed && $intervals !== []) {
+            foreach ($intervals as $interval) {
+                $exception->intervals()->create([
+                    'starts_at' => $interval['starts_at'],
+                    'ends_at' => $interval['ends_at'],
+                ]);
+            }
+        }
+
+        return back()->with('notice', 'Исключение обновлено.');
+    }
+
+    public function destroyScheduleException(Request $request, string $type, Venue $venue, VenueScheduleException $exception)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        $schedule = $exception->schedule;
+        if (!$schedule || $schedule->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        $exception->delete();
+
+        return back()->with('notice', 'Исключение удалено.');
+    }
+
     public function updateContractPermissions(
         Request $request,
         string $type,
@@ -466,6 +832,118 @@ class VenuesController extends Controller
                 ]
             );
         }
+    }
+
+    private function resolveSchedule(Venue $venue): VenueSchedule
+    {
+        return VenueSchedule::query()->firstOrCreate(
+            ['venue_id' => $venue->id],
+            ['timezone' => 'UTC+3']
+        );
+    }
+
+    private function ensureCanManageSchedule(\App\Models\User $user, Venue $venue): void
+    {
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueScheduleManage, $venue)) {
+            abort(403);
+        }
+    }
+
+    private function ensureIntervalValid(string $startsAt, string $endsAt): void
+    {
+        if ($this->timeToMinutes($startsAt) >= $this->timeToMinutes($endsAt)) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'Время начала должно быть меньше времени окончания.',
+            ]);
+        }
+    }
+
+    private function ensureWeeklyIntervalAvailability(
+        VenueSchedule $schedule,
+        int $dayOfWeek,
+        string $startsAt,
+        string $endsAt,
+        ?int $ignoreId = null
+    ): void {
+        $existing = $schedule->intervals()
+            ->where('day_of_week', $dayOfWeek)
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->get(['starts_at', 'ends_at']);
+
+        foreach ($existing as $interval) {
+            if ($this->hasOverlap($startsAt, $endsAt, $interval->starts_at, $interval->ends_at)) {
+                throw ValidationException::withMessages([
+                    'starts_at' => 'Интервал пересекается с существующим.',
+                ]);
+            }
+        }
+    }
+
+    private function ensureExceptionIntervalsValid(array $intervals): void
+    {
+        if ($intervals === []) {
+            return;
+        }
+
+        $normalized = [];
+        foreach ($intervals as $interval) {
+            $startsAt = $interval['starts_at'] ?? '';
+            $endsAt = $interval['ends_at'] ?? '';
+            $this->ensureIntervalValid($startsAt, $endsAt);
+            $normalized[] = [$startsAt, $endsAt];
+        }
+
+        $count = count($normalized);
+        for ($i = 0; $i < $count; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                if ($this->hasOverlap($normalized[$i][0], $normalized[$i][1], $normalized[$j][0], $normalized[$j][1])) {
+                    throw ValidationException::withMessages([
+                        'intervals' => 'Интервалы исключения пересекаются.',
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function hasOverlap(string $startA, string $endA, string $startB, string $endB): bool
+    {
+        $aStart = $this->timeToMinutes($startA);
+        $aEnd = $this->timeToMinutes($endA);
+        $bStart = $this->timeToMinutes($startB);
+        $bEnd = $this->timeToMinutes($endB);
+
+        return $aStart < $bEnd && $aEnd > $bStart;
+    }
+
+    private function timeToMinutes(string $time): int
+    {
+        $chunk = substr($time, 0, 5);
+        [$hours, $minutes] = array_pad(explode(':', $chunk, 2), 2, 0);
+
+        return ((int) $hours) * 60 + (int) $minutes;
+    }
+
+    private function formatTime(?string $time): string
+    {
+        if (!$time) {
+            return '';
+        }
+
+        return substr($time, 0, 5);
+    }
+
+    private function weekDays(): array
+    {
+        return [
+            ['value' => 1, 'label' => 'Понедельник'],
+            ['value' => 2, 'label' => 'Вторник'],
+            ['value' => 3, 'label' => 'Среда'],
+            ['value' => 4, 'label' => 'Четверг'],
+            ['value' => 5, 'label' => 'Пятница'],
+            ['value' => 6, 'label' => 'Суббота'],
+            ['value' => 7, 'label' => 'Воскресенье'],
+        ];
     }
 
     public function store(StoreVenueRequest $request, CreateVenue $useCase)

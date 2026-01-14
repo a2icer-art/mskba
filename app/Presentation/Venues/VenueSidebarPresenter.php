@@ -35,6 +35,10 @@ class VenueSidebarPresenter extends BasePresenter
                         'label' => 'Общая информация',
                         'href' => "/venues/{$typeSlug}/{$venue->alias}",
                     ],
+                    [
+                        'label' => 'Расписание',
+                        'href' => "/venues/{$typeSlug}/{$venue->alias}/schedule",
+                    ],
                 ],
             ],
         ];
