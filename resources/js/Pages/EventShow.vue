@@ -1,0 +1,269 @@
+<script setup>
+import { computed, ref } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
+import Breadcrumbs from '../Components/Breadcrumbs.vue';
+import MainFooter from '../Components/MainFooter.vue';
+import MainHeader from '../Components/MainHeader.vue';
+
+const props = defineProps({
+    appName: {
+        type: String,
+        default: 'Laravel',
+    },
+    event: {
+        type: Object,
+        default: null,
+    },
+    bookings: {
+        type: Array,
+        default: () => [],
+    },
+    venues: {
+        type: Array,
+        default: () => [],
+    },
+    canBook: {
+        type: Boolean,
+        default: false,
+    },
+    breadcrumbs: {
+        type: Array,
+        default: () => [],
+    },
+});
+
+const page = usePage();
+const actionNotice = computed(() => page.props?.flash?.notice ?? '');
+const actionError = computed(() => page.props?.errors?.booking ?? '');
+const hasBookings = computed(() => props.bookings.length > 0);
+
+const bookingOpen = ref(false);
+const bookingForm = useForm({
+    venue_id: '',
+    starts_at: '',
+    ends_at: '',
+});
+
+const openBooking = () => {
+    bookingForm.clearErrors();
+    if (!bookingForm.venue_id && props.venues.length) {
+        bookingForm.venue_id = props.venues[0].id;
+    }
+    if (!bookingForm.starts_at && props.event?.starts_at) {
+        bookingForm.starts_at = toLocalInput(props.event.starts_at);
+    }
+    if (!bookingForm.ends_at && props.event?.ends_at) {
+        bookingForm.ends_at = toLocalInput(props.event.ends_at);
+    }
+    bookingOpen.value = true;
+};
+
+const closeBooking = () => {
+    bookingForm.reset('venue_id', 'starts_at', 'ends_at');
+    bookingForm.clearErrors();
+    bookingOpen.value = false;
+};
+
+const submitBooking = () => {
+    bookingForm.post(`/events/${props.event?.id}/bookings`, {
+        preserveScroll: true,
+        onSuccess: closeBooking,
+    });
+};
+
+const isBookingDisabled = computed(() => {
+    if (bookingForm.processing) {
+        return true;
+    }
+    return !bookingForm.venue_id || !bookingForm.starts_at || !bookingForm.ends_at;
+});
+
+const formatDateTime = (value) => {
+    if (!value) {
+        return '—';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString('ru-RU');
+};
+
+const toLocalInput = (value) => {
+    if (!value) {
+        return '';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+</script>
+
+<template>
+    <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
+        <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
+
+        <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
+            <MainHeader
+                :app-name="appName"
+                :is-authenticated="Boolean($page.props.auth?.user)"
+                :login-label="$page.props.auth?.user?.login"
+            />
+
+            <main class="grid gap-6">
+                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
+                    <Breadcrumbs :items="breadcrumbs" />
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h1 class="text-3xl font-semibold text-slate-900">
+                                {{ event?.title || 'Событие' }}
+                            </h1>
+                            <p class="mt-2 text-sm text-slate-600">
+                                {{ event?.type?.label || 'Тип не задан' }}
+                            </p>
+                        </div>
+                        <button
+                            v-if="canBook"
+                            class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                            type="button"
+                            @click="openBooking"
+                        >
+                            Забронировать площадку
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+                        <div>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Начало</span>
+                            <div>{{ formatDateTime(event?.starts_at) }}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Окончание</span>
+                            <div>{{ formatDateTime(event?.ends_at) }}</div>
+                        </div>
+                    </div>
+
+                    <div v-if="actionNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        {{ actionNotice }}
+                    </div>
+                    <div v-if="actionError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {{ actionError }}
+                    </div>
+
+                    <section class="mt-8">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-lg font-semibold text-slate-900">Бронирования</h2>
+                        </div>
+
+                        <div v-if="!hasBookings" class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                            Бронирования пока не созданы.
+                        </div>
+                        <div v-else class="mt-4 grid gap-3">
+                            <div
+                                v-for="booking in bookings"
+                                :key="booking.id"
+                                class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                            >
+                                <div class="flex flex-wrap items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-900">
+                                            {{ booking.venue?.name || 'Площадка' }}
+                                        </p>
+                                        <p class="mt-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                            {{ booking.status }}
+                                        </p>
+                                    </div>
+                                    <div class="text-sm text-slate-700">
+                                        {{ formatDateTime(booking.starts_at) }} – {{ formatDateTime(booking.ends_at) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+
+            <MainFooter :app-name="appName" />
+        </div>
+    </div>
+
+    <div v-if="bookingOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: bookingForm.processing }" @submit.prevent="submitBooking">
+                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Новое бронирование</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeBooking"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="grid gap-3">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Площадка
+                            <select
+                                v-model="bookingForm.venue_id"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            >
+                                <option value="">Выберите площадку</option>
+                                <option v-for="venue in venues" :key="venue.id" :value="venue.id">
+                                    {{ venue.name }}
+                                </option>
+                            </select>
+                        </label>
+                        <div v-if="bookingForm.errors.venue_id" class="text-xs text-rose-700">
+                            {{ bookingForm.errors.venue_id }}
+                        </div>
+
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Начало
+                                <input
+                                    v-model="bookingForm.starts_at"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    type="datetime-local"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Окончание
+                                <input
+                                    v-model="bookingForm.ends_at"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    type="datetime-local"
+                                />
+                            </label>
+                        </div>
+                        <div v-if="bookingForm.errors.starts_at || bookingForm.errors.ends_at" class="text-xs text-rose-700">
+                            {{ bookingForm.errors.starts_at || bookingForm.errors.ends_at }}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="bookingForm.processing"
+                        @click="closeBooking"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="isBookingDisabled"
+                    >
+                        Создать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</template>

@@ -17,9 +17,12 @@ defineProps({
         >
             Площадки
         </Link>
-        <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
-            Матчи
-        </a>
+        <Link
+            class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300"
+            href="/events"
+        >
+            События
+        </Link>
         <a class="rounded-full border border-slate-200 bg-white/80 px-4 py-2 transition hover:-translate-y-0.5 hover:border-slate-300" href="#">
             Турниры
         </a>
