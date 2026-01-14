@@ -84,9 +84,10 @@
   - Единый реестр прав и базовые пресеты для ролей.
 - `PermissionChecker`
   - Доменная проверка прав (global и resource).
-- Интеграция с Laravel
-  - Policy для ресурсных прав (например, `VenuePolicy`).
-  - Gate для глобальных прав (`admin.access`, `moderation.access`, `logs.view`).
+  - Интеграция с Laravel
+    - Policy для ресурсных прав (например, `VenuePolicy`).
+    - Gate для глобальных прав (`admin.access`, `moderation.access`, `logs.view`).
+    - Middleware `confirmed.role:<min>` для проверки статуса confirmed и минимального role_level.
   - Доступы в UI и маршрутах должны опираться на permissions (например, `can:venue.create`).
   - Отправка площадки на модерацию контролируется ресурсным правом `venue.submit_for_moderation`.
 

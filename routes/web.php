@@ -81,7 +81,7 @@ Route::get('/integrations/user-suggest', UserSuggestController::class)
     ->middleware('auth')
     ->name('integrations.user-suggest');
 
-Route::middleware(['auth', 'can:moderation.access'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');
     Route::get('/users-moderation', [AdminUsersModerationController::class, 'index'])
         ->name('admin.users.moderation');
