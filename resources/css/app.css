@@ -35,6 +35,10 @@
     .input-predictive.is-loading {
         background-image: url("../images/loading.gif");
     }
+
+    .popup-body {
+        padding-bottom: 50px;
+    }
 }
 
 @layer utilities {

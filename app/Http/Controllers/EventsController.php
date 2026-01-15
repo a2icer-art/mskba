@@ -11,6 +11,8 @@ use App\Domain\Venues\Models\Venue;
 use App\Presentation\Breadcrumbs\EventBreadcrumbsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class EventsController extends Controller
@@ -58,6 +60,7 @@ class EventsController extends Controller
             ->all();
 
         $canCreate = $user && $checker->can($user, PermissionCode::EventCreate);
+        $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present()['data'];
 
         return Inertia::render('Events', [
@@ -65,6 +68,7 @@ class EventsController extends Controller
             'events' => $events,
             'eventTypes' => $eventTypes,
             'canCreate' => $canCreate,
+            'canBook' => $canBook,
             'breadcrumbs' => $breadcrumbs,
         ]);
     }
@@ -82,6 +86,7 @@ class EventsController extends Controller
                 'title' => ['nullable', 'string', 'max:255'],
                 'starts_at' => ['required', 'date'],
                 'ends_at' => ['required', 'date'],
+                'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
             ]
         );
 
@@ -106,18 +111,55 @@ class EventsController extends Controller
         }
 
         $title = $data['title'] ?: $type->label;
+        $venue = null;
+        if (!empty($data['venue_id'])) {
+            $checker = app(PermissionChecker::class);
+            if (!$checker->can($user, PermissionCode::VenueBooking)) {
+                return back()->withErrors(['venue_id' => 'Недостаточно прав для бронирования площадки.']);
+            }
 
-        $event = Event::query()->create([
-            'event_type_id' => $type->id,
-            'organizer_id' => $user->id,
-            'status' => 'draft',
-            'title' => $title,
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-            'timezone' => 'UTC+3',
-        ]);
+            $gameTypeCodes = ['game', 'training', 'game_training'];
+            if (!in_array($type->code, $gameTypeCodes, true)) {
+                return back()->withErrors(['venue_id' => 'Площадка доступна только для игровых типов событий.']);
+            }
 
-        return redirect()->route('events.show', $event)->with('notice', 'Событие создано.');
+            $venue = Venue::query()
+                ->visibleFor($user)
+                ->whereKey($data['venue_id'])
+                ->first();
+
+            if (!$venue) {
+                return back()->withErrors(['venue_id' => 'Площадка не найдена.']);
+            }
+        }
+
+        try {
+            $event = DB::transaction(function () use ($type, $user, $title, $startsAt, $endsAt, $venue): Event {
+                $event = Event::query()->create([
+                    'event_type_id' => $type->id,
+                    'organizer_id' => $user->id,
+                    'status' => 'draft',
+                    'title' => $title,
+                    'starts_at' => $startsAt,
+                    'ends_at' => $endsAt,
+                    'timezone' => 'UTC+3',
+                ]);
+
+                if ($venue) {
+                    app(EventBookingService::class)->create($event, $venue, $user->id, $startsAt, $endsAt);
+                }
+
+                return $event;
+            });
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        }
+
+        $notice = $venue
+            ? 'Событие и бронирование созданы.'
+            : 'Событие создано.';
+
+        return redirect()->route('events.show', $event)->with('notice', $notice);
     }
 
     public function show(Request $request, Event $event)
@@ -143,16 +185,6 @@ class EventsController extends Controller
                         : null,
                 ];
             })
-            ->all();
-
-        $venues = Venue::query()
-            ->visibleFor($user)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(static fn (Venue $venue) => [
-                'id' => $venue->id,
-                'name' => $venue->name,
-            ])
             ->all();
 
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
@@ -183,7 +215,6 @@ class EventsController extends Controller
                     : null,
             ],
             'bookings' => $bookings,
-            'venues' => $venues,
             'canBook' => $canBook,
             'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,

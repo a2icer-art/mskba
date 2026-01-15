@@ -13,6 +13,7 @@ use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Permissions\Registry\PermissionRegistry;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Domain\Events\Models\EventBooking;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSchedule;
@@ -346,6 +347,17 @@ class VenuesController extends Controller
                 ->all();
         }
 
+        $bookingDates = EventBooking::query()
+            ->where('venue_id', $venue->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->orderBy('starts_at')
+            ->get(['starts_at'])
+            ->map(static fn (EventBooking $booking) => $booking->starts_at?->toDateString())
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $checker = app(PermissionChecker::class);
         $canManage = $user
             && $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
@@ -365,6 +377,7 @@ class VenuesController extends Controller
                 : null,
             'weeklyIntervals' => $weeklyIntervals,
             'exceptions' => $exceptions,
+            'bookingDates' => $bookingDates,
             'canManage' => $canManage,
             'daysOfWeek' => $this->weekDays(),
             'navigation' => $navigation,

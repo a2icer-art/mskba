@@ -12,6 +12,7 @@ use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\Integrations\UserSuggestController;
+use App\Http\Controllers\Integrations\VenueSuggestController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Support\Facades\Route;
@@ -102,6 +103,9 @@ Route::get('/integrations/address-suggest', AddressSuggestController::class)
 Route::get('/integrations/user-suggest', UserSuggestController::class)
     ->middleware('auth')
     ->name('integrations.user-suggest');
+Route::get('/integrations/venue-suggest', VenueSuggestController::class)
+    ->middleware('auth')
+    ->name('integrations.venue-suggest');
 
 Route::get('/events', [EventsController::class, 'index'])
     ->name('events.index');

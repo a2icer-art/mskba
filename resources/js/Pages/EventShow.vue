@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
@@ -15,10 +15,6 @@ const props = defineProps({
         default: null,
     },
     bookings: {
-        type: Array,
-        default: () => [],
-    },
-    venues: {
         type: Array,
         default: () => [],
     },
@@ -45,31 +41,45 @@ const bookingOpen = ref(false);
 const deleteOpen = ref(false);
 const bookingForm = useForm({
     venue_id: '',
+    date: '',
+    starts_time: '',
+    ends_time: '',
     starts_at: '',
     ends_at: '',
 });
+const venueQuery = ref('');
+const venueSuggestions = ref([]);
+const venueSuggestLoading = ref(false);
+const venueSuggestError = ref('');
+let venueSuggestTimer = null;
+let venueSuggestRequestId = 0;
 
 const openBooking = () => {
     bookingForm.clearErrors();
-    if (!bookingForm.venue_id && props.venues.length) {
-        bookingForm.venue_id = props.venues[0].id;
+    if (!bookingForm.date && props.event?.starts_at) {
+        bookingForm.date = toLocalDate(props.event.starts_at);
     }
-    if (!bookingForm.starts_at && props.event?.starts_at) {
-        bookingForm.starts_at = toLocalInput(props.event.starts_at);
+    if (!bookingForm.starts_time && props.event?.starts_at) {
+        bookingForm.starts_time = toLocalTime(props.event.starts_at);
     }
-    if (!bookingForm.ends_at && props.event?.ends_at) {
-        bookingForm.ends_at = toLocalInput(props.event.ends_at);
+    if (!bookingForm.ends_time && props.event?.ends_at) {
+        bookingForm.ends_time = toLocalTime(props.event.ends_at);
     }
     bookingOpen.value = true;
 };
 
 const closeBooking = () => {
-    bookingForm.reset('venue_id', 'starts_at', 'ends_at');
+    bookingForm.reset('venue_id', 'date', 'starts_time', 'ends_time', 'starts_at', 'ends_at');
     bookingForm.clearErrors();
+    venueQuery.value = '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
     bookingOpen.value = false;
 };
 
 const submitBooking = () => {
+    bookingForm.starts_at = combineDateTime(bookingForm.date, bookingForm.starts_time);
+    bookingForm.ends_at = combineDateTime(bookingForm.date, bookingForm.ends_time);
     bookingForm.post(`/events/${props.event?.id}/bookings`, {
         preserveScroll: true,
         onSuccess: closeBooking,
@@ -97,8 +107,63 @@ const isBookingDisabled = computed(() => {
     if (bookingForm.processing) {
         return true;
     }
-    return !bookingForm.venue_id || !bookingForm.starts_at || !bookingForm.ends_at;
+    return !bookingForm.venue_id || !bookingForm.date || !bookingForm.starts_time || !bookingForm.ends_time;
 });
+
+const scheduleVenueSuggestions = (value) => {
+    bookingForm.venue_id = '';
+    venueSuggestError.value = '';
+    if (venueSuggestTimer) {
+        clearTimeout(venueSuggestTimer);
+    }
+    if (!value || value.trim().length < 2) {
+        venueSuggestLoading.value = false;
+        venueSuggestions.value = [];
+        return;
+    }
+    venueSuggestTimer = setTimeout(() => {
+        fetchVenueSuggestions(value.trim());
+    }, 250);
+};
+
+const fetchVenueSuggestions = async (query) => {
+    const requestId = ++venueSuggestRequestId;
+    venueSuggestLoading.value = true;
+    try {
+        const response = await fetch(`/integrations/venue-suggest?query=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error('suggest_failed');
+        }
+        const data = await response.json();
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = data?.suggestions ?? [];
+    } catch (error) {
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = [];
+        venueSuggestError.value = 'Не удалось получить подсказки площадок.';
+    } finally {
+        if (requestId === venueSuggestRequestId) {
+            venueSuggestLoading.value = false;
+        }
+    }
+};
+
+const applyVenueSuggestion = (suggestion) => {
+    bookingForm.venue_id = suggestion.id;
+    venueQuery.value = suggestion.label || suggestion.name || '';
+    venueSuggestions.value = [];
+};
+
+const clearVenueSelection = () => {
+    bookingForm.venue_id = '';
+    venueQuery.value = '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
+};
 
 const formatDateTime = (value) => {
     if (!value) {
@@ -111,7 +176,7 @@ const formatDateTime = (value) => {
     return date.toLocaleString('ru-RU');
 };
 
-const toLocalInput = (value) => {
+const toLocalDate = (value) => {
     if (!value) {
         return '';
     }
@@ -120,7 +185,26 @@ const toLocalInput = (value) => {
         return '';
     }
     const pad = (number) => String(number).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const toLocalTime = (value) => {
+    if (!value) {
+        return '';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const combineDateTime = (date, time) => {
+    if (!date || !time) {
+        return '';
+    }
+    return `${date}T${time}`;
 };
 </script>
 
@@ -139,8 +223,8 @@ const toLocalInput = (value) => {
             <main class="grid gap-6">
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex-1">
                             <h1 class="text-3xl font-semibold text-slate-900">
                                 {{ event?.title || 'Событие' }}
                             </h1>
@@ -148,22 +232,24 @@ const toLocalInput = (value) => {
                                 {{ event?.type?.label || 'Тип не задан' }}
                             </p>
                         </div>
-                        <button
-                            v-if="canBook"
-                            class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                            type="button"
-                            @click="openBooking"
-                        >
-                            Забронировать площадку
-                        </button>
-                        <button
-                            v-if="canDelete"
-                            class="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
-                            type="button"
-                            @click="openDelete"
-                        >
-                            Удалить событие
-                        </button>
+                        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                            <button
+                                v-if="canDelete"
+                                class="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                type="button"
+                                @click="openDelete"
+                            >
+                                Удалить событие
+                            </button>
+                            <button
+                                v-if="canBook"
+                                class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                                type="button"
+                                @click="openBooking"
+                            >
+                                Забронировать площадку
+                            </button>
+                        </div>
                     </div>
 
                     <div class="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
@@ -224,7 +310,7 @@ const toLocalInput = (value) => {
     <div v-if="bookingOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
         <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
             <form :class="{ loading: bookingForm.processing }" @submit.prevent="submitBooking">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">Новое бронирование</h2>
                     <button
                         class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -235,39 +321,78 @@ const toLocalInput = (value) => {
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <div class="grid gap-3">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Площадка
-                            <select
-                                v-model="bookingForm.venue_id"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        <div class="relative">
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Площадка
+                                <input
+                                    v-model="venueQuery"
+                                    class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    type="text"
+                                    placeholder="Начните вводить название, метро или адрес"
+                                    @input="scheduleVenueSuggestions($event.target.value)"
+                                />
+                            </label>
+                            <div
+                                v-if="venueSuggestError"
+                                class="text-xs text-rose-700"
                             >
-                                <option value="">Выберите площадку</option>
-                                <option v-for="venue in venues" :key="venue.id" :value="venue.id">
-                                    {{ venue.name }}
-                                </option>
-                            </select>
-                        </label>
-                        <div v-if="bookingForm.errors.venue_id" class="text-xs text-rose-700">
-                            {{ bookingForm.errors.venue_id }}
+                                {{ venueSuggestError }}
+                            </div>
+                            <div
+                                v-else-if="!venueSuggestLoading && venueSuggestions.length"
+                                class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                            >
+                                <button
+                                    v-for="(suggestion, index) in venueSuggestions"
+                                    :key="`${suggestion.id}-${index}`"
+                                    class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                    type="button"
+                                    @click="applyVenueSuggestion(suggestion)"
+                                >
+                                    {{ suggestion.label }}
+                                </button>
+                            </div>
+                            <div v-if="bookingForm.venue_id" class="flex items-center justify-between text-xs text-slate-500">
+                                <span>Площадка выбрана.</span>
+                                <button
+                                    class="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
+                                    type="button"
+                                    @click="clearVenueSelection"
+                                >
+                                    Очистить
+                                </button>
+                            </div>
+                            <div v-if="bookingForm.errors.venue_id" class="text-xs text-rose-700">
+                                {{ bookingForm.errors.venue_id }}
+                            </div>
                         </div>
 
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Дата
+                            <input
+                                v-model="bookingForm.date"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="date"
+                            />
+                        </label>
                         <div class="grid gap-3 md:grid-cols-2">
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Начало
                                 <input
-                                    v-model="bookingForm.starts_at"
+                                    v-model="bookingForm.starts_time"
                                     class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    type="datetime-local"
+                                    type="time"
                                 />
                             </label>
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Окончание
                                 <input
-                                    v-model="bookingForm.ends_at"
+                                    v-model="bookingForm.ends_time"
                                     class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    type="datetime-local"
+                                    type="time"
                                 />
                             </label>
                         </div>
@@ -276,7 +401,7 @@ const toLocalInput = (value) => {
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -300,7 +425,7 @@ const toLocalInput = (value) => {
     <div v-if="deleteOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
         <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
             <form :class="{ loading: deleteForm.processing }" @submit.prevent="submitDelete">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">Удалить событие</h2>
                     <button
                         class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -311,12 +436,12 @@ const toLocalInput = (value) => {
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <p class="text-sm text-slate-600">
                         Вы уверены, что хотите удалить событие «{{ event?.title || 'Событие' }}»?
                     </p>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -337,3 +462,4 @@ const toLocalInput = (value) => {
         </div>
     </div>
 </template>
+

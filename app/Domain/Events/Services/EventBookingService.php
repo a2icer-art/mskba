@@ -68,7 +68,9 @@ class EventBookingService
         }
 
         $date = $startsAt->toDateString();
-        $exception = $schedule->exceptions->firstWhere('date', $date);
+        $exception = $schedule->exceptions->first(function ($item) use ($date) {
+            return $item->date?->toDateString() === $date;
+        });
 
         if ($exception && $exception->is_closed) {
             throw ValidationException::withMessages([
@@ -89,7 +91,7 @@ class EventBookingService
             ]);
         }
 
-        $fitsInterval = $intervals->contains(function (VenueScheduleInterval $interval) use ($startsAt, $endsAt): bool {
+        $fitsInterval = $intervals->contains(function ($interval) use ($startsAt, $endsAt): bool {
             $startMinutes = $this->timeToMinutes($startsAt->format('H:i'));
             $endMinutes = $this->timeToMinutes($endsAt->format('H:i'));
             $intervalStart = $this->timeToMinutes($interval->starts_at);

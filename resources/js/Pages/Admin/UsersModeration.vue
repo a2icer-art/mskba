@@ -486,7 +486,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         <div v-if="rejectOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: rejectForm.processing }" @submit.prevent="submitReject">
-                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <h2 class="text-lg font-semibold text-slate-900">Отклонить заявку</h2>
                         <button
                             class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -497,7 +497,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             x
                         </button>
                     </div>
-                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                         <p class="text-sm text-slate-600">
                             Вы можете указать причину отклонения. Она будет показана пользователю.
                         </p>
@@ -510,7 +510,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             {{ rejectForm.errors.reason }}
                         </div>
                     </div>
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
                             class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                             type="button"
@@ -534,7 +534,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         <div v-if="approveOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: approveForm.processing }" @submit.prevent="submitApprove">
-                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <h2 class="text-lg font-semibold text-slate-900">Подтвердить пользователя</h2>
                         <button
                             class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -545,7 +545,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             x
                         </button>
                     </div>
-                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                         <p class="text-sm text-slate-600">
                             Пользователь будет подтвержден, а заявка переведена в статус "Подтверждено".
                         </p>
@@ -621,7 +621,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             </div>
                         </div>
                     </div>
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
                             class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                             type="button"
@@ -645,7 +645,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         <div v-if="blockOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: blockForm.processing }" @submit.prevent="submitBlock">
-                    <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <h2 class="text-lg font-semibold text-slate-900">Заблокировать пользователя</h2>
                         <button
                             class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -656,7 +656,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             x
                         </button>
                     </div>
-                    <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                         <p class="text-sm text-slate-600">
                             Укажите причину блокировки (необязательно). Она может быть использована в коммуникации с пользователем.
                         </p>
@@ -669,7 +669,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                             {{ blockForm.errors.reason }}
                         </div>
                     </div>
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
                             class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                             type="button"
@@ -692,7 +692,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 
         <div v-if="viewOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">Данные пользователя</h2>
                     <button
                         class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -703,7 +703,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
@@ -777,7 +777,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -799,4 +799,5 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
     </div>
 </template>
+
 

@@ -162,7 +162,7 @@ const formatValue = (value) => {
 
         <div v-if="logOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-xl">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">Детали лога</h2>
                     <button
                         class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -173,7 +173,7 @@ const formatValue = (value) => {
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <p class="text-sm text-slate-600">
                         {{ selectedLog?.entity_label || '—' }} • #{{ selectedLog?.entity_id || '—' }}
                     </p>
@@ -223,7 +223,7 @@ const formatValue = (value) => {
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -236,4 +236,5 @@ const formatValue = (value) => {
         </div>
     </div>
 </template>
+
 

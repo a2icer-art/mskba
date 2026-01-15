@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
@@ -30,6 +30,10 @@ const props = defineProps({
     canManage: {
         type: Boolean,
         default: false,
+    },
+    bookingDates: {
+        type: Array,
+        default: () => [],
     },
     daysOfWeek: {
         type: Array,
@@ -83,6 +87,7 @@ const hasExceptionData = computed(() => {
     return Boolean(editExceptionTarget.value || exceptionForm.intervals.length || exceptionForm.is_closed || exceptionForm.comment);
 });
 const now = new Date();
+const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const calendarDate = ref(new Date(now.getFullYear(), now.getMonth(), 1));
 const monthNames = [
     'Январь',
@@ -133,6 +138,7 @@ const closedWeekDays = computed(() => {
     });
     return days;
 });
+const bookingDatesSet = computed(() => new Set(props.bookingDates ?? []));
 const calendarDays = computed(() => {
     const current = calendarDate.value;
     const year = current.getFullYear();
@@ -153,6 +159,8 @@ const calendarDays = computed(() => {
             exception: exceptionByDate.value.get(date) || null,
             isClosedByWeek: closedWeekDays.value.has(dayOfWeek),
             isOpenByWeek: !closedWeekDays.value.has(dayOfWeek),
+            isToday: date === todayString,
+            hasBookings: bookingDatesSet.value.has(date),
         });
     }
     return items;
@@ -270,6 +278,22 @@ const removeExceptionInterval = (index) => {
     exceptionForm.intervals.splice(index, 1);
 };
 
+const getWeeklyIntervalsForDate = (date) => {
+    if (!date) {
+        return [];
+    }
+    const parts = date.split('-').map((item) => Number(item));
+    if (parts.length !== 3) {
+        return [];
+    }
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const dayOfWeek = ((dateObj.getDay() + 6) % 7) + 1;
+    return (props.weeklyIntervals?.[dayOfWeek] || []).map((interval) => ({
+        starts_at: interval.starts_at,
+        ends_at: interval.ends_at,
+    }));
+};
+
 watch(
     () => exceptionForm.is_closed,
     (value) => {
@@ -278,7 +302,8 @@ watch(
             return;
         }
         if (exceptionForm.intervals.length === 0) {
-            exceptionForm.intervals = [{ starts_at: '', ends_at: '' }];
+            const fallbackIntervals = getWeeklyIntervalsForDate(exceptionForm.date);
+            exceptionForm.intervals = fallbackIntervals.length ? fallbackIntervals : [{ starts_at: '', ends_at: '' }];
         }
     }
 );
@@ -363,9 +388,6 @@ const removeException = (exceptionId) => {
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 class="text-3xl font-semibold text-slate-900">Расписание</h1>
-                            <p class="mt-2 text-sm text-slate-600">
-                                Площадка: {{ venue?.name || '—' }}
-                            </p>
                         </div>
                     </div>
 
@@ -446,12 +468,7 @@ const removeException = (exceptionId) => {
                     </section>
 
                     <section class="mt-8">
-                        <div class="flex items-center justify-between gap-3">
-                            <h2 class="text-lg font-semibold text-slate-900">Исключения</h2>
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Даты</span>
-                        </div>
-
-                        <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="text-sm font-semibold text-slate-900">{{ calendarLabel }}</div>
                                 <div class="flex items-center gap-2">
@@ -487,6 +504,7 @@ const removeException = (exceptionId) => {
                                         day.exception && !day.exception?.is_closed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : '',
                                         !day.exception && day.isClosedByWeek ? 'border-slate-200 bg-slate-50 text-slate-500' : '',
                                         !day.exception && day.isOpenByWeek ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : '',
+                                        day.isToday ? 'border-emerald-500 ring-2 ring-emerald-200' : '',
                                     ]"
                                     type="button"
                                     :disabled="!day.date || (!day.exception && day.isClosedByWeek && !canManage)"
@@ -504,6 +522,10 @@ const removeException = (exceptionId) => {
                                                     ? 'bg-emerald-500'
                                                     : 'bg-slate-400'"
                                     ></span>
+                                    <span
+                                        v-if="day.hasBookings"
+                                        class="absolute right-1.5 top-4 h-2 w-2 rounded-full bg-violet-500"
+                                    ></span>
                                 </button>
                             </div>
                             <p class="mt-3 text-xs text-slate-500">
@@ -517,6 +539,10 @@ const removeException = (exceptionId) => {
                                 <div class="flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                                     Открыто
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                    Есть бронирования
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-slate-400"></span>
@@ -592,7 +618,7 @@ const removeException = (exceptionId) => {
     <div v-if="intervalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
         <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
             <form :class="{ loading: intervalForm.processing }" @submit.prevent="submitInterval">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">
                         {{ editIntervalTarget ? 'Редактировать интервал' : 'Новый интервал' }}
                     </h2>
@@ -605,7 +631,7 @@ const removeException = (exceptionId) => {
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <div class="grid gap-3">
                         <div>
                             <p class="text-xs uppercase tracking-[0.15em] text-slate-500">День недели</p>
@@ -636,7 +662,7 @@ const removeException = (exceptionId) => {
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -660,9 +686,9 @@ const removeException = (exceptionId) => {
     <div v-if="exceptionOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
         <div class="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-xl">
             <form :class="{ loading: exceptionForm.processing }" @submit.prevent="submitException">
-                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                     <h2 class="text-lg font-semibold text-slate-900">
-                        {{ editExceptionTarget ? 'Редактировать исключение' : 'Новое исключение' }}
+                        Расписание на день
                     </h2>
                     <button
                         class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
@@ -673,16 +699,16 @@ const removeException = (exceptionId) => {
                         x
                     </button>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                     <div v-if="!canManage" class="grid gap-3">
                         <div>
                             <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата</p>
                             <p class="mt-2 text-sm font-semibold text-slate-900">{{ exceptionForm.date || '—' }}</p>
                         </div>
-                        <div>
+                        <div v-if="exceptionForm.is_closed">
                             <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Статус</p>
-                            <p class="mt-2 text-sm font-semibold text-slate-900">
-                                {{ exceptionForm.is_closed ? 'Закрыто' : 'Открыто' }}
+                            <p class="mt-2 text-sm font-semibold text-rose-700">
+                                Закрыто
                             </p>
                         </div>
                         <div v-if="exceptionForm.comment">
@@ -690,7 +716,7 @@ const removeException = (exceptionId) => {
                             <p class="mt-2 text-sm text-slate-700">{{ exceptionForm.comment }}</p>
                         </div>
                         <div v-if="!exceptionForm.is_closed">
-                            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Интервалы</p>
+                            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">График работы</p>
                             <div v-if="readOnlyIntervals.length" class="mt-2 flex flex-wrap gap-2">
                                 <span
                                     v-for="(interval, index) in readOnlyIntervals"
@@ -700,10 +726,7 @@ const removeException = (exceptionId) => {
                                     {{ interval.starts_at }} – {{ interval.ends_at }}
                                 </span>
                             </div>
-                            <p v-else class="mt-2 text-sm text-slate-500">Интервалы не заданы.</p>
-                        </div>
-                        <div v-if="!hasExceptionData" class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                            Исключение не задано.
+                            <p v-else class="mt-2 text-sm text-slate-500">График работы не задан.</p>
                         </div>
                     </div>
                     <div v-else class="grid gap-3">
@@ -787,7 +810,7 @@ const removeException = (exceptionId) => {
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
@@ -809,3 +832,4 @@ const removeException = (exceptionId) => {
         </div>
     </div>
 </template>
+
