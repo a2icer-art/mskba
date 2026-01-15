@@ -4,6 +4,8 @@ namespace App\Presentation\Venues;
 
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Models\Contract;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use App\Presentation\BasePresenter;
@@ -43,15 +45,27 @@ class VenueSidebarPresenter extends BasePresenter
             ],
         ];
 
-        if ($this->canViewContracts($user, $venue)) {
+        $canViewContracts = $this->canViewContracts($user, $venue);
+        $canManageBookings = $this->canManageBookings($user, $venue);
+
+        if ($canViewContracts || $canManageBookings) {
+            $adminItems = [];
+            if ($canViewContracts) {
+                $adminItems[] = [
+                    'label' => 'Контракты',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/contracts",
+                ];
+            }
+            if ($canManageBookings) {
+                $adminItems[] = [
+                    'label' => 'Бронирование',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/bookings",
+                ];
+            }
+
             $groups[] = [
                 'title' => 'Администрация',
-                'items' => [
-                    [
-                        'label' => 'Контракты',
-                        'href' => "/venues/{$typeSlug}/{$venue->alias}/contracts",
-                    ],
-                ],
+                'items' => $adminItems,
             ];
         }
 
@@ -88,5 +102,17 @@ class VenueSidebarPresenter extends BasePresenter
                     ->orWhere('ends_at', '>=', $now);
             })
             ->exists();
+    }
+
+    private function canManageBookings(?User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueBookingConfirm, $venue)
+            || $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
     }
 }
