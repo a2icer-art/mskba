@@ -23,16 +23,20 @@ class EventsController extends Controller
         $checker = app(PermissionChecker::class);
 
         $events = Event::query()
-            ->with(['type', 'organizer'])
+            ->with(['type', 'organizer', 'bookings'])
             ->orderByDesc('created_at')
             ->get()
             ->map(static function (Event $event): array {
+                $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
+                $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'cancelled');
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
                     'status' => $event->status,
                     'starts_at' => $event->starts_at?->toDateTimeString(),
                     'ends_at' => $event->ends_at?->toDateTimeString(),
+                    'has_approved_booking' => $hasApprovedBooking,
+                    'has_cancelled_booking' => $hasCancelledBooking,
                     'type' => $event->type
                         ? [
                             'code' => $event->type->code,
@@ -176,6 +180,7 @@ class EventsController extends Controller
                     'status' => $booking->status,
                     'starts_at' => $booking->starts_at?->toDateTimeString(),
                     'ends_at' => $booking->ends_at?->toDateTimeString(),
+                    'moderation_comment' => $booking->moderation_comment,
                     'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,
@@ -188,7 +193,8 @@ class EventsController extends Controller
             ->all();
 
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
-        $canDelete = $this->canDelete($user, $event);
+        $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
+        $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
             'event' => $event,
         ])['data'];
@@ -260,6 +266,12 @@ class EventsController extends Controller
         $user = $request->user();
         if (!$user || !$this->canDelete($user, $event)) {
             abort(403);
+        }
+
+        if ($event->bookings()->where('status', 'approved')->exists()) {
+            return back()->withErrors([
+                'event' => 'Нельзя удалить событие с подтвержденными бронированиями.',
+            ]);
         }
 
         $event->delete();

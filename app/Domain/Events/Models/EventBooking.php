@@ -18,6 +18,7 @@ class EventBooking extends Model
         'starts_at',
         'ends_at',
         'status',
+        'moderation_comment',
         'created_by',
     ];
 

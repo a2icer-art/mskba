@@ -175,6 +175,21 @@ const formatDateTime = (value) => {
     }
     return date.toLocaleString('ru-RU');
 };
+
+const formatDateRange = (startsAt, endsAt) => {
+    if (!startsAt || !endsAt) {
+        return '—';
+    }
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return `${startsAt} – ${endsAt}`;
+    }
+    const dateLabel = start.toLocaleDateString('ru-RU');
+    const startTime = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const endTime = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return `${dateLabel}, ${startTime} – ${endTime}`;
+};
 </script>
 
 <template>
@@ -228,10 +243,28 @@ const formatDateTime = (value) => {
                             <div class="flex flex-wrap items-center justify-between gap-4">
                                 <div>
                                     <h2 class="text-lg font-semibold text-slate-900">
-                                        {{ event.title }}
+                                        <Link class="transition hover:text-slate-700" :href="`/events/${event.id}`">
+                                            {{ event.title }}
+                                        </Link>
                                     </h2>
                                     <div class="mt-1 text-sm text-slate-600">
                                         {{ event.type?.label || 'Тип не задан' }}
+                                    </div>
+                                    <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                        <span
+                                            v-if="event.has_approved_booking"
+                                            class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                                            title="Есть подтвержденные бронирования"
+                                        >
+                                            <span class="text-sm leading-none">✓</span>
+                                        </span>
+                                        <span
+                                            v-if="event.has_cancelled_booking"
+                                            class="flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700"
+                                            title="Есть отмененные бронирования"
+                                        >
+                                            <span class="text-sm leading-none">✕</span>
+                                        </span>
                                     </div>
                                 </div>
                                 <Link
@@ -241,15 +274,9 @@ const formatDateTime = (value) => {
                                     Открыть
                                 </Link>
                             </div>
-                            <div class="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-                                <div>
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Начало</span>
-                                    <div>{{ formatDateTime(event.starts_at) }}</div>
-                                </div>
-                                <div>
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Окончание</span>
-                                    <div>{{ formatDateTime(event.ends_at) }}</div>
-                                </div>
+                            <div class="mt-3 text-sm text-slate-700">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Время</span>
+                                <div class="mt-1">{{ formatDateRange(event.starts_at, event.ends_at) }}</div>
                             </div>
                         </article>
                     </div>
@@ -404,4 +431,3 @@ const formatDateTime = (value) => {
         </div>
     </div>
 </template>
-

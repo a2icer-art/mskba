@@ -94,6 +94,15 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
         ->middleware('auth')
         ->name('venues.contracts.revoke');
+    Route::get('/{type}/{venue}/bookings', [VenuesController::class, 'bookings'])
+        ->middleware('auth')
+        ->name('venues.bookings');
+    Route::post('/{type}/{venue}/bookings/{booking}/confirm', [VenuesController::class, 'confirmBooking'])
+        ->middleware('auth')
+        ->name('venues.bookings.confirm');
+    Route::post('/{type}/{venue}/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
+        ->middleware('auth')
+        ->name('venues.bookings.cancel');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
 

@@ -36,6 +36,8 @@ const page = usePage();
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
+const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
+const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
 
 const bookingOpen = ref(false);
 const deleteOpen = ref(false);
@@ -176,6 +178,21 @@ const formatDateTime = (value) => {
     return date.toLocaleString('ru-RU');
 };
 
+const formatDateRange = (startsAt, endsAt) => {
+    if (!startsAt || !endsAt) {
+        return '—';
+    }
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return `${startsAt} – ${endsAt}`;
+    }
+    const dateLabel = start.toLocaleDateString('ru-RU');
+    const startTime = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const endTime = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return `${dateLabel}, ${startTime} – ${endTime}`;
+};
+
 const toLocalDate = (value) => {
     if (!value) {
         return '';
@@ -252,15 +269,23 @@ const combineDateTime = (date, time) => {
                         </div>
                     </div>
 
-                    <div class="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-                        <div>
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Начало</span>
-                            <div>{{ formatDateTime(event?.starts_at) }}</div>
-                        </div>
-                        <div>
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Окончание</span>
-                            <div>{{ formatDateTime(event?.ends_at) }}</div>
-                        </div>
+                    <div class="mt-4 text-sm text-slate-700">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Время</span>
+                        <div class="mt-1">{{ formatDateRange(event?.starts_at, event?.ends_at) }}</div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
+                        <span
+                            v-if="hasApprovedBooking"
+                            class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                        >
+                            Есть подтвержденное бронирование
+                        </span>
+                        <span
+                            v-if="hasCancelledBooking"
+                            class="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700"
+                        >
+                            Есть отмененные бронирования
+                        </span>
                     </div>
 
                     <div v-if="actionNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -294,8 +319,12 @@ const combineDateTime = (date, time) => {
                                         </p>
                                     </div>
                                     <div class="text-sm text-slate-700">
-                                        {{ formatDateTime(booking.starts_at) }} – {{ formatDateTime(booking.ends_at) }}
+                                        {{ formatDateRange(booking.starts_at, booking.ends_at) }}
                                     </div>
+                                </div>
+                                <div v-if="booking.moderation_comment" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
+                                    <p class="mt-1">{{ booking.moderation_comment }}</p>
                                 </div>
                             </div>
                         </div>
@@ -462,4 +491,3 @@ const combineDateTime = (date, time) => {
         </div>
     </div>
 </template>
-

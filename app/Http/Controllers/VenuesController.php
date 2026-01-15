@@ -387,6 +387,200 @@ class VenuesController extends Controller
         ]);
     }
 
+    public function bookings(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+        $venue->loadMissing(['venueType:id,name,plural_name,alias']);
+
+        $checker = app(PermissionChecker::class);
+        $canConfirm = $checker->can($user, PermissionCode::VenueBookingConfirm, $venue);
+        $canCancel = $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
+
+        if (!$canConfirm && !$canCancel) {
+            abort(403);
+        }
+
+        $now = now();
+        $status = $request->string('status')->toString();
+        $allowedStatuses = ['pending', 'approved', 'cancelled'];
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = '';
+        }
+
+        $bookings = EventBooking::query()
+            ->where('venue_id', $venue->id)
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->with(['event.type', 'event.organizer', 'creator'])
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString()
+            ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $now): array {
+                $status = $booking->status;
+                $isPast = $booking->starts_at && $booking->starts_at->lt($now);
+                return [
+                    'id' => $booking->id,
+                    'status' => $status,
+                    'starts_at' => $booking->starts_at?->toDateTimeString(),
+                    'ends_at' => $booking->ends_at?->toDateTimeString(),
+                    'event' => $booking->event
+                        ? [
+                            'id' => $booking->event->id,
+                            'title' => $booking->event->title ?: 'Событие',
+                            'type' => $booking->event->type
+                                ? [
+                                    'code' => $booking->event->type->code,
+                                    'label' => $booking->event->type->label,
+                                ]
+                                : null,
+                            'organizer' => $booking->event->organizer
+                                ? [
+                                    'id' => $booking->event->organizer->id,
+                                    'login' => $booking->event->organizer->login,
+                                ]
+                                : null,
+                        ]
+                        : null,
+                    'creator' => $booking->creator
+                        ? [
+                            'id' => $booking->creator->id,
+                            'login' => $booking->creator->login,
+                        ]
+                        : null,
+                    'can_confirm' => !$isPast && $canConfirm && $status === 'pending',
+                    'can_cancel' => !$isPast && $canCancel && in_array($status, ['pending', 'approved'], true),
+                ];
+            });
+
+        $navigation = app(VenueSidebarPresenter::class)->present([
+            'title' => 'Площадки',
+            'typeSlug' => $type,
+            'venue' => $venue,
+            'user' => $user,
+        ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Бронирование',
+        ])['data'];
+
+        return Inertia::render('VenueBookings', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'bookings' => $bookings,
+            'filters' => [
+                'status' => $status,
+            ],
+            'canConfirm' => $canConfirm,
+            'canCancel' => $canCancel,
+            'navigation' => $navigation,
+            'activeHref' => "/venues/{$type}/{$venue->alias}/bookings",
+            'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function confirmBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueBookingConfirm, $venue)) {
+            abort(403);
+        }
+
+        if ($booking->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        if ($booking->starts_at && $booking->starts_at->lt(now())) {
+            return back()->withErrors([
+                'booking' => 'Нельзя подтверждать бронирование в прошлом.',
+            ]);
+        }
+
+        if ($booking->status !== 'pending') {
+            return back()->withErrors([
+                'booking' => 'Подтвердить можно только заявку в статусе ожидания.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $booking->update([
+            'status' => 'approved',
+            'moderation_comment' => $data['comment'] ?? null,
+        ]);
+
+        return back()->with('notice', 'Бронирование подтверждено.');
+    }
+
+    public function cancelBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueBookingCancel, $venue)) {
+            abort(403);
+        }
+
+        if ($booking->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        if ($booking->starts_at && $booking->starts_at->lt(now())) {
+            return back()->withErrors([
+                'booking' => 'Нельзя отменять бронирование в прошлом.',
+            ]);
+        }
+
+        if (!in_array($booking->status, ['pending', 'approved'], true)) {
+            return back()->withErrors([
+                'booking' => 'Отменить можно только активную заявку.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $booking->update([
+            'status' => 'cancelled',
+            'moderation_comment' => $data['comment'] ?? null,
+        ]);
+
+        return back()->with('notice', 'Бронирование отменено.');
+    }
+
     public function storeScheduleInterval(Request $request, string $type, Venue $venue)
     {
         $user = $request->user();
