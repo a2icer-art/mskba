@@ -252,6 +252,13 @@ const formatDateRange = (startsAt, endsAt) => {
                                     </div>
                                     <div class="mt-2 flex flex-wrap gap-2 text-xs">
                                         <span
+                                            v-if="event.has_pending_booking"
+                                            class="flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700"
+                                            title="Есть бронирования в ожидании"
+                                        >
+                                            <span class="text-sm leading-none">•</span>
+                                        </span>
+                                        <span
                                             v-if="event.has_approved_booking"
                                             class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
                                             title="Есть подтвержденные бронирования"

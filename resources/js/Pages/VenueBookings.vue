@@ -231,6 +231,12 @@ const submitCancel = () => {
                                     <p v-if="booking.creator?.login" class="mt-1 text-xs text-slate-500">
                                         Создатель: {{ booking.creator.login }}
                                     </p>
+                                    <p v-if="booking.moderator?.login" class="mt-1 text-xs text-slate-500">
+                                        Модератор: {{ booking.moderator.login }}
+                                    </p>
+                                    <p v-if="booking.moderated_at" class="mt-1 text-xs text-slate-500">
+                                        Модерация: {{ formatDateTime(booking.moderated_at) }}
+                                    </p>
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
                                     <span

@@ -403,6 +403,7 @@ class VenuesController extends Controller
         $checker = app(PermissionChecker::class);
         $canConfirm = $checker->can($user, PermissionCode::VenueBookingConfirm, $venue);
         $canCancel = $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
 
         if (!$canConfirm && !$canCancel) {
             abort(403);
@@ -418,11 +419,11 @@ class VenuesController extends Controller
         $bookings = EventBooking::query()
             ->where('venue_id', $venue->id)
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->with(['event.type', 'event.organizer', 'creator'])
+            ->with(['event.type', 'event.organizer', 'creator', 'moderator'])
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString()
-            ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $now): array {
+            ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $isAdmin, $now): array {
                 $status = $booking->status;
                 $isPast = $booking->starts_at && $booking->starts_at->lt($now);
                 return [
@@ -454,8 +455,15 @@ class VenuesController extends Controller
                             'login' => $booking->creator->login,
                         ]
                         : null,
+                    'moderator' => $booking->moderator
+                        ? [
+                            'id' => $booking->moderator->id,
+                            'login' => $booking->moderator->login,
+                        ]
+                        : null,
+                    'moderated_at' => $booking->moderated_at?->toDateTimeString(),
                     'can_confirm' => !$isPast && $canConfirm && $status === 'pending',
-                    'can_cancel' => !$isPast && $canCancel && in_array($status, ['pending', 'approved'], true),
+                    'can_cancel' => !$isPast && $canCancel && ($status === 'pending' || ($status === 'approved' && $isAdmin)),
                 ];
             });
 
@@ -531,6 +539,8 @@ class VenuesController extends Controller
         $booking->update([
             'status' => 'approved',
             'moderation_comment' => $data['comment'] ?? null,
+            'moderated_by' => $user->id,
+            'moderated_at' => now(),
         ]);
 
         return back()->with('notice', 'Бронирование подтверждено.');
@@ -569,6 +579,15 @@ class VenuesController extends Controller
             ]);
         }
 
+        if ($booking->status === 'approved') {
+            $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+            if (!$isAdmin) {
+                return back()->withErrors([
+                    'booking' => 'Отменить подтвержденное бронирование может только администратор.',
+                ]);
+            }
+        }
+
         $data = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -576,6 +595,8 @@ class VenuesController extends Controller
         $booking->update([
             'status' => 'cancelled',
             'moderation_comment' => $data['comment'] ?? null,
+            'moderated_by' => $user->id,
+            'moderated_at' => now(),
         ]);
 
         return back()->with('notice', 'Бронирование отменено.');

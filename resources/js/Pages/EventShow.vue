@@ -38,6 +38,15 @@ const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
+const bookingStatusLabel = (status) => {
+    if (status === 'approved') {
+        return 'Подтверждено';
+    }
+    if (status === 'cancelled') {
+        return 'Отменено';
+    }
+    return 'Ожидает';
+};
 
 const bookingOpen = ref(false);
 const deleteOpen = ref(false);
@@ -315,7 +324,7 @@ const combineDateTime = (date, time) => {
                                             {{ booking.venue?.name || 'Площадка' }}
                                         </p>
                                         <p class="mt-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                            {{ booking.status }}
+                                            {{ bookingStatusLabel(booking.status) }}
                                         </p>
                                     </div>
                                     <div class="text-sm text-slate-700">

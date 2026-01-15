@@ -19,6 +19,8 @@ class EventBooking extends Model
         'ends_at',
         'status',
         'moderation_comment',
+        'moderated_by',
+        'moderated_at',
         'created_by',
     ];
 
@@ -27,6 +29,7 @@ class EventBooking extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'moderated_at' => 'datetime',
         ];
     }
 
@@ -43,5 +46,10 @@ class EventBooking extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function moderator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'moderated_by');
     }
 }

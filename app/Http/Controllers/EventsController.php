@@ -29,6 +29,7 @@ class EventsController extends Controller
             ->map(static function (Event $event): array {
                 $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
                 $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'cancelled');
+                $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'pending');
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
@@ -37,6 +38,7 @@ class EventsController extends Controller
                     'ends_at' => $event->ends_at?->toDateTimeString(),
                     'has_approved_booking' => $hasApprovedBooking,
                     'has_cancelled_booking' => $hasCancelledBooking,
+                    'has_pending_booking' => $hasPendingBooking,
                     'type' => $event->type
                         ? [
                             'code' => $event->type->code,
