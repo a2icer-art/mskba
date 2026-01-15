@@ -156,6 +156,7 @@ class EventsController extends Controller
             ->all();
 
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
+        $canDelete = $this->canDelete($user, $event);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
             'event' => $event,
         ])['data'];
@@ -184,6 +185,7 @@ class EventsController extends Controller
             'bookings' => $bookings,
             'venues' => $venues,
             'canBook' => $canBook,
+            'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,
         ]);
     }
@@ -220,5 +222,28 @@ class EventsController extends Controller
         );
 
         return back()->with('notice', 'Бронирование создано.');
+    }
+
+    public function destroy(Request $request, Event $event)
+    {
+        $user = $request->user();
+        if (!$user || !$this->canDelete($user, $event)) {
+            abort(403);
+        }
+
+        $event->delete();
+
+        return redirect()->route('events.index')->with('notice', 'Событие удалено.');
+    }
+
+    private function canDelete(?\App\Models\User $user, Event $event): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+
+        return $isAdmin || $event->organizer_id === $user->id;
     }
 }

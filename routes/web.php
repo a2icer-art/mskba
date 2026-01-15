@@ -110,6 +110,9 @@ Route::post('/events', [EventsController::class, 'store'])
     ->name('events.store');
 Route::get('/events/{event}', [EventsController::class, 'show'])
     ->name('events.show');
+Route::delete('/events/{event}', [EventsController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('events.destroy');
 Route::post('/events/{event}/bookings', [EventsController::class, 'storeBooking'])
     ->middleware(['auth', 'can:venue.booking'])
     ->name('events.bookings.store');

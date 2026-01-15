@@ -137,10 +137,20 @@ const openAssign = () => {
     assignOpen.value = true;
 };
 
+const getContractPermissions = (contract) => {
+    if (Array.isArray(contract?.permissions)) {
+        return contract.permissions;
+    }
+    if (contract?.permissions && typeof contract.permissions === 'object') {
+        return Object.values(contract.permissions);
+    }
+    return [];
+};
+
 const openEdit = (contract) => {
     editForm.clearErrors();
     editTarget.value = contract;
-    editForm.permissions = (contract.permissions ?? []).map((permission) => permission.code);
+    editForm.permissions = getContractPermissions(contract).map((permission) => permission.code);
     editOpen.value = true;
 };
 
@@ -376,9 +386,9 @@ const formatDate = (value) => {
 
                             <div class="mt-4">
                                 <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права</p>
-                                <div v-if="contract.permissions?.length" class="mt-2 flex flex-wrap gap-2">
+                                <div v-if="getContractPermissions(contract).length" class="mt-2 flex flex-wrap gap-2">
                                     <span
-                                        v-for="permission in contract.permissions"
+                                        v-for="permission in getContractPermissions(contract)"
                                         :key="permission.code"
                                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600"
                                     >

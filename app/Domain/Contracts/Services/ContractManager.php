@@ -243,9 +243,10 @@ class ContractManager
     ): array {
         $checker = app(PermissionChecker::class);
         $allowed = [];
+        $isAdmin = $this->isAdmin($actor);
 
         foreach ($permissionCodes as $code) {
-            if (!$checker->can($actor, $code, $entity)) {
+            if (!$isAdmin && !$checker->can($actor, $code, $entity)) {
                 continue;
             }
 

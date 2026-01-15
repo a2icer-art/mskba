@@ -26,6 +26,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    canDelete: {
+        type: Boolean,
+        default: false,
+    },
     breadcrumbs: {
         type: Array,
         default: () => [],
@@ -38,6 +42,7 @@ const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
 
 const bookingOpen = ref(false);
+const deleteOpen = ref(false);
 const bookingForm = useForm({
     venue_id: '',
     starts_at: '',
@@ -68,6 +73,23 @@ const submitBooking = () => {
     bookingForm.post(`/events/${props.event?.id}/bookings`, {
         preserveScroll: true,
         onSuccess: closeBooking,
+    });
+};
+
+const openDelete = () => {
+    deleteOpen.value = true;
+};
+
+const closeDelete = () => {
+    deleteOpen.value = false;
+};
+
+const deleteForm = useForm({});
+
+const submitDelete = () => {
+    deleteForm.delete(`/events/${props.event?.id}`, {
+        preserveScroll: true,
+        onSuccess: closeDelete,
     });
 };
 
@@ -133,6 +155,14 @@ const toLocalInput = (value) => {
                             @click="openBooking"
                         >
                             Забронировать площадку
+                        </button>
+                        <button
+                            v-if="canDelete"
+                            class="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                            type="button"
+                            @click="openDelete"
+                        >
+                            Удалить событие
                         </button>
                     </div>
 
@@ -261,6 +291,46 @@ const toLocalInput = (value) => {
                         :disabled="isBookingDisabled"
                     >
                         Создать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div v-if="deleteOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: deleteForm.processing }" @submit.prevent="submitDelete">
+                <div class="flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Удалить событие</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeDelete"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="max-h-[500px] overflow-y-auto px-6 py-4">
+                    <p class="text-sm text-slate-600">
+                        Вы уверены, что хотите удалить событие «{{ event?.title || 'Событие' }}»?
+                    </p>
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="deleteForm.processing"
+                        @click="closeDelete"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-rose-500 bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-600 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="deleteForm.processing"
+                    >
+                        Удалить
                     </button>
                 </div>
             </form>
