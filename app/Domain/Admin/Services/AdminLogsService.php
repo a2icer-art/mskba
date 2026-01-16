@@ -79,6 +79,18 @@ class AdminLogsService
                 'model' => \App\Domain\Events\Models\EventBooking::class,
                 'href' => '/admin/logs/event-bookings',
             ],
+            [
+                'key' => 'balances',
+                'label' => 'Балансы',
+                'model' => \App\Domain\Balances\Models\Balance::class,
+                'href' => '/admin/logs/balances',
+            ],
+            [
+                'key' => 'balance-transactions',
+                'label' => 'Операции баланса',
+                'model' => \App\Domain\Balances\Models\BalanceTransaction::class,
+                'href' => '/admin/logs/balance-transactions',
+            ],
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminBalancesController;
 use App\Http\Controllers\AdminLogsController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUsersModerationController;
@@ -30,6 +31,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/profile', [AccountController::class, 'profile'])->name('account.profile');
     Route::get('/contacts', [AccountController::class, 'contacts'])->name('account.contacts');
     Route::get('/access', [AccountController::class, 'access'])->name('account.access');
+    Route::get('/balance', [AccountController::class, 'balance'])->name('account.balance');
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
@@ -177,4 +179,14 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
         ->name('admin.settings');
     Route::patch('/settings', [AdminSettingsController::class, 'update'])
         ->name('admin.settings.update');
+    Route::get('/balances', [AdminBalancesController::class, 'index'])
+        ->name('admin.balances');
+    Route::post('/balances/{user}/top-up', [AdminBalancesController::class, 'topUp'])
+        ->name('admin.balances.topup');
+    Route::post('/balances/{user}/debit', [AdminBalancesController::class, 'debit'])
+        ->name('admin.balances.debit');
+    Route::post('/balances/{user}/block', [AdminBalancesController::class, 'block'])
+        ->name('admin.balances.block');
+    Route::post('/balances/{user}/unblock', [AdminBalancesController::class, 'unblock'])
+        ->name('admin.balances.unblock');
 });

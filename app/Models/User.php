@@ -13,6 +13,7 @@ use App\Domain\Users\Models\UserRole;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Permissions\Models\Permission;
+use App\Domain\Balances\Models\Balance;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -81,6 +82,11 @@ class User extends Authenticatable
     public function profile(): HasOne
     {
         return $this->hasOne(UserProfile::class);
+    }
+
+    public function balance(): HasOne
+    {
+        return $this->hasOne(Balance::class);
     }
 
     public function creator(): BelongsTo

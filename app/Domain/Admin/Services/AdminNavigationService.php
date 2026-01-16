@@ -45,6 +45,10 @@ class AdminNavigationService
                 'label' => 'Настройки',
                 'href' => '/admin/settings',
             ];
+            $systemItems[] = [
+                'label' => 'Балансы',
+                'href' => '/admin/balances',
+            ];
         }
 
         if ($moderationItems !== []) {

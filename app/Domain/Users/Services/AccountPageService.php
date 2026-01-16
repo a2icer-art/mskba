@@ -11,6 +11,7 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Resources\UserProfileViewResource;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
+use App\Domain\Balances\Services\BalanceService;
 use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
 use App\Support\DateFormatter;
@@ -22,6 +23,7 @@ class AccountPageService
         $user->load(['profile', 'contacts', 'roles.permissions', 'permissions']);
 
         $participantRoles = $this->getParticipantRoles($user);
+        $balance = app(BalanceService::class)->getOrCreate($user);
         $navigation = app(AccountNavigationPresenter::class)->present([
             'participantRoles' => $participantRoles,
         ]);
@@ -70,6 +72,14 @@ class AccountPageService
             'contactVerifications' => $this->getContactVerifications($user),
             'moderationRequest' => $this->getModerationRequest($user),
             'permissions' => $this->resolveUserPermissions($user),
+            'balance' => [
+                'available_amount' => $balance->available_amount,
+                'held_amount' => $balance->held_amount,
+                'currency' => $balance->currency?->value,
+                'status' => $balance->status?->value,
+                'block_reason' => $balance->block_reason,
+                'blocked_at' => DateFormatter::dateTime($balance->blocked_at),
+            ],
             'navigation' => $navigation,
             'breadcrumbs' => $breadcrumbs,
         ];

@@ -47,6 +47,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    balance: {
+        type: Object,
+        default: () => ({}),
+    },
     activeTab: {
         type: String,
         default: 'user',
@@ -73,6 +77,7 @@ const accountMenuItems = computed(() => {
         { key: 'profile', label: 'Профиль', href: '/account/profile' },
         { key: 'contacts', label: 'Контакты', href: '/account/contacts' },
         { key: 'access', label: 'Доступы', href: '/account/access' },
+        { key: 'balance', label: 'Баланс', href: '/account/balance' },
     ];
 
     const roleItems = props.participantRoles.map((role) => ({
@@ -166,6 +171,19 @@ const roleItems = (role) => [
 
 const activeRole = computed(() => props.participantRoles.find((role) => `role-${role.id}` === activeTab.value) ?? null);
 const permissions = computed(() => props.permissions ?? []);
+const balance = computed(() => props.balance ?? {});
+const balanceStatusLabel = computed(() => {
+    if (balance.value?.status === 'blocked') {
+        return 'Заблокирован';
+    }
+    return 'Активен';
+});
+const formatAmount = (amount, currency) => {
+    const value = Number(amount ?? 0);
+    const label = currency || 'RUB';
+    const display = Number.isNaN(value) ? 0 : value;
+    return `${display.toLocaleString('ru-RU')} ${label}`;
+};
 
 const emails = computed(() =>
     [...props.emails].sort((left, right) => left.id - right.id)
@@ -1310,6 +1328,39 @@ const logout = () => {
                         </div>
                     </div>
 
+                    <div v-else-if="activeTab === 'balance'" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Доступно</span>
+                                <div class="mt-2 text-xl font-semibold text-slate-900">
+                                    {{ formatAmount(balance.available_amount, balance.currency) }}
+                                </div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">В удержании</span>
+                                <div class="mt-2 text-xl font-semibold text-slate-900">
+                                    {{ formatAmount(balance.held_amount, balance.currency) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-700">
+                            <span
+                                class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
+                                :class="balance.status === 'blocked'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'"
+                            >
+                                {{ balanceStatusLabel }}
+                            </span>
+                            <span v-if="balance.block_reason" class="text-xs text-rose-700">
+                                Причина: {{ balance.block_reason }}
+                            </span>
+                            <span v-if="balance.blocked_at && balance.status === 'blocked'" class="text-xs text-slate-500">
+                                {{ formatDate(balance.blocked_at) }}
+                            </span>
+                        </div>
+                    </div>
+
                     <div v-else-if="activeRole" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div v-for="item in roleItems(activeRole)" :key="item.label" class="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">{{ item.label }}</span>
@@ -1511,4 +1562,3 @@ const logout = () => {
         </div>
     </div>
 </template>
-
