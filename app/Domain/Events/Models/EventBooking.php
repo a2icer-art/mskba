@@ -2,6 +2,7 @@
 
 namespace App\Domain\Events\Models;
 
+use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EventBooking extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $fillable = [
         'event_id',

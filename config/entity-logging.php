@@ -19,5 +19,7 @@ return [
         App\Domain\Metros\Models\Metro::class,
         App\Domain\Participants\Models\ParticipantRole::class,
         App\Domain\Participants\Models\ParticipantRoleAssignment::class,
+        App\Domain\Events\Models\Event::class,
+        App\Domain\Events\Models\EventBooking::class,
     ],
 ];

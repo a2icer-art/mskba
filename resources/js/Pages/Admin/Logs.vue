@@ -42,9 +42,14 @@ const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasEntities = computed(() => props.entities.length > 0);
 const hasLogs = computed(() => props.logs?.data?.length > 0);
 const actionLabels = {
-    created: 'Создано',
-    updated: 'Обновлено',
-    deleted: 'Удалено',
+    created: 'Создание',
+    updated: 'Редактирование',
+    deleted: 'Удаление',
+};
+const actionClasses = {
+    created: 'text-emerald-600',
+    updated: 'text-amber-600',
+    deleted: 'text-rose-600',
 };
 const selectedLog = ref(null);
 const logOpen = ref(false);
@@ -120,18 +125,25 @@ const formatValue = (value) => {
                         <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Выбранная сущность</p>
                         <p class="mt-2 text-lg font-semibold text-slate-900">{{ activeEntity.label }}</p>
                         <div v-if="hasLogs" class="mt-4 space-y-3">
-                            <div class="grid grid-cols-[160px_1fr_140px] gap-4 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                            <div class="grid grid-cols-[160px_140px_1fr_140px] gap-4 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
                                 <div>Сущность</div>
+                                <div>Действие</div>
                                 <div>Поля</div>
                                 <div>Дата</div>
                             </div>
                             <div
                                 v-for="log in logs.data"
                                 :key="log.id"
-                                class="grid grid-cols-[160px_1fr_140px] gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                                class="grid grid-cols-[160px_140px_1fr_140px] gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
                                 @dblclick="openLog(log)"
                             >
                                 <div class="font-semibold text-slate-800">{{ log.entity_label || '—' }}</div>
+                                <div
+                                    class="font-semibold"
+                                    :class="actionClasses[log.action] || 'text-slate-600'"
+                                >
+                                    {{ actionLabels[log.action] || log.action || '—' }}
+                                </div>
                                 <div class="text-slate-600">{{ formatFields(log.fields) }}</div>
                                 <div>{{ log.created_at || '—' }}</div>
                             </div>
@@ -236,5 +248,3 @@ const formatValue = (value) => {
         </div>
     </div>
 </template>
-
-

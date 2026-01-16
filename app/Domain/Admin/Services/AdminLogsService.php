@@ -67,6 +67,18 @@ class AdminLogsService
                 'model' => \App\Domain\Participants\Models\ParticipantRoleAssignment::class,
                 'href' => '/admin/logs/participant-role-assignments',
             ],
+            [
+                'key' => 'events',
+                'label' => 'События',
+                'model' => \App\Domain\Events\Models\Event::class,
+                'href' => '/admin/logs/events',
+            ],
+            [
+                'key' => 'event-bookings',
+                'label' => 'Бронирования',
+                'model' => \App\Domain\Events\Models\EventBooking::class,
+                'href' => '/admin/logs/event-bookings',
+            ],
         ];
     }
 
