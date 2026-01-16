@@ -22,6 +22,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    bookingDeadlinePassed: {
+        type: Boolean,
+        default: false,
+    },
     canDelete: {
         type: Boolean,
         default: false,
@@ -268,7 +272,7 @@ const combineDateTime = (date, time) => {
                                 Удалить событие
                             </button>
                             <button
-                                v-if="canBook"
+                                v-if="canBook && !hasApprovedBooking && !bookingDeadlinePassed"
                                 class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
                                 type="button"
                                 @click="openBooking"

@@ -194,6 +194,11 @@ class EventsController extends Controller
             })
             ->all();
 
+        $timezone = config('app.timezone');
+        $now = Carbon::now($timezone);
+        $bookingDeadlinePassed = $event->starts_at
+            ? $event->starts_at->copy()->subMinutes(15)->lte($now)
+            : false;
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
         $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
         $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
@@ -224,6 +229,7 @@ class EventsController extends Controller
             ],
             'bookings' => $bookings,
             'canBook' => $canBook,
+            'bookingDeadlinePassed' => $bookingDeadlinePassed,
             'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,
         ]);
@@ -234,6 +240,14 @@ class EventsController extends Controller
         $user = $request->user();
         if (!$user) {
             abort(403);
+        }
+
+        $timezone = config('app.timezone');
+        $now = Carbon::now($timezone);
+        if ($event->starts_at && $event->starts_at->copy()->subMinutes(15)->lte($now)) {
+            return back()->withErrors([
+                'booking' => 'Бронирование возможно не позднее чем за 15 минут до начала события.',
+            ]);
         }
 
         $data = $request->validate(
