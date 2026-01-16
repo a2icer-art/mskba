@@ -43,6 +43,12 @@ const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
 const bookingStatusLabel = (status) => {
+    if (status === 'awaiting_payment') {
+        return 'Ожидает оплату';
+    }
+    if (status === 'paid') {
+        return 'Оплачено';
+    }
     if (status === 'approved') {
         return 'Подтверждено';
     }
@@ -379,6 +385,10 @@ const bookingClientError = computed(() => {
                                 <div v-if="booking.moderation_comment" class="mt-3 text-sm text-slate-700">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
                                     <p class="mt-1">{{ booking.moderation_comment }}</p>
+                                </div>
+                                <div v-if="booking.payment_order" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Порядок оплаты</span>
+                                    <p class="mt-1">{{ booking.payment_order }}</p>
                                 </div>
                             </div>
                         </div>

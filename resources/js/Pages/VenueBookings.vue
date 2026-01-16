@@ -58,6 +58,8 @@ const statusFilter = ref(props.filters?.status || '');
 const statuses = [
     { value: '', label: 'Все' },
     { value: 'pending', label: 'Ожидает' },
+    { value: 'awaiting_payment', label: 'Ожидает оплату' },
+    { value: 'paid', label: 'Оплачено' },
     { value: 'approved', label: 'Подтверждено' },
     { value: 'cancelled', label: 'Отменено' },
 ];
@@ -102,6 +104,12 @@ const formatDateRange = (startsAt, endsAt) => {
 };
 
 const statusLabel = (status) => {
+    if (status === 'awaiting_payment') {
+        return 'Ожидает оплату';
+    }
+    if (status === 'paid') {
+        return 'Оплачено';
+    }
     if (status === 'approved') {
         return 'Подтверждено';
     }
@@ -113,9 +121,13 @@ const statusLabel = (status) => {
 
 const confirmOpen = ref(false);
 const cancelOpen = ref(false);
+const awaitPaymentOpen = ref(false);
+const paidOpen = ref(false);
 const activeBooking = ref(null);
 const confirmForm = useForm({ comment: '' });
 const cancelForm = useForm({ comment: '' });
+const awaitPaymentForm = useForm({ comment: '' });
+const paidForm = useForm({ comment: '' });
 
 const openConfirm = (booking) => {
     activeBooking.value = booking;
@@ -145,6 +157,34 @@ const closeCancel = () => {
     cancelForm.clearErrors();
 };
 
+const openAwaitPayment = (booking) => {
+    activeBooking.value = booking;
+    awaitPaymentForm.reset('comment');
+    awaitPaymentForm.clearErrors();
+    awaitPaymentOpen.value = true;
+};
+
+const closeAwaitPayment = () => {
+    awaitPaymentOpen.value = false;
+    activeBooking.value = null;
+    awaitPaymentForm.reset('comment');
+    awaitPaymentForm.clearErrors();
+};
+
+const openPaid = (booking) => {
+    activeBooking.value = booking;
+    paidForm.reset('comment');
+    paidForm.clearErrors();
+    paidOpen.value = true;
+};
+
+const closePaid = () => {
+    paidOpen.value = false;
+    activeBooking.value = null;
+    paidForm.reset('comment');
+    paidForm.clearErrors();
+};
+
 const submitConfirm = () => {
     if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
         return;
@@ -162,6 +202,26 @@ const submitCancel = () => {
     cancelForm.post(
         `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/cancel`,
         { preserveScroll: true, onSuccess: closeCancel }
+    );
+};
+
+const submitAwaitPayment = () => {
+    if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    awaitPaymentForm.post(
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/await-payment`,
+        { preserveScroll: true, onSuccess: closeAwaitPayment }
+    );
+};
+
+const submitPaid = () => {
+    if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    paidForm.post(
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/mark-paid`,
+        { preserveScroll: true, onSuccess: closePaid }
     );
 };
 </script>
@@ -245,11 +305,36 @@ const submitCancel = () => {
                                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                             : booking.status === 'cancelled'
                                                 ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                                : 'border-amber-200 bg-amber-50 text-amber-800'"
+                                                : booking.status === 'awaiting_payment'
+                                                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                                                    : booking.status === 'paid'
+                                                        ? 'border-sky-200 bg-sky-50 text-sky-700'
+                                                        : 'border-amber-200 bg-amber-50 text-amber-800'"
                                     >
                                         {{ statusLabel(booking.status) }}
                                     </span>
+                                    <span v-if="booking.payment_order" class="text-xs text-slate-500">
+                                        Порядок оплаты: {{ booking.payment_order }}
+                                    </span>
                                     <div class="flex flex-wrap items-center gap-2">
+                                        <button
+                                            v-if="booking.can_await_payment"
+                                            class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-300"
+                                            type="button"
+                                            :disabled="awaitPaymentForm.processing"
+                                            @click="openAwaitPayment(booking)"
+                                        >
+                                            Ожидает оплату
+                                        </button>
+                                        <button
+                                            v-if="booking.can_mark_paid"
+                                            class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 transition hover:-translate-y-0.5 hover:border-sky-300"
+                                            type="button"
+                                            :disabled="paidForm.processing"
+                                            @click="openPaid(booking)"
+                                        >
+                                            Оплачено
+                                        </button>
                                         <button
                                             v-if="booking.can_confirm"
                                             class="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
@@ -340,6 +425,112 @@ const submitCancel = () => {
                             :disabled="confirmForm.processing"
                         >
                             Подтвердить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-if="awaitPaymentOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <form :class="{ loading: awaitPaymentForm.processing }" @submit.prevent="submitAwaitPayment">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Ожидание оплаты</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeAwaitPayment"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                        <p class="text-sm text-slate-700">
+                            Событие: {{ activeBooking?.event?.title || 'Событие' }}
+                        </p>
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ formatDateTime(activeBooking?.starts_at) }} – {{ formatDateTime(activeBooking?.ends_at) }}
+                        </p>
+                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Комментарий (опционально)
+                            <textarea
+                                v-model="awaitPaymentForm.comment"
+                                class="min-h-[100px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            ></textarea>
+                        </label>
+                        <div v-if="awaitPaymentForm.errors.comment" class="text-xs text-rose-700">
+                            {{ awaitPaymentForm.errors.comment }}
+                        </div>
+                    </div>
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="awaitPaymentForm.processing"
+                            @click="closeAwaitPayment"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="awaitPaymentForm.processing"
+                        >
+                            Перевести
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-if="paidOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <form :class="{ loading: paidForm.processing }" @submit.prevent="submitPaid">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Отметить оплату</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closePaid"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                        <p class="text-sm text-slate-700">
+                            Событие: {{ activeBooking?.event?.title || 'Событие' }}
+                        </p>
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ formatDateTime(activeBooking?.starts_at) }} – {{ formatDateTime(activeBooking?.ends_at) }}
+                        </p>
+                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Комментарий (опционально)
+                            <textarea
+                                v-model="paidForm.comment"
+                                class="min-h-[100px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            ></textarea>
+                        </label>
+                        <div v-if="paidForm.errors.comment" class="text-xs text-rose-700">
+                            {{ paidForm.errors.comment }}
+                        </div>
+                    </div>
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="paidForm.processing"
+                            @click="closePaid"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="paidForm.processing"
+                        >
+                            Отметить
                         </button>
                     </div>
                 </form>

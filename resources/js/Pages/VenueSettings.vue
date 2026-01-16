@@ -50,7 +50,7 @@ const actionError = computed(() => page.props?.errors ?? {});
 const form = useForm({
     booking_lead_time_minutes: props.settings?.booking_lead_time_minutes ?? 15,
     booking_min_interval_minutes: props.settings?.booking_min_interval_minutes ?? 30,
-    payment_order: props.settings?.payment_order ?? 'prepayment',
+    payment_order_id: props.settings?.payment_order_id ?? '',
 });
 
 const submit = () => {
@@ -122,15 +122,15 @@ const submit = () => {
                                     Порядок оплаты
                                 </label>
                                 <select
-                                    v-model="form.payment_order"
+                                    v-model="form.payment_order_id"
                                     class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                                 >
                                     <option v-for="option in paymentOrderOptions" :key="option.value" :value="option.value">
                                         {{ option.label }}
                                     </option>
                                 </select>
-                                <p v-if="actionError.payment_order" class="text-xs text-rose-700">
-                                    {{ actionError.payment_order }}
+                                <p v-if="actionError.payment_order_id" class="text-xs text-rose-700">
+                                    {{ actionError.payment_order_id }}
                                 </p>
                             </div>
 

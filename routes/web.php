@@ -101,6 +101,12 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/bookings/{booking}/confirm', [VenuesController::class, 'confirmBooking'])
         ->middleware('auth')
         ->name('venues.bookings.confirm');
+    Route::post('/{type}/{venue}/bookings/{booking}/await-payment', [VenuesController::class, 'awaitPaymentBooking'])
+        ->middleware('auth')
+        ->name('venues.bookings.await-payment');
+    Route::post('/{type}/{venue}/bookings/{booking}/mark-paid', [VenuesController::class, 'markPaidBooking'])
+        ->middleware('auth')
+        ->name('venues.bookings.mark-paid');
     Route::post('/{type}/{venue}/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
         ->middleware('auth')
         ->name('venues.bookings.cancel');

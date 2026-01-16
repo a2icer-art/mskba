@@ -2,6 +2,7 @@
 
 namespace App\Domain\Venues\Models;
 
+use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ class VenueSettings extends Model
         'venue_id',
         'booking_lead_time_minutes',
         'booking_min_interval_minutes',
-        'payment_order',
+        'payment_order_id',
     ];
 
     protected function casts(): array
@@ -27,12 +28,17 @@ class VenueSettings extends Model
         return [
             'booking_lead_time_minutes' => 'integer',
             'booking_min_interval_minutes' => 'integer',
-            'payment_order' => VenuePaymentOrder::class,
+            'payment_order_id' => 'integer',
         ];
     }
 
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function paymentOrder(): BelongsTo
+    {
+        return $this->belongsTo(PaymentOrder::class);
     }
 }

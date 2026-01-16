@@ -32,6 +32,8 @@ class EventsController extends Controller
                 $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
                 $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'cancelled');
                 $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'pending');
+                $hasAwaitingPaymentBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'awaiting_payment');
+                $hasPaidBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'paid');
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
@@ -41,6 +43,8 @@ class EventsController extends Controller
                     'has_approved_booking' => $hasApprovedBooking,
                     'has_cancelled_booking' => $hasCancelledBooking,
                     'has_pending_booking' => $hasPendingBooking,
+                    'has_awaiting_payment_booking' => $hasAwaitingPaymentBooking,
+                    'has_paid_booking' => $hasPaidBooking,
                     'type' => $event->type
                         ? [
                             'code' => $event->type->code,
@@ -187,16 +191,18 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        $event->loadMissing(['type', 'organizer', 'bookings.venue']);
+        $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder']);
 
         $bookings = $event->bookings
             ->map(static function ($booking): array {
+                $snapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 return [
                     'id' => $booking->id,
                     'status' => $booking->status,
                     'starts_at' => $booking->starts_at?->toDateTimeString(),
                     'ends_at' => $booking->ends_at?->toDateTimeString(),
                     'moderation_comment' => $booking->moderation_comment,
+                    'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
                     'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,

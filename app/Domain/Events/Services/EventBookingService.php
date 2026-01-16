@@ -112,7 +112,7 @@ class EventBookingService
 
         $overlapExists = EventBooking::query()
             ->where('venue_id', $venue->id)
-            ->whereIn('status', ['pending', 'approved'])
+            ->whereIn('status', ['pending', 'awaiting_payment', 'paid', 'approved'])
             ->where(function ($query) use ($startsAt, $endsAt): void {
                 $query->where('starts_at', '<', $endsAt)
                     ->where('ends_at', '>', $startsAt);

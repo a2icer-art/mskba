@@ -3,6 +3,7 @@
 namespace App\Domain\Events\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,6 +21,8 @@ class EventBooking extends Model
         'starts_at',
         'ends_at',
         'status',
+        'payment_order_id',
+        'payment_order_snapshot',
         'moderation_comment',
         'moderated_by',
         'moderated_at',
@@ -32,6 +35,7 @@ class EventBooking extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'moderated_at' => 'datetime',
+            'payment_order_snapshot' => 'array',
         ];
     }
 
@@ -43,6 +47,11 @@ class EventBooking extends Model
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function paymentOrder(): BelongsTo
+    {
+        return $this->belongsTo(PaymentOrder::class);
     }
 
     public function creator(): BelongsTo

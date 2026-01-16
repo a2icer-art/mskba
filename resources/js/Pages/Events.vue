@@ -259,6 +259,20 @@ const formatDateRange = (startsAt, endsAt) => {
                                             <span class="text-sm leading-none">•</span>
                                         </span>
                                         <span
+                                            v-if="event.has_awaiting_payment_booking"
+                                            class="flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-indigo-700"
+                                            title="Есть бронирования в ожидании оплаты"
+                                        >
+                                            <span class="text-sm leading-none">◇</span>
+                                        </span>
+                                        <span
+                                            v-if="event.has_paid_booking"
+                                            class="flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-700"
+                                            title="Есть оплаченные бронирования"
+                                        >
+                                            <span class="text-sm leading-none">◆</span>
+                                        </span>
+                                        <span
                                             v-if="event.has_approved_booking"
                                             class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
                                             title="Есть подтвержденные бронирования"

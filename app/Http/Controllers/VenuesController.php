@@ -15,6 +15,7 @@ use App\Domain\Permissions\Registry\PermissionRegistry;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
@@ -351,7 +352,7 @@ class VenuesController extends Controller
 
         $bookingDates = EventBooking::query()
             ->where('venue_id', $venue->id)
-            ->whereIn('status', ['pending', 'approved'])
+            ->whereIn('status', ['pending', 'awaiting_payment', 'paid', 'approved'])
             ->orderBy('starts_at')
             ->get(['starts_at'])
             ->map(static fn (EventBooking $booking) => $booking->starts_at?->toDateString())
@@ -413,7 +414,7 @@ class VenuesController extends Controller
 
         $now = now();
         $status = $request->string('status')->toString();
-        $allowedStatuses = ['pending', 'approved', 'cancelled'];
+        $allowedStatuses = ['pending', 'awaiting_payment', 'paid', 'approved', 'cancelled'];
         if (!in_array($status, $allowedStatuses, true)) {
             $status = '';
         }
@@ -421,18 +422,20 @@ class VenuesController extends Controller
         $bookings = EventBooking::query()
             ->where('venue_id', $venue->id)
             ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->with(['event.type', 'event.organizer', 'creator', 'moderator'])
+            ->with(['event.type', 'event.organizer', 'creator', 'moderator', 'paymentOrder'])
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString()
             ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $isAdmin, $now): array {
                 $status = $booking->status;
                 $isPast = $booking->starts_at && $booking->starts_at->lt($now);
+                $paymentSnapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 return [
                     'id' => $booking->id,
                     'status' => $status,
                     'starts_at' => $booking->starts_at?->toDateTimeString(),
                     'ends_at' => $booking->ends_at?->toDateTimeString(),
+                    'payment_order' => $paymentSnapshot['label'] ?? $booking->paymentOrder?->label,
                     'event' => $booking->event
                         ? [
                             'id' => $booking->event->id,
@@ -464,8 +467,11 @@ class VenuesController extends Controller
                         ]
                         : null,
                     'moderated_at' => $booking->moderated_at?->toDateTimeString(),
-                    'can_confirm' => !$isPast && $canConfirm && $status === 'pending',
-                    'can_cancel' => !$isPast && $canCancel && ($status === 'pending' || ($status === 'approved' && $isAdmin)),
+                    'can_await_payment' => !$isPast && $canConfirm && $status === 'pending',
+                    'can_mark_paid' => !$isPast && $canConfirm && $status === 'awaiting_payment',
+                    'can_confirm' => !$isPast && $canConfirm && $status === 'paid',
+                    'can_cancel' => !$isPast && $canCancel && (in_array($status, ['pending', 'awaiting_payment'], true)
+                        || ($status === 'approved' && $isAdmin)),
                 ];
             });
 
@@ -531,14 +537,27 @@ class VenuesController extends Controller
             'label' => 'Настройки',
         ])['data'];
 
+        $defaultPaymentOrderId = PaymentOrder::query()
+            ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
+            ->value('id');
+
         $settings = VenueSettings::query()->firstOrCreate(
             ['venue_id' => $venue->id],
             [
                 'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
                 'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
-                'payment_order' => VenueSettings::DEFAULT_PAYMENT_ORDER->value,
+                'payment_order_id' => $defaultPaymentOrderId,
             ]
         );
+
+        $paymentOrders = PaymentOrder::query()
+            ->orderBy('label')
+            ->get(['id', 'label'])
+            ->map(fn (PaymentOrder $order) => [
+                'value' => $order->id,
+                'label' => $order->label,
+            ])
+            ->all();
 
         return Inertia::render('VenueSettings', [
             'appName' => config('app.name'),
@@ -550,13 +569,9 @@ class VenuesController extends Controller
             'settings' => [
                 'booking_lead_time_minutes' => $settings->booking_lead_time_minutes,
                 'booking_min_interval_minutes' => $settings->booking_min_interval_minutes,
-                'payment_order' => $settings->payment_order?->value,
+                'payment_order_id' => $settings->payment_order_id,
             ],
-            'paymentOrderOptions' => [
-                ['value' => VenuePaymentOrder::Prepayment->value, 'label' => 'Предоплата'],
-                ['value' => VenuePaymentOrder::PartialPrepayment->value, 'label' => 'Частичная предоплата'],
-                ['value' => VenuePaymentOrder::Postpayment->value, 'label' => 'Постоплата'],
-            ],
+            'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/settings",
             'activeTypeSlug' => $type,
@@ -584,38 +599,30 @@ class VenuesController extends Controller
 
         $data = $request->validate(
             [
-                'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
-                'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
-                'payment_order' => [
-                    'required',
-                    'string',
-                    'in:' . implode(',', [
-                        VenuePaymentOrder::Prepayment->value,
-                        VenuePaymentOrder::PartialPrepayment->value,
-                        VenuePaymentOrder::Postpayment->value,
-                    ]),
-                ],
-            ],
-            [
-                'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
-                'booking_lead_time_minutes.integer' => 'Допустимое время до начала бронирования должно быть числом.',
-                'booking_lead_time_minutes.min' => 'Допустимое время до начала бронирования не может быть отрицательным.',
-                'booking_lead_time_minutes.max' => 'Допустимое время до начала бронирования не может превышать 1440 минут.',
-                'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
-                'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
-                'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
-                'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
-                'payment_order.required' => 'Выберите порядок оплаты.',
-                'payment_order.in' => 'Выберите корректный порядок оплаты.',
-            ]
-        );
+            'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
+            'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
+        ],
+        [
+            'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
+            'booking_lead_time_minutes.integer' => 'Допустимое время до начала бронирования должно быть числом.',
+            'booking_lead_time_minutes.min' => 'Допустимое время до начала бронирования не может быть отрицательным.',
+            'booking_lead_time_minutes.max' => 'Допустимое время до начала бронирования не может превышать 1440 минут.',
+            'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
+            'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
+            'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
+            'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
+            'payment_order_id.required' => 'Выберите порядок оплаты.',
+            'payment_order_id.exists' => 'Выберите корректный порядок оплаты.',
+        ]
+    );
 
         VenueSettings::query()->updateOrCreate(
             ['venue_id' => $venue->id],
             [
                 'booking_lead_time_minutes' => $data['booking_lead_time_minutes'],
                 'booking_min_interval_minutes' => $data['booking_min_interval_minutes'],
-                'payment_order' => $data['payment_order'],
+                'payment_order_id' => $data['payment_order_id'],
             ]
         );
 
@@ -649,9 +656,9 @@ class VenuesController extends Controller
             ]);
         }
 
-        if ($booking->status !== 'pending') {
+        if ($booking->status !== 'paid') {
             return back()->withErrors([
-                'booking' => 'Подтвердить можно только заявку в статусе ожидания.',
+                'booking' => 'Подтверждение возможно только после оплаты.',
             ]);
         }
 
@@ -667,6 +674,111 @@ class VenuesController extends Controller
         ]);
 
         return back()->with('notice', 'Бронирование подтверждено.');
+    }
+
+    public function awaitPaymentBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueBookingConfirm, $venue)) {
+            abort(403);
+        }
+
+        if ($booking->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        if ($booking->status !== 'pending') {
+            return back()->withErrors([
+                'booking' => 'Бронирование уже обработано.',
+            ]);
+        }
+
+        if ($booking->starts_at && $booking->starts_at->lt(now())) {
+            return back()->withErrors([
+                'booking' => 'Нельзя подтверждать бронирование в прошлом.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $paymentOrder = $venue->settings?->paymentOrder;
+        if (!$paymentOrder) {
+            $paymentOrder = PaymentOrder::query()
+                ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
+                ->first();
+        }
+
+        $booking->update([
+            'status' => 'awaiting_payment',
+            'payment_order_id' => $paymentOrder?->id,
+            'payment_order_snapshot' => $paymentOrder
+                ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
+                : null,
+            'moderation_comment' => $data['comment'] ?? null,
+            'moderated_by' => $user->id,
+            'moderated_at' => now(),
+        ]);
+
+        return back()->with('notice', 'Бронирование переведено в ожидание оплаты.');
+    }
+
+    public function markPaidBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueBookingConfirm, $venue)) {
+            abort(403);
+        }
+
+        if ($booking->venue_id !== $venue->id) {
+            abort(404);
+        }
+
+        if ($booking->status !== 'awaiting_payment') {
+            return back()->withErrors([
+                'booking' => 'Бронирование уже обработано.',
+            ]);
+        }
+
+        if ($booking->starts_at && $booking->starts_at->lt(now())) {
+            return back()->withErrors([
+                'booking' => 'Нельзя подтверждать бронирование в прошлом.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $booking->update([
+            'status' => 'paid',
+            'moderation_comment' => $data['comment'] ?? null,
+            'moderated_by' => $user->id,
+            'moderated_at' => now(),
+        ]);
+
+        return back()->with('notice', 'Бронирование помечено как оплаченное.');
     }
 
     public function cancelBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
@@ -696,7 +808,7 @@ class VenuesController extends Controller
             ]);
         }
 
-        if (!in_array($booking->status, ['pending', 'approved'], true)) {
+        if (!in_array($booking->status, ['pending', 'awaiting_payment', 'approved'], true)) {
             return back()->withErrors([
                 'booking' => 'Отменить можно только активную заявку.',
             ]);
