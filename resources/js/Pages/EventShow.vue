@@ -62,6 +62,12 @@ const bookingForm = useForm({
     starts_at: '',
     ends_at: '',
 });
+const defaultLeadMinutes = 15;
+const defaultMinIntervalMinutes = 30;
+const venueSettings = ref({
+    leadMinutes: defaultLeadMinutes,
+    minIntervalMinutes: defaultMinIntervalMinutes,
+});
 const venueQuery = ref('');
 const venueSuggestions = ref([]);
 const venueSuggestLoading = ref(false);
@@ -122,7 +128,7 @@ const isBookingDisabled = computed(() => {
     if (bookingForm.processing) {
         return true;
     }
-    return !bookingForm.venue_id || !bookingForm.date || !bookingForm.starts_time || !bookingForm.ends_time;
+    return !bookingForm.venue_id || !bookingForm.date || !bookingForm.starts_time || !bookingForm.ends_time || bookingClientError.value !== '';
 });
 
 const scheduleVenueSuggestions = (value) => {
@@ -171,6 +177,10 @@ const applyVenueSuggestion = (suggestion) => {
     bookingForm.venue_id = suggestion.id;
     venueQuery.value = suggestion.label || suggestion.name || '';
     venueSuggestions.value = [];
+    venueSettings.value = {
+        leadMinutes: Number(suggestion.booking_lead_time_minutes) || defaultLeadMinutes,
+        minIntervalMinutes: Number(suggestion.booking_min_interval_minutes) || defaultMinIntervalMinutes,
+    };
 };
 
 const clearVenueSelection = () => {
@@ -178,6 +188,10 @@ const clearVenueSelection = () => {
     venueQuery.value = '';
     venueSuggestions.value = [];
     venueSuggestError.value = '';
+    venueSettings.value = {
+        leadMinutes: defaultLeadMinutes,
+        minIntervalMinutes: defaultMinIntervalMinutes,
+    };
 };
 
 const formatDateTime = (value) => {
@@ -236,6 +250,33 @@ const combineDateTime = (date, time) => {
     }
     return `${date}T${time}`;
 };
+
+const bookingClientError = computed(() => {
+    if (!bookingForm.date || !bookingForm.starts_time) {
+        return '';
+    }
+    const start = new Date(`${bookingForm.date}T${bookingForm.starts_time}`);
+    if (Number.isNaN(start.getTime())) {
+        return '';
+    }
+    const minStart = new Date();
+    minStart.setMinutes(minStart.getMinutes() + venueSettings.value.leadMinutes);
+    if (start < minStart) {
+        return `Бронирование возможно не ранее чем через ${venueSettings.value.leadMinutes} мин.`;
+    }
+    if (!bookingForm.ends_time) {
+        return '';
+    }
+    const end = new Date(`${bookingForm.date}T${bookingForm.ends_time}`);
+    if (Number.isNaN(end.getTime())) {
+        return '';
+    }
+    const minEnd = new Date(start.getTime() + venueSettings.value.minIntervalMinutes * 60000);
+    if (end < minEnd) {
+        return `Длительность бронирования должна быть не менее ${venueSettings.value.minIntervalMinutes} мин.`;
+    }
+    return '';
+});
 </script>
 
 <template>
@@ -420,6 +461,9 @@ const combineDateTime = (date, time) => {
                                 type="date"
                             />
                         </label>
+                        <p class="text-xs text-slate-500">
+                            Допустимое время до начала: {{ venueSettings.leadMinutes }} мин.
+                        </p>
                         <div class="grid gap-3 md:grid-cols-2">
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Начало
@@ -438,8 +482,14 @@ const combineDateTime = (date, time) => {
                                 />
                             </label>
                         </div>
+                        <p class="text-xs text-slate-500">
+                            Минимальная длительность: {{ venueSettings.minIntervalMinutes }} мин.
+                        </p>
                         <div v-if="bookingForm.errors.starts_at || bookingForm.errors.ends_at" class="text-xs text-rose-700">
                             {{ bookingForm.errors.starts_at || bookingForm.errors.ends_at }}
+                        </div>
+                        <div v-else-if="bookingClientError" class="text-xs text-rose-700">
+                            {{ bookingClientError }}
                         </div>
                     </div>
                 </div>

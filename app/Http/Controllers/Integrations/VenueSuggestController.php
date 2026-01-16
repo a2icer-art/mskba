@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Integrations;
 
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,7 +33,7 @@ class VenueSuggestController
                             });
                     });
             })
-            ->with(['latestAddress.metro'])
+            ->with(['latestAddress.metro', 'settings'])
             ->orderBy('name')
             ->limit(10)
             ->get(['id', 'name', 'str_address']);
@@ -55,6 +56,10 @@ class VenueSuggestController
                 'address' => $address,
                 'metro' => $metro,
                 'label' => $label,
+                'booking_lead_time_minutes' => $venue->settings?->booking_lead_time_minutes
+                    ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+                'booking_min_interval_minutes' => $venue->settings?->booking_min_interval_minutes
+                    ?? VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
             ];
         })->all();
 
