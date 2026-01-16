@@ -7,6 +7,7 @@ use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminLogsController;
+use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\HomeController;
@@ -166,4 +167,8 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])
         ->middleware('can:logs.view')
         ->name('admin.logs.show');
+    Route::get('/settings', [AdminSettingsController::class, 'index'])
+        ->name('admin.settings');
+    Route::patch('/settings', [AdminSettingsController::class, 'update'])
+        ->name('admin.settings.update');
 });

@@ -40,6 +40,13 @@ class AdminNavigationService
             ];
         }
 
+        if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
+            $systemItems[] = [
+                'label' => 'Настройки',
+                'href' => '/admin/settings',
+            ];
+        }
+
         if ($moderationItems !== []) {
             $groups[] = [
                 'title' => 'Модерация',
