@@ -15,6 +15,9 @@ use App\Domain\Permissions\Registry\PermissionRegistry;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Payments\Enums\PaymentCurrency;
+use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Payments\Models\Payment;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
@@ -419,24 +422,25 @@ class VenuesController extends Controller
             $status = '';
         }
 
-        $bookings = EventBooking::query()
-            ->where('venue_id', $venue->id)
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->with(['event.type', 'event.organizer', 'creator', 'moderator', 'paymentOrder'])
-            ->orderByDesc('id')
-            ->paginate(10)
-            ->withQueryString()
-            ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $isAdmin, $now): array {
+          $bookings = EventBooking::query()
+              ->where('venue_id', $venue->id)
+              ->when($status !== '', fn ($query) => $query->where('status', $status))
+              ->with(['event.type', 'event.organizer', 'creator', 'moderator', 'paymentOrder', 'payment'])
+              ->orderByDesc('id')
+              ->paginate(10)
+              ->withQueryString()
+              ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $isAdmin, $now): array {
                 $status = $booking->status;
                 $isPast = $booking->starts_at && $booking->starts_at->lt($now);
                 $paymentSnapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 return [
                     'id' => $booking->id,
                     'status' => $status,
-                    'starts_at' => $booking->starts_at?->toDateTimeString(),
-                    'ends_at' => $booking->ends_at?->toDateTimeString(),
-                    'payment_order' => $paymentSnapshot['label'] ?? $booking->paymentOrder?->label,
-                    'event' => $booking->event
+                      'starts_at' => $booking->starts_at?->toDateTimeString(),
+                      'ends_at' => $booking->ends_at?->toDateTimeString(),
+                      'payment_order' => $paymentSnapshot['label'] ?? $booking->paymentOrder?->label,
+                      'payment_code' => $booking->payment?->payment_code,
+                      'event' => $booking->event
                         ? [
                             'id' => $booking->event->id,
                             'title' => $booking->event->title ?: 'Событие',
@@ -746,6 +750,42 @@ class VenuesController extends Controller
             'moderated_at' => now(),
         ]);
 
+        $settings = $venue->settings ?: new VenueSettings([
+            'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+            'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+        ]);
+        $durationMinutes = $booking->starts_at && $booking->ends_at
+            ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
+            : 0;
+        $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
+        $units = $durationMinutes > 0 ? (int) ceil($durationMinutes / $unitMinutes) : 0;
+        $unitPrice = (int) $settings->rental_price_rub;
+        $amount = $units * $unitPrice;
+        $snapshot = $paymentOrder
+            ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
+            : null;
+
+        Payment::query()->updateOrCreate(
+            [
+                'payable_type' => $booking->getMorphClass(),
+                'payable_id' => $booking->id,
+            ],
+            [
+                'user_id' => $booking->created_by ?? $user->id,
+                'payment_order_id' => $paymentOrder?->id,
+                'payment_order_snapshot' => $snapshot,
+                'amount_minor' => $amount,
+                'currency' => PaymentCurrency::Rub,
+                'status' => PaymentStatus::Pending,
+                'meta' => [
+                    'duration_minutes' => $durationMinutes,
+                    'unit_minutes' => $unitMinutes,
+                    'unit_price_rub' => $unitPrice,
+                    'units' => $units,
+                ],
+            ]
+        );
+
         return back()->with('notice', 'Бронирование переведено в ожидание оплаты.');
     }
 
@@ -792,6 +832,14 @@ class VenuesController extends Controller
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);
+
+        Payment::query()
+            ->where('payable_type', $booking->getMorphClass())
+            ->where('payable_id', $booking->id)
+            ->update([
+                'status' => PaymentStatus::Paid,
+                'paid_at' => now(),
+            ]);
 
         return back()->with('notice', 'Бронирование помечено как оплаченное.');
     }
@@ -848,6 +896,13 @@ class VenuesController extends Controller
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);
+
+        Payment::query()
+            ->where('payable_type', $booking->getMorphClass())
+            ->where('payable_id', $booking->id)
+            ->update([
+                'status' => PaymentStatus::Cancelled,
+            ]);
 
         return back()->with('notice', 'Бронирование отменено.');
     }

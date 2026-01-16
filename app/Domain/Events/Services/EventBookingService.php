@@ -4,6 +4,9 @@ namespace App\Domain\Events\Services;
 
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Payments\Enums\PaymentCurrency;
+use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Payments\Models\Payment;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use Carbon\CarbonInterface;
@@ -15,7 +18,7 @@ class EventBookingService
     {
         $this->ensureBookingValid($event, $venue, $startsAt, $endsAt);
 
-        return EventBooking::query()->create([
+        $booking = EventBooking::query()->create([
             'event_id' => $event->id,
             'venue_id' => $venue->id,
             'starts_at' => $startsAt,
@@ -23,6 +26,10 @@ class EventBookingService
             'status' => 'pending',
             'created_by' => $createdBy,
         ]);
+
+        $this->createInitialPayment($booking, $venue, $createdBy);
+
+        return $booking;
     }
 
     private function ensureBookingValid(Event $event, Venue $venue, CarbonInterface $startsAt, CarbonInterface $endsAt): void
@@ -145,6 +152,35 @@ class EventBookingService
             'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
             'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
             'payment_order' => VenueSettings::DEFAULT_PAYMENT_ORDER->value,
+            'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+            'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+        ]);
+    }
+
+    private function createInitialPayment(EventBooking $booking, Venue $venue, int $createdBy): void
+    {
+        $settings = $this->resolveSettings($venue);
+        $durationMinutes = $booking->starts_at && $booking->ends_at
+            ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
+            : 0;
+        $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
+        $units = $durationMinutes > 0 ? (int) ceil($durationMinutes / $unitMinutes) : 0;
+        $unitPrice = (int) $settings->rental_price_rub;
+        $amount = $units * $unitPrice;
+
+        Payment::query()->create([
+            'user_id' => $createdBy,
+            'payable_type' => $booking->getMorphClass(),
+            'payable_id' => $booking->id,
+            'amount_minor' => $amount,
+            'currency' => PaymentCurrency::Rub,
+            'status' => PaymentStatus::Created,
+            'meta' => [
+                'duration_minutes' => $durationMinutes,
+                'unit_minutes' => $unitMinutes,
+                'unit_price_rub' => $unitPrice,
+                'units' => $units,
+            ],
         ]);
     }
 }

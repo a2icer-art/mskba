@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class EventBooking extends Model
 {
@@ -52,6 +53,11 @@ class EventBooking extends Model
     public function paymentOrder(): BelongsTo
     {
         return $this->belongsTo(PaymentOrder::class);
+    }
+
+    public function payment(): MorphOne
+    {
+        return $this->morphOne(\App\Domain\Payments\Models\Payment::class, 'payable');
     }
 
     public function creator(): BelongsTo

@@ -390,6 +390,10 @@ const bookingClientError = computed(() => {
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Порядок оплаты</span>
                                     <p class="mt-1">{{ booking.payment_order }}</p>
                                 </div>
+                                <div v-if="booking.payment_code" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
+                                    <p class="mt-1">{{ booking.payment_code }}</p>
+                                </div>
                             </div>
                         </div>
                     </section>

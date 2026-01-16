@@ -316,6 +316,9 @@ const submitPaid = () => {
                                     <span v-if="booking.payment_order" class="text-xs text-slate-500">
                                         Порядок оплаты: {{ booking.payment_order }}
                                     </span>
+                                    <span v-if="booking.payment_code" class="text-xs text-slate-500">
+                                        Платеж № {{ booking.payment_code }}
+                                    </span>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <button
                                             v-if="booking.can_await_payment"

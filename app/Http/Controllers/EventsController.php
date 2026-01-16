@@ -191,7 +191,7 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder']);
+        $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder', 'bookings.payment']);
 
         $bookings = $event->bookings
             ->map(static function ($booking): array {
@@ -199,11 +199,12 @@ class EventsController extends Controller
                 return [
                     'id' => $booking->id,
                     'status' => $booking->status,
-                    'starts_at' => $booking->starts_at?->toDateTimeString(),
-                    'ends_at' => $booking->ends_at?->toDateTimeString(),
-                    'moderation_comment' => $booking->moderation_comment,
-                    'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
-                    'venue' => $booking->venue
+                  'starts_at' => $booking->starts_at?->toDateTimeString(),
+                  'ends_at' => $booking->ends_at?->toDateTimeString(),
+                  'moderation_comment' => $booking->moderation_comment,
+                  'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
+                  'payment_code' => $booking->payment?->payment_code,
+                  'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,
                             'name' => $booking->venue->name,
