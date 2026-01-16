@@ -541,14 +541,16 @@ class VenuesController extends Controller
             ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
             ->value('id');
 
-        $settings = VenueSettings::query()->firstOrCreate(
-            ['venue_id' => $venue->id],
-            [
-                'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
-                'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
-                'payment_order_id' => $defaultPaymentOrderId,
-            ]
-        );
+          $settings = VenueSettings::query()->firstOrCreate(
+              ['venue_id' => $venue->id],
+              [
+                  'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+                  'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
+                  'payment_order_id' => $defaultPaymentOrderId,
+                  'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+                  'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+              ]
+          );
 
         $paymentOrders = PaymentOrder::query()
             ->orderBy('label')
@@ -567,10 +569,12 @@ class VenuesController extends Controller
                 'alias' => $venue->alias,
             ],
             'settings' => [
-                'booking_lead_time_minutes' => $settings->booking_lead_time_minutes,
-                'booking_min_interval_minutes' => $settings->booking_min_interval_minutes,
-                'payment_order_id' => $settings->payment_order_id,
-            ],
+              'booking_lead_time_minutes' => $settings->booking_lead_time_minutes,
+              'booking_min_interval_minutes' => $settings->booking_min_interval_minutes,
+              'payment_order_id' => $settings->payment_order_id,
+              'rental_duration_minutes' => $settings->rental_duration_minutes,
+              'rental_price_rub' => $settings->rental_price_rub,
+          ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/settings",
@@ -599,32 +603,43 @@ class VenuesController extends Controller
 
         $data = $request->validate(
             [
-            'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
-            'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
-            'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
-        ],
-        [
+              'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+              'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
+              'rental_duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+              'rental_price_rub' => ['required', 'integer', 'min:0'],
+              'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
+          ],
+          [
             'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
             'booking_lead_time_minutes.integer' => 'Допустимое время до начала бронирования должно быть числом.',
             'booking_lead_time_minutes.min' => 'Допустимое время до начала бронирования не может быть отрицательным.',
             'booking_lead_time_minutes.max' => 'Допустимое время до начала бронирования не может превышать 1440 минут.',
-            'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
-            'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
-            'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
-            'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
-            'payment_order_id.required' => 'Выберите порядок оплаты.',
-            'payment_order_id.exists' => 'Выберите корректный порядок оплаты.',
-        ]
-    );
+              'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
+              'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
+              'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
+              'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
+              'rental_duration_minutes.required' => 'Укажите длительность аренды.',
+              'rental_duration_minutes.integer' => 'Длительность аренды должна быть числом.',
+              'rental_duration_minutes.min' => 'Длительность аренды должна быть больше 0 минут.',
+              'rental_duration_minutes.max' => 'Длительность аренды не может превышать 1440 минут.',
+              'rental_price_rub.required' => 'Укажите стоимость аренды.',
+              'rental_price_rub.integer' => 'Стоимость аренды должна быть числом.',
+              'rental_price_rub.min' => 'Стоимость аренды не может быть отрицательной.',
+              'payment_order_id.required' => 'Выберите порядок оплаты.',
+              'payment_order_id.exists' => 'Выберите корректный порядок оплаты.',
+          ]
+      );
 
         VenueSettings::query()->updateOrCreate(
             ['venue_id' => $venue->id],
-            [
-                'booking_lead_time_minutes' => $data['booking_lead_time_minutes'],
-                'booking_min_interval_minutes' => $data['booking_min_interval_minutes'],
-                'payment_order_id' => $data['payment_order_id'],
-            ]
-        );
+              [
+                  'booking_lead_time_minutes' => $data['booking_lead_time_minutes'],
+                  'booking_min_interval_minutes' => $data['booking_min_interval_minutes'],
+                  'payment_order_id' => $data['payment_order_id'],
+                  'rental_duration_minutes' => $data['rental_duration_minutes'],
+                  'rental_price_rub' => $data['rental_price_rub'],
+              ]
+          );
 
         return back()->with('notice', 'Настройки площадки обновлены.');
     }

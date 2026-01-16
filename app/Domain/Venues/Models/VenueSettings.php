@@ -15,12 +15,16 @@ class VenueSettings extends Model
     public const DEFAULT_BOOKING_LEAD_MINUTES = 15;
     public const DEFAULT_BOOKING_MIN_INTERVAL_MINUTES = 30;
     public const DEFAULT_PAYMENT_ORDER = VenuePaymentOrder::Prepayment;
+    public const DEFAULT_RENTAL_DURATION_MINUTES = 60;
+    public const DEFAULT_RENTAL_PRICE_RUB = 0;
 
     protected $fillable = [
         'venue_id',
         'booking_lead_time_minutes',
         'booking_min_interval_minutes',
         'payment_order_id',
+        'rental_duration_minutes',
+        'rental_price_rub',
     ];
 
     protected function casts(): array
@@ -29,6 +33,8 @@ class VenueSettings extends Model
             'booking_lead_time_minutes' => 'integer',
             'booking_min_interval_minutes' => 'integer',
             'payment_order_id' => 'integer',
+            'rental_duration_minutes' => 'integer',
+            'rental_price_rub' => 'integer',
         ];
     }
 

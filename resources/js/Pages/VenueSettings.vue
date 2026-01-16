@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
@@ -47,13 +47,43 @@ const page = usePage();
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors ?? {});
 
+const isMinutes = ref(false);
+const rentalDurationValue = ref(1);
+const initialRentalMinutes = props.settings?.rental_duration_minutes ?? 60;
+if (initialRentalMinutes % 60 === 0) {
+    isMinutes.value = false;
+    rentalDurationValue.value = initialRentalMinutes / 60;
+} else {
+    isMinutes.value = true;
+    rentalDurationValue.value = initialRentalMinutes;
+}
+const rentalDurationMax = computed(() => (isMinutes.value ? 1440 : 24));
+const rentalDurationStep = computed(() => (isMinutes.value ? 1 : 0.25));
+
+watch(isMinutes, (value) => {
+    const current = Number(rentalDurationValue.value);
+    if (!Number.isFinite(current)) {
+        return;
+    }
+
+    rentalDurationValue.value = value ? current * 60 : Number((current / 60).toFixed(2));
+});
+
 const form = useForm({
     booking_lead_time_minutes: props.settings?.booking_lead_time_minutes ?? 15,
     booking_min_interval_minutes: props.settings?.booking_min_interval_minutes ?? 30,
+    rental_duration_minutes: props.settings?.rental_duration_minutes ?? 60,
+    rental_price_rub: props.settings?.rental_price_rub ?? 0,
     payment_order_id: props.settings?.payment_order_id ?? '',
 });
 
 const submit = () => {
+    const durationValue = Number(rentalDurationValue.value);
+    form.rental_duration_minutes = Number.isFinite(durationValue)
+        ? isMinutes.value
+            ? durationValue
+            : durationValue * 60
+        : null;
     form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/settings`, {
         preserveScroll: true,
     });
@@ -132,6 +162,45 @@ const submit = () => {
                                 <p v-if="actionError.payment_order_id" class="text-xs text-rose-700">
                                     {{ actionError.payment_order_id }}
                                 </p>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="grid gap-2">
+                                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                        Длительность аренды
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                        <input v-model="isMinutes" type="checkbox" class="input-switch" />
+                                        <span>В минутах</span>
+                                    </label>
+                                    <input
+                                        v-model="rentalDurationValue"
+                                        type="number"
+                                        min="1"
+                                        :step="rentalDurationStep"
+                                        :max="rentalDurationMax"
+                                        class="h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                    />
+                                    <p v-if="actionError.rental_duration_minutes" class="text-xs text-rose-700">
+                                        {{ actionError.rental_duration_minutes }}
+                                    </p>
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                        Стоимость аренды (руб.)
+                                    </label>
+                                    <div class="h-6"></div>
+                                    <input
+                                        v-model="form.rental_price_rub"
+                                        type="number"
+                                        min="0"
+                                        class="h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                    />
+                                    <p v-if="actionError.rental_price_rub" class="text-xs text-rose-700">
+                                        {{ actionError.rental_price_rub }}
+                                    </p>
+                                </div>
                             </div>
 
                             <div class="flex flex-wrap items-center justify-end gap-3">
