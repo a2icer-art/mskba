@@ -101,8 +101,11 @@ class EventsController extends Controller
         $startsAt = Carbon::parse($data['starts_at'], $timezone);
         $endsAt = Carbon::parse($data['ends_at'], $timezone);
 
-        if ($endsAt->lt($startsAt->copy()->addMinutes(15))) {
-            return back()->withErrors(['ends_at' => 'Длительность события должна быть не менее 15 минут.']);
+        $eventMinDuration = (int) config('events.min_duration_minutes', 15);
+        if ($endsAt->lt($startsAt->copy()->addMinutes($eventMinDuration))) {
+            return back()->withErrors([
+                'ends_at' => 'Длительность события должна быть не менее ' . $eventMinDuration . ' минут.',
+            ]);
         }
 
         $type = EventType::query()->find($data['event_type_id']);
@@ -133,10 +136,11 @@ class EventsController extends Controller
             }
         }
 
-        $leadMinutes = VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
         if ($venue) {
             $settings = $venue->settings()->first();
             $leadMinutes = $settings?->booking_lead_time_minutes ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
+        } else {
+            $leadMinutes = (int) config('events.lead_time_minutes', VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES);
         }
         $minStart = Carbon::now($timezone)->addMinutes($leadMinutes);
         if ($startsAt->lt($minStart)) {
