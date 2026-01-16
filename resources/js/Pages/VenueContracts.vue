@@ -307,9 +307,6 @@ const formatDate = (value) => {
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 class="text-3xl font-semibold text-slate-900">Контракты</h1>
-                            <p class="mt-2 text-sm text-slate-600">
-                                Площадка: {{ venue?.name || '—' }}
-                            </p>
                         </div>
                         <button
                             v-if="canAssignContracts"
@@ -648,4 +645,3 @@ const formatDate = (value) => {
         </div>
     </div>
 </template>
-

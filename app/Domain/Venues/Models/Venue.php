@@ -70,6 +70,11 @@ class Venue extends Model
         return $this->hasOne(VenueSchedule::class);
     }
 
+    public function settings(): HasOne
+    {
+        return $this->hasOne(VenueSettings::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

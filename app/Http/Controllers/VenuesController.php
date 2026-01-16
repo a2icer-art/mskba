@@ -16,6 +16,8 @@ use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueSettings;
+use App\Domain\Venues\Enums\VenuePaymentOrder;
 use App\Domain\Venues\Models\VenueSchedule;
 use App\Domain\Venues\Models\VenueScheduleException;
 use App\Domain\Venues\Models\VenueScheduleExceptionInterval;
@@ -497,6 +499,127 @@ class VenuesController extends Controller
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
+    }
+
+    public function settings(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        $navigation = app(VenueSidebarPresenter::class)->present([
+            'title' => 'Площадки',
+            'typeSlug' => $type,
+            'venue' => $venue,
+            'user' => $user,
+        ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Настройки',
+        ])['data'];
+
+        $settings = VenueSettings::query()->firstOrCreate(
+            ['venue_id' => $venue->id],
+            [
+                'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+                'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
+                'payment_order' => VenueSettings::DEFAULT_PAYMENT_ORDER->value,
+            ]
+        );
+
+        return Inertia::render('VenueSettings', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'settings' => [
+                'booking_lead_time_minutes' => $settings->booking_lead_time_minutes,
+                'booking_min_interval_minutes' => $settings->booking_min_interval_minutes,
+                'payment_order' => $settings->payment_order?->value,
+            ],
+            'paymentOrderOptions' => [
+                ['value' => VenuePaymentOrder::Prepayment->value, 'label' => 'Предоплата'],
+                ['value' => VenuePaymentOrder::PartialPrepayment->value, 'label' => 'Частичная предоплата'],
+                ['value' => VenuePaymentOrder::Postpayment->value, 'label' => 'Постоплата'],
+            ],
+            'navigation' => $navigation,
+            'activeHref' => "/venues/{$type}/{$venue->alias}/settings",
+            'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function updateSettings(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        $data = $request->validate(
+            [
+                'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+                'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
+                'payment_order' => [
+                    'required',
+                    'string',
+                    'in:' . implode(',', [
+                        VenuePaymentOrder::Prepayment->value,
+                        VenuePaymentOrder::PartialPrepayment->value,
+                        VenuePaymentOrder::Postpayment->value,
+                    ]),
+                ],
+            ],
+            [
+                'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
+                'booking_lead_time_minutes.integer' => 'Допустимое время до начала бронирования должно быть числом.',
+                'booking_lead_time_minutes.min' => 'Допустимое время до начала бронирования не может быть отрицательным.',
+                'booking_lead_time_minutes.max' => 'Допустимое время до начала бронирования не может превышать 1440 минут.',
+                'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
+                'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
+                'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
+                'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
+                'payment_order.required' => 'Выберите порядок оплаты.',
+                'payment_order.in' => 'Выберите корректный порядок оплаты.',
+            ]
+        );
+
+        VenueSettings::query()->updateOrCreate(
+            ['venue_id' => $venue->id],
+            [
+                'booking_lead_time_minutes' => $data['booking_lead_time_minutes'],
+                'booking_min_interval_minutes' => $data['booking_min_interval_minutes'],
+                'payment_order' => $data['payment_order'],
+            ]
+        );
+
+        return back()->with('notice', 'Настройки площадки обновлены.');
     }
 
     public function confirmBooking(Request $request, string $type, Venue $venue, EventBooking $booking)

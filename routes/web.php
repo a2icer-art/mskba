@@ -103,6 +103,12 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
         ->middleware('auth')
         ->name('venues.bookings.cancel');
+    Route::get('/{type}/{venue}/settings', [VenuesController::class, 'settings'])
+        ->middleware('auth')
+        ->name('venues.settings');
+    Route::patch('/{type}/{venue}/settings', [VenuesController::class, 'updateSettings'])
+        ->middleware('auth')
+        ->name('venues.settings.update');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
 

@@ -47,8 +47,9 @@ class VenueSidebarPresenter extends BasePresenter
 
         $canViewContracts = $this->canViewContracts($user, $venue);
         $canManageBookings = $this->canManageBookings($user, $venue);
+        $canManageSettings = $this->canManageSettings($user, $venue);
 
-        if ($canViewContracts || $canManageBookings) {
+        if ($canViewContracts || $canManageBookings || $canManageSettings) {
             $adminItems = [];
             if ($canViewContracts) {
                 $adminItems[] = [
@@ -60,6 +61,12 @@ class VenueSidebarPresenter extends BasePresenter
                 $adminItems[] = [
                     'label' => 'Бронирование',
                     'href' => "/venues/{$typeSlug}/{$venue->alias}/bookings",
+                ];
+            }
+            if ($canManageSettings) {
+                $adminItems[] = [
+                    'label' => 'Настройки',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/settings",
                 ];
             }
 
@@ -114,5 +121,24 @@ class VenueSidebarPresenter extends BasePresenter
 
         return $checker->can($user, PermissionCode::VenueBookingConfirm, $venue)
             || $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
+    }
+
+    private function canManageSettings(?User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()
+            ->where('alias', 'admin')
+            ->exists();
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueUpdate, $venue);
     }
 }
