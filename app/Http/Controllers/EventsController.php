@@ -8,6 +8,7 @@ use App\Domain\Events\Services\EventBookingService;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Venues\Models\VenueSettings;
 use App\Presentation\Breadcrumbs\EventBreadcrumbsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -99,13 +100,6 @@ class EventsController extends Controller
         $timezone = config('app.timezone');
         $startsAt = Carbon::parse($data['starts_at'], $timezone);
         $endsAt = Carbon::parse($data['ends_at'], $timezone);
-        $minStart = Carbon::now($timezone)->addMinutes(15);
-
-        if ($startsAt->lt($minStart)) {
-            return back()->withErrors([
-                'starts_at' => 'Событие должно начинаться не ранее чем ' . $minStart->format('d.m.Y H:i') . '.',
-            ]);
-        }
 
         if ($endsAt->lt($startsAt->copy()->addMinutes(15))) {
             return back()->withErrors(['ends_at' => 'Длительность события должна быть не менее 15 минут.']);
@@ -137,6 +131,18 @@ class EventsController extends Controller
             if (!$venue) {
                 return back()->withErrors(['venue_id' => 'Площадка не найдена.']);
             }
+        }
+
+        $leadMinutes = VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
+        if ($venue) {
+            $settings = $venue->settings()->first();
+            $leadMinutes = $settings?->booking_lead_time_minutes ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
+        }
+        $minStart = Carbon::now($timezone)->addMinutes($leadMinutes);
+        if ($startsAt->lt($minStart)) {
+            return back()->withErrors([
+                'starts_at' => 'Событие должно начинаться не ранее чем ' . $minStart->format('d.m.Y H:i') . '.',
+            ]);
         }
 
         try {
@@ -197,7 +203,7 @@ class EventsController extends Controller
         $timezone = config('app.timezone');
         $now = Carbon::now($timezone);
         $bookingDeadlinePassed = $event->starts_at
-            ? $event->starts_at->copy()->subMinutes(15)->lte($now)
+            ? $event->starts_at->copy()->subMinutes(VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES)->lte($now)
             : false;
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
         $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
@@ -242,14 +248,6 @@ class EventsController extends Controller
             abort(403);
         }
 
-        $timezone = config('app.timezone');
-        $now = Carbon::now($timezone);
-        if ($event->starts_at && $event->starts_at->copy()->subMinutes(15)->lte($now)) {
-            return back()->withErrors([
-                'booking' => 'Бронирование возможно не позднее чем за 15 минут до начала события.',
-            ]);
-        }
-
         $data = $request->validate(
             [
                 'venue_id' => ['required', 'integer', 'exists:venues,id'],
@@ -264,6 +262,16 @@ class EventsController extends Controller
         $venue = Venue::query()->find($data['venue_id']);
         if (!$venue) {
             return back()->withErrors(['venue_id' => 'Площадка не найдена.']);
+        }
+
+        $settings = $venue->settings()->first();
+        $leadMinutes = $settings?->booking_lead_time_minutes ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
+        $timezone = config('app.timezone');
+        $now = Carbon::now($timezone);
+        if ($event->starts_at && $event->starts_at->copy()->subMinutes($leadMinutes)->lte($now)) {
+            return back()->withErrors([
+                'booking' => 'Бронирование возможно не позднее чем за ' . $leadMinutes . ' минут до начала события.',
+            ]);
         }
 
         $service->create(

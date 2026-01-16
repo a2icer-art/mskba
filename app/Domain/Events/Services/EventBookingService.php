@@ -5,7 +5,7 @@ namespace App\Domain\Events\Services;
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Venues\Models\Venue;
-use App\Domain\Venues\Models\VenueScheduleInterval;
+use App\Domain\Venues\Models\VenueSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
@@ -33,16 +33,20 @@ class EventBookingService
             ]);
         }
 
-        $minStart = now()->addMinutes(15);
+        $settings = $this->resolveSettings($venue);
+        $leadMinutes = (int) $settings->booking_lead_time_minutes;
+        $minIntervalMinutes = (int) $settings->booking_min_interval_minutes;
+
+        $minStart = now()->addMinutes($leadMinutes);
         if ($startsAt->lt($minStart)) {
             throw ValidationException::withMessages([
                 'starts_at' => 'Бронирование должно начинаться не ранее чем ' . $minStart->format('d.m.Y H:i') . '.',
             ]);
         }
 
-        if ($endsAt->lt($startsAt->copy()->addMinutes(15))) {
+        if ($endsAt->lt($startsAt->copy()->addMinutes($minIntervalMinutes))) {
             throw ValidationException::withMessages([
-                'ends_at' => 'Длительность бронирования должна быть не менее 15 минут.',
+                'ends_at' => 'Длительность бронирования должна быть не менее ' . $minIntervalMinutes . ' минут.',
             ]);
         }
 
@@ -128,5 +132,19 @@ class EventBookingService
         [$hours, $minutes] = array_pad(explode(':', $chunk, 2), 2, 0);
 
         return ((int) $hours) * 60 + (int) $minutes;
+    }
+
+    private function resolveSettings(Venue $venue): VenueSettings
+    {
+        $settings = $venue->settings()->first();
+        if ($settings) {
+            return $settings;
+        }
+
+        return new VenueSettings([
+            'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+            'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
+            'payment_order' => VenueSettings::DEFAULT_PAYMENT_ORDER->value,
+        ]);
     }
 }
