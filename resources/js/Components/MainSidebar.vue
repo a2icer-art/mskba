@@ -56,6 +56,20 @@ const groups = computed(() => {
 });
 
 const hasItems = computed(() => groups.value.length > 0);
+
+const formatBadge = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+        if (numeric <= 0) {
+            return '';
+        }
+        return numeric > 9 ? '…' : String(numeric);
+    }
+    return String(value);
+};
 </script>
 
 <template>
@@ -77,8 +91,14 @@ const hasItems = computed(() => groups.value.length > 0);
                                 : 'bg-slate-100 text-slate-700 hover:bg-amber-100/70'
                         "
                     >
-                        <Link class="block" :href="item.href">
-                            {{ item.label }}
+                        <Link class="flex items-center justify-between gap-3" :href="item.href">
+                            <span>{{ item.label }}</span>
+                            <span
+                                v-if="formatBadge(item.badge)"
+                                class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                            >
+                                {{ formatBadge(item.badge) }}
+                            </span>
                         </Link>
                     </li>
                 </ul>

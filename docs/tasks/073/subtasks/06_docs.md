@@ -1,0 +1,11 @@
+# 06_docs.md
+- Обновлен `docs/project/current_state.md`.
+- Проверка UI:
+  - `/account/messages`: список диалогов + правый чат, отправка сообщений.
+  - `/account/settings/messages`: настройки приватности, белый/черный список.
+  - Бейдж непрочитанных в sidebar и header.
+  - Приватность: смена режима, белый/черный список.
+- Проверка backend:
+  - POST `/account/messages/conversations/{id}/messages` (отправка).
+  - POST `/account/messages/conversations/{id}/read` (прочтение).
+  - POST `/account/messages/messages/{id}/delete` (удаление).

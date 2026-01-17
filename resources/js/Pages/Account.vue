@@ -73,11 +73,23 @@ const accountMenuItems = computed(() => {
     }
 
     const items = [
-        { key: 'user', label: 'Пользователь', href: '/account' },
-        { key: 'profile', label: 'Профиль', href: '/account/profile' },
-        { key: 'contacts', label: 'Контакты', href: '/account/contacts' },
-        { key: 'access', label: 'Доступы', href: '/account/access' },
-        { key: 'balance', label: 'Баланс', href: '/account/balance' },
+        {
+            title: '',
+            items: [
+                { key: 'user', label: 'Пользователь', href: '/account' },
+                { key: 'profile', label: 'Профиль', href: '/account/profile' },
+                { key: 'contacts', label: 'Контакты', href: '/account/contacts' },
+                { key: 'balance', label: 'Баланс', href: '/account/balance' },
+                { key: 'messages', label: 'Сообщения', href: '/account/messages' },
+            ],
+        },
+        {
+            title: 'Настройки',
+            items: [
+                { key: 'access', label: 'Доступы', href: '/account/access' },
+                { key: 'messages-settings', label: 'Сообщения', href: '/account/settings/messages' },
+            ],
+        },
     ];
 
     const roleItems = props.participantRoles.map((role) => ({

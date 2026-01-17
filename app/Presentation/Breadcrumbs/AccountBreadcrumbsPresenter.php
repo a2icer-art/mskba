@@ -16,7 +16,14 @@ class AccountBreadcrumbsPresenter extends BasePresenter
             'participantRoles' => $participantRoles,
         ])['data'];
 
-        $currentItem = collect($navigation)
+        $flatItems = collect($navigation)->flatMap(function (array $item): array {
+            if (isset($item['items']) && is_array($item['items'])) {
+                return $item['items'];
+            }
+            return [$item];
+        });
+
+        $currentItem = $flatItems
             ->first(fn (array $item) => ($item['key'] ?? null) === $activeTab);
 
         $items = [

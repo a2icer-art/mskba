@@ -6,6 +6,7 @@ use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Messages\Services\MessageCountersService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -70,6 +71,13 @@ class HandleInertiaRequests extends Middleware
                     ]
                     : null,
             ],
+            'messageCounters' => $user
+                ? [
+                    'unread_messages' => app(MessageCountersService::class)->getUnreadMessages($user),
+                ]
+                : [
+                    'unread_messages' => 0,
+                ],
             'participantRoles' => ParticipantRole::query()
                 ->where('status', ParticipantRoleStatus::Confirmed)
                 ->orderBy('sort')

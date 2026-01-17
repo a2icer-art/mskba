@@ -12,6 +12,7 @@ use App\Domain\Users\Resources\UserProfileViewResource;
 use App\Models\User;
 use App\Domain\Users\Services\ContactVerificationService;
 use App\Domain\Balances\Services\BalanceService;
+use App\Domain\Messages\Services\MessageCountersService;
 use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
 use App\Support\DateFormatter;
@@ -24,8 +25,12 @@ class AccountPageService
 
         $participantRoles = $this->getParticipantRoles($user);
         $balance = app(BalanceService::class)->getOrCreate($user);
+        $messageCounters = [
+            'unread_messages' => app(MessageCountersService::class)->getUnreadMessages($user),
+        ];
         $navigation = app(AccountNavigationPresenter::class)->present([
             'participantRoles' => $participantRoles,
+            'messageCounters' => $messageCounters,
         ]);
         $breadcrumbs = app(AccountBreadcrumbsPresenter::class)->present([
             'activeTab' => $activeTab,
@@ -82,10 +87,11 @@ class AccountPageService
             ],
             'navigation' => $navigation,
             'breadcrumbs' => $breadcrumbs,
+            'messageCounters' => $messageCounters,
         ];
     }
 
-    private function getParticipantRoles(User $user): array
+    public function getParticipantRoles(User $user): array
     {
         return $user->participantRoleAssignments()
             ->with('role:id,name,alias')

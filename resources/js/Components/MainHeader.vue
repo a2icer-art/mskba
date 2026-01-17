@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import BrandLogo from './BrandLogo.vue';
 import MainHeaderNav from './MainHeaderNav.vue';
+import { useMessagePolling } from '../Composables/useMessagePolling';
 
 const props = defineProps({
     appName: {
@@ -26,6 +27,21 @@ const roleLevel = computed(() => Number(page.props.auth?.user?.role_level ?? 0))
 const canSeeControlPanel = computed(
     () => props.isAuthenticated && roleLevel.value > 10
 );
+const { unreadCount } = useMessagePolling({
+    enabled: props.isAuthenticated,
+    pollUrl: '/account/messages/poll',
+    params: { scope: 'counter' },
+});
+const unreadBadge = computed(() => {
+    if (!props.isAuthenticated) {
+        return '';
+    }
+    const count = Number(unreadCount.value ?? 0);
+    if (count <= 0) {
+        return '';
+    }
+    return count > 9 ? '…' : String(count);
+});
 </script>
 
 <template>
@@ -45,10 +61,16 @@ const canSeeControlPanel = computed(
         <div class="flex items-center gap-3">
             <Link
                 v-if="isAuthenticated"
-                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                class="relative rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                 href="/account"
             >
                 {{ loginLabel || 'login' }}
+                <span
+                    v-if="unreadBadge"
+                    class="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                >
+                    {{ unreadBadge }}
+                </span>
             </Link>
             <button
                 v-else

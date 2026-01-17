@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
+use App\Http\Controllers\AccountMessagesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
@@ -32,6 +33,9 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/contacts', [AccountController::class, 'contacts'])->name('account.contacts');
     Route::get('/access', [AccountController::class, 'access'])->name('account.access');
     Route::get('/balance', [AccountController::class, 'balance'])->name('account.balance');
+    Route::get('/messages', [AccountMessagesController::class, 'index'])->name('account.messages');
+    Route::get('/settings/messages', [AccountMessagesController::class, 'settings'])
+        ->name('account.settings.messages');
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
@@ -50,6 +54,24 @@ Route::middleware('auth')->prefix('account')->group(function () {
 
     Route::patch('/emails/{contact}', [AccountContactsController::class, 'updateEmail'])->name('account.emails.update');
     Route::delete('/emails/{contact}', [AccountContactsController::class, 'destroyEmail'])->name('account.emails.destroy');
+
+    Route::prefix('messages')->name('account.messages.')->group(function () {
+        Route::get('/poll', [AccountMessagesController::class, 'poll'])->name('poll');
+        Route::post('/conversations', [AccountMessagesController::class, 'startConversation'])->name('conversations.start');
+        Route::post('/conversations/{conversation}/messages', [AccountMessagesController::class, 'sendMessage'])
+            ->name('conversations.messages.store');
+        Route::post('/conversations/{conversation}/read', [AccountMessagesController::class, 'markRead'])
+            ->name('conversations.read');
+        Route::post('/messages/{message}/delete', [AccountMessagesController::class, 'deleteMessage'])
+            ->name('messages.delete');
+    });
+    Route::prefix('settings/messages')->name('account.messages.settings.')->group(function () {
+        Route::patch('/', [AccountMessagesController::class, 'updateSettings'])->name('update');
+        Route::post('/allow-list', [AccountMessagesController::class, 'storeAllowList'])->name('allow.store');
+        Route::delete('/allow-list/{user}', [AccountMessagesController::class, 'destroyAllowList'])->name('allow.destroy');
+        Route::post('/block-list', [AccountMessagesController::class, 'storeBlockList'])->name('block.store');
+        Route::delete('/block-list/{user}', [AccountMessagesController::class, 'destroyBlockList'])->name('block.destroy');
+    });
 });
 
 Route::prefix('venues')->group(function () {
