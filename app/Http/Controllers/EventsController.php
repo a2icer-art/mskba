@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventType;
 use App\Domain\Events\Services\EventBookingService;
@@ -29,11 +30,11 @@ class EventsController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->map(static function (Event $event): array {
-                $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
-                $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'cancelled');
-                $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'pending');
-                $hasAwaitingPaymentBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'awaiting_payment');
-                $hasPaidBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'paid');
+                $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
+                $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Cancelled);
+                $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Pending);
+                $hasAwaitingPaymentBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::AwaitingPayment);
+                $hasPaidBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Paid);
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
@@ -198,7 +199,7 @@ class EventsController extends Controller
                 $snapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 return [
                     'id' => $booking->id,
-                    'status' => $booking->status,
+                  'status' => $booking->status?->value,
                   'starts_at' => $booking->starts_at?->toDateTimeString(),
                   'ends_at' => $booking->ends_at?->toDateTimeString(),
                   'moderation_comment' => $booking->moderation_comment,
@@ -221,7 +222,7 @@ class EventsController extends Controller
             ? $event->starts_at->copy()->subMinutes(VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES)->lte($now)
             : false;
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
-        $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === 'approved');
+        $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
         $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
             'event' => $event,
@@ -307,7 +308,7 @@ class EventsController extends Controller
             abort(403);
         }
 
-        if ($event->bookings()->where('status', 'approved')->exists()) {
+        if ($event->bookings()->where('status', EventBookingStatus::Approved->value)->exists()) {
             return back()->withErrors([
                 'event' => 'Нельзя удалить событие с подтвержденными бронированиями.',
             ]);

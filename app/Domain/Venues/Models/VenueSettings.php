@@ -3,6 +3,7 @@
 namespace App\Domain\Venues\Models;
 
 use App\Domain\Payments\Models\PaymentOrder;
+use App\Domain\Venues\Enums\VenueBookingMode;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class VenueSettings extends Model
     public const DEFAULT_PAYMENT_ORDER = VenuePaymentOrder::Prepayment;
     public const DEFAULT_RENTAL_DURATION_MINUTES = 60;
     public const DEFAULT_RENTAL_PRICE_RUB = 0;
+    public const DEFAULT_BOOKING_MODE = VenueBookingMode::Instant;
 
     protected $fillable = [
         'venue_id',
@@ -25,6 +27,7 @@ class VenueSettings extends Model
         'payment_order_id',
         'rental_duration_minutes',
         'rental_price_rub',
+        'booking_mode',
     ];
 
     protected function casts(): array
@@ -35,6 +38,7 @@ class VenueSettings extends Model
             'payment_order_id' => 'integer',
             'rental_duration_minutes' => 'integer',
             'rental_price_rub' => 'integer',
+            'booking_mode' => VenueBookingMode::class,
         ];
     }
 

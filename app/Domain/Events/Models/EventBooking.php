@@ -3,6 +3,7 @@
 namespace App\Domain\Events\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
@@ -37,6 +38,7 @@ class EventBooking extends Model
             'ends_at' => 'datetime',
             'moderated_at' => 'datetime',
             'payment_order_snapshot' => 'array',
+            'status' => EventBookingStatus::class,
         ];
     }
 

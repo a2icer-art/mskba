@@ -4,6 +4,7 @@ namespace App\Domain\Events\Services;
 
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
 use App\Domain\Payments\Models\Payment;
@@ -23,7 +24,7 @@ class EventBookingService
             'venue_id' => $venue->id,
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
-            'status' => 'pending',
+            'status' => EventBookingStatus::Pending,
             'created_by' => $createdBy,
         ]);
 
@@ -119,7 +120,12 @@ class EventBookingService
 
         $overlapExists = EventBooking::query()
             ->where('venue_id', $venue->id)
-            ->whereIn('status', ['pending', 'awaiting_payment', 'paid', 'approved'])
+            ->whereIn('status', [
+                EventBookingStatus::Pending->value,
+                EventBookingStatus::AwaitingPayment->value,
+                EventBookingStatus::Paid->value,
+                EventBookingStatus::Approved->value,
+            ])
             ->where(function ($query) use ($startsAt, $endsAt): void {
                 $query->where('starts_at', '<', $endsAt)
                     ->where('ends_at', '>', $startsAt);

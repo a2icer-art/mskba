@@ -75,6 +75,7 @@ const form = useForm({
     rental_duration_minutes: props.settings?.rental_duration_minutes ?? 60,
     rental_price_rub: props.settings?.rental_price_rub ?? 0,
     payment_order_id: props.settings?.payment_order_id ?? '',
+    booking_mode: props.settings?.booking_mode ?? 'instant',
 });
 
 const submit = () => {
@@ -161,6 +162,22 @@ const submit = () => {
                                 </select>
                                 <p v-if="actionError.payment_order_id" class="text-xs text-rose-700">
                                     {{ actionError.payment_order_id }}
+                                </p>
+                            </div>
+
+                            <div class="grid gap-2">
+                                <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                    Режим бронирования
+                                </label>
+                                <select
+                                    v-model="form.booking_mode"
+                                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                >
+                                    <option value="instant">Мгновенное подтверждение</option>
+                                    <option value="approval_required">Подтверждение администратора</option>
+                                </select>
+                                <p v-if="actionError.booking_mode" class="text-xs text-rose-700">
+                                    {{ actionError.booking_mode }}
                                 </p>
                             </div>
 
