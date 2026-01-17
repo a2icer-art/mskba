@@ -40,7 +40,12 @@ class AccountMessagesController extends Controller
 
         $conversations = $messagesService->getConversations($user);
         if (!$conversation && !empty($conversations)) {
-            $firstId = $conversations[0]['id'] ?? null;
+            $sorted = collect($conversations)->sortByDesc(function (array $item) {
+                return $item['last_message']['created_at']
+                    ?? $item['updated_at']
+                    ?? '1970-01-01 00:00:00';
+            });
+            $firstId = $sorted->first()['id'] ?? null;
             if ($firstId) {
                 $conversation = Conversation::query()
                     ->whereKey($firstId)

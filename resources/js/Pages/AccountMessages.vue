@@ -524,14 +524,16 @@ const deleteMessage = async (messageId) => {
                                     type="button"
                                     class="w-full rounded-2xl border px-4 py-3 text-left transition"
                                     :class="conversation.id === selectedConversationId
-                                        ? 'border-slate-900 bg-slate-900 text-white'
+                                        ? 'border-[#444b5b] bg-[#444b5b] text-[#99aecc]'
                                         : conversation.type === 'system'
                                             ? 'border-sky-200 bg-white text-slate-700 hover:border-sky-300'
                                             : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'"
                                     @click="openConversation(conversation)"
                                 >
                                     <div class="flex items-center justify-between gap-2">
-                                        <span class="font-semibold">{{ conversation.title }}</span>
+                                        <span :class="conversation.id === selectedConversationId ? 'font-semibold text-white' : 'font-semibold'">
+                                            {{ conversation.title }}
+                                        </span>
                                         <span
                                             v-if="conversation.unread_count"
                                             class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
@@ -539,7 +541,11 @@ const deleteMessage = async (messageId) => {
                                             {{ conversation.unread_count > 9 ? '…' : conversation.unread_count }}
                                         </span>
                                     </div>
-                                    <p v-if="conversation.last_message" class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        v-if="conversation.last_message"
+                                        class="mt-1 text-xs"
+                                        :class="conversation.id === selectedConversationId ? 'text-[#99aecc]' : 'text-slate-500'"
+                                    >
                                         {{ conversation.last_message.body }}
                                     </p>
                                 </button>
@@ -550,7 +556,7 @@ const deleteMessage = async (messageId) => {
                             <div v-if="!activeConversationState" class="text-sm text-slate-500">
                                 Выберите диалог слева, чтобы увидеть переписку.
                             </div>
-                            <div v-else class="space-y-4">
+                            <div v-else class="flex h-[600px] flex-col gap-4 overflow-hidden">
                                 <div class="border-b border-slate-100 pb-3">
                                     <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Диалог</p>
                                     <p class="mt-1 text-lg font-semibold text-slate-900">
@@ -559,7 +565,7 @@ const deleteMessage = async (messageId) => {
                                 </div>
                                 <div
                                     ref="messagesContainer"
-                                    class="max-h-[360px] space-y-3 overflow-y-auto pr-1"
+                                    class="flex-1 space-y-3 overflow-y-auto pr-1"
                                     @scroll="handleMessagesScroll"
                                 >
                                     <template v-if="isLoading">
@@ -586,7 +592,7 @@ const deleteMessage = async (messageId) => {
                                             <div
                                                 class="max-w-[80%] rounded-2xl px-4 py-3 text-sm"
                                                 :class="message.is_outgoing
-                                                    ? 'bg-slate-900 text-white'
+                                                    ? 'bg-[#444b5b] text-white'
                                                     : 'bg-slate-100 text-slate-700'"
                                             >
                                                 <p v-if="message.title" class="font-semibold">
@@ -628,7 +634,7 @@ const deleteMessage = async (messageId) => {
                                     </template>
                                 </div>
 
-                                <div v-if="activeConversationState?.type === 'system'" class="mt-4 space-y-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+                                <div v-if="activeConversationState?.type === 'system'" class="mt-auto space-y-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
                                     <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакты для ответа</p>
                                     <div class="flex flex-wrap gap-2">
                                         <button
@@ -672,7 +678,7 @@ const deleteMessage = async (messageId) => {
                                         </div>
                                     </div>
                                 </div>
-                                <form v-else class="mt-4 space-y-2" @submit.prevent="sendMessage">
+                                <form v-else class="mt-auto space-y-2" @submit.prevent="sendMessage">
                                     <textarea
                                         v-model="messageBody"
                                         class="min-h-[96px] w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
