@@ -15,7 +15,10 @@ class Message extends Model
     protected $fillable = [
         'conversation_id',
         'sender_id',
+        'contact_user_id',
+        'title',
         'body',
+        'link_url',
     ];
 
     public function conversation(): BelongsTo
@@ -26,6 +29,11 @@ class Message extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function contactUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'contact_user_id');
     }
 
     public function receipts(): HasMany

@@ -9,6 +9,7 @@ export const useMessagePolling = (options = {}) => {
     const pollUrl = options.pollUrl ?? '/account/messages/poll';
     const params = options.params ?? {};
     const enabled = options.enabled ?? true;
+    const isEnabled = ref(Boolean(enabled));
     const onData = options.onData;
     let timer = null;
 
@@ -19,8 +20,8 @@ export const useMessagePolling = (options = {}) => {
         }
     };
 
-    const poll = async (extraParams = {}) => {
-        if (!enabled) {
+    const poll = async (extraParams = {}, options = {}) => {
+        if (!isEnabled.value && !options.force) {
             return null;
         }
         const query = new URLSearchParams({ ...params, ...extraParams }).toString();
@@ -43,21 +44,45 @@ export const useMessagePolling = (options = {}) => {
         }
     };
 
-    onMounted(() => {
-        syncFromPage();
-        if (!enabled) {
+    const startTimer = () => {
+        if (timer) {
             return;
         }
-        poll();
         timer = setInterval(poll, intervalMs);
+    };
+
+    const stopTimer = () => {
+        if (!timer) {
+            return;
+        }
+        clearInterval(timer);
+        timer = null;
+    };
+
+    const pause = () => {
+        isEnabled.value = false;
+        stopTimer();
+    };
+
+    const resume = (options = {}) => {
+        isEnabled.value = true;
+        if (options.pollNow) {
+            poll();
+        }
+        startTimer();
+    };
+
+    onMounted(() => {
+        syncFromPage();
+        if (!isEnabled.value) {
+            return;
+        }
+        resume({ pollNow: true });
     });
 
     onUnmounted(() => {
-        if (timer) {
-            clearInterval(timer);
-            timer = null;
-        }
+        stopTimer();
     });
 
-    return { unreadCount, poll };
+    return { unreadCount, poll, pause, resume };
 };

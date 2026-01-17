@@ -6,6 +6,8 @@ use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
+use App\Domain\Events\Services\BookingNotificationService;
+use App\Models\User;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
 use App\Domain\Payments\Models\Payment;
@@ -31,6 +33,8 @@ class EventBookingService
         ]);
 
         $this->createInitialPayment($booking, $venue, $createdBy);
+        $actor = User::query()->find($createdBy);
+        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::Pending, $actor);
 
         return $booking;
     }

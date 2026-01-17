@@ -42,4 +42,40 @@ class ConversationService
 
         return $conversation;
     }
+
+    public function findOrCreateSystem(string $contextType, int $contextId, string $label, array $userIds): Conversation
+    {
+        $conversation = Conversation::query()
+            ->where('type', 'system')
+            ->where('context_type', $contextType)
+            ->where('context_id', $contextId)
+            ->first();
+
+        if (!$conversation) {
+            $conversation = Conversation::query()->create([
+                'type' => 'system',
+                'context_type' => $contextType,
+                'context_id' => $contextId,
+                'context_label' => $label,
+            ]);
+        } elseif ($conversation->context_label !== $label) {
+            $conversation->update(['context_label' => $label]);
+        }
+
+        $existingIds = $conversation->participants()->pluck('user_id')->all();
+        $missingIds = array_values(array_diff($userIds, $existingIds));
+
+        if ($missingIds !== []) {
+            $now = Carbon::now();
+            foreach ($missingIds as $userId) {
+                ConversationParticipant::query()->create([
+                    'conversation_id' => $conversation->id,
+                    'user_id' => $userId,
+                    'joined_at' => $now,
+                ]);
+            }
+        }
+
+        return $conversation;
+    }
 }

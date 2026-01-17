@@ -16,6 +16,9 @@ class Conversation extends Model
     protected $fillable = [
         'type',
         'created_by',
+        'context_type',
+        'context_id',
+        'context_label',
     ];
 
     public function creator(): BelongsTo

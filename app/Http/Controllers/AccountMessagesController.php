@@ -12,10 +12,16 @@ use App\Domain\Messages\Services\MessageCountersService;
 use App\Domain\Messages\Services\MessagePrivacyService;
 use App\Domain\Messages\Services\MessageQueryService;
 use App\Domain\Messages\Services\MessageService;
+use App\Domain\Contracts\Enums\ContractStatus;
+use App\Domain\Contracts\Models\Contract;
+use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Services\BookingPaymentExpiryService;
+use App\Domain\Permissions\Enums\PermissionCode;
 use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -33,13 +39,23 @@ class AccountMessagesController extends Controller
         $messagesService = app(MessageQueryService::class);
 
         $conversations = $messagesService->getConversations($user);
+        if (!$conversation && !empty($conversations)) {
+            $firstId = $conversations[0]['id'] ?? null;
+            if ($firstId) {
+                $conversation = Conversation::query()
+                    ->whereKey($firstId)
+                    ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
+                    ->first();
+            }
+        }
         $activeConversation = $conversation
             ? $this->presentConversation($conversation, $user)
             : null;
-        $messages = $conversation
-            ? $messagesService->getMessages($conversation, $user)
-            : [];
-
+        $messagesPayload = $conversation
+            ? $messagesService->getMessages($conversation, $user, 10)
+            : ['messages' => [], 'meta' => ['has_more' => false, 'oldest_id' => null]];
+        $messages = $messagesPayload['messages'];
+        $messagesMeta = $messagesPayload['meta'];
         if ($conversation) {
             $messagesService->markConversationRead($conversation, $user);
         }
@@ -60,6 +76,7 @@ class AccountMessagesController extends Controller
             'conversations' => $conversations,
             'activeConversation' => $activeConversation,
             'messages' => $messages,
+            'messagesMeta' => $messagesMeta,
             'navigation' => $navigation,
             'activeHref' => '/account/messages',
             'breadcrumbs' => $breadcrumbs,
@@ -144,6 +161,8 @@ class AccountMessagesController extends Controller
             abort(403);
         }
 
+        app(BookingPaymentExpiryService::class)->runIfDue();
+
         $messagesService = app(MessageQueryService::class);
         $countersService = app(MessageCountersService::class);
 
@@ -164,7 +183,26 @@ class AccountMessagesController extends Controller
 
             if ($conversation) {
                 $payload['active_conversation'] = $this->presentConversation($conversation, $user);
-                $payload['messages'] = $messagesService->getMessages($conversation, $user);
+                $limit = max(1, min(50, (int) $request->integer('messages_limit', 10)));
+                $beforeId = $request->integer('messages_before_id') ?: null;
+                $afterId = $request->integer('messages_after_id') ?: null;
+                if ($beforeId) {
+                    $afterId = null;
+                }
+                $messagesPayload = $messagesService->getMessages($conversation, $user, $limit, $beforeId, $afterId);
+                $payload['messages'] = $messagesPayload['messages'];
+                if (array_key_exists('meta', $messagesPayload) && $messagesPayload['meta'] !== null) {
+                    $payload['messages_meta'] = $messagesPayload['meta'];
+                }
+                if ($beforeId) {
+                    $payload['messages_mode'] = 'prepend';
+                } elseif ($afterId) {
+                    $payload['messages_mode'] = 'append';
+                    $refreshPayload = $messagesService->getMessages($conversation, $user, 10);
+                    $payload['messages_refresh'] = $refreshPayload['messages'];
+                } else {
+                    $payload['messages_mode'] = 'replace';
+                }
             }
         }
 
@@ -216,6 +254,14 @@ class AccountMessagesController extends Controller
             abort(403);
         }
 
+        $rateKey = "messages:send:conversation:{$conversation->id}:{$user->id}";
+        if (RateLimiter::tooManyAttempts($rateKey, 1)) {
+            throw ValidationException::withMessages([
+                'message' => 'Сообщение можно отправлять не чаще одного раза в секунду.',
+            ]);
+        }
+        RateLimiter::hit($rateKey, 2);
+
         $recipientId = collect($participants)->first(fn ($id) => $id !== $user->id);
         if ($recipientId) {
             $recipient = User::query()->find($recipientId);
@@ -227,6 +273,46 @@ class AccountMessagesController extends Controller
         $message = $service->send($conversation, $user, $data['body']);
 
         return response()->json([
+            'message_id' => $message->id,
+        ]);
+    }
+
+    public function sendDirect(
+        Request $request,
+        ConversationService $conversationService,
+        MessageService $messageService,
+        MessagePrivacyService $privacyService
+    ) {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $recipient = User::query()->find($data['user_id']);
+        if (!$recipient) {
+            throw ValidationException::withMessages(['recipient_id' => 'Пользователь не найден.']);
+        }
+
+        $rateKey = "messages:send:direct:{$user->id}:{$recipient->id}";
+        if (RateLimiter::tooManyAttempts($rateKey, 1)) {
+            throw ValidationException::withMessages([
+                'message' => 'Сообщение можно отправлять не чаще одного раза в секунду.',
+            ]);
+        }
+        RateLimiter::hit($rateKey, 2);
+
+        $privacyService->ensureCanSend($user, $recipient);
+
+        $conversation = $conversationService->findOrCreateDirect($user, $recipient);
+        $message = $messageService->send($conversation, $user, $data['body']);
+
+        return response()->json([
+            'conversation_id' => $conversation->id,
             'message_id' => $message->id,
         ]);
     }
@@ -379,17 +465,30 @@ class AccountMessagesController extends Controller
         $otherParticipant = $conversation->participants
             ->first(fn ($participant) => $participant->user_id !== $user->id);
         $otherUser = $otherParticipant?->user;
+        $isSystem = $conversation->type === 'system';
+        $title = $isSystem ? ($conversation->context_label ?? 'Системное уведомление') : ($otherUser?->login ?? 'Диалог');
+        $contacts = $isSystem
+            ? $this->resolveSystemContacts($conversation, $user)
+            : $conversation->participants
+                ->map(fn ($participant) => $participant->user
+                    ? ['id' => $participant->user->id, 'login' => $participant->user->login]
+                    : null
+                )
+                ->filter()
+                ->values()
+                ->all();
 
         return [
             'id' => $conversation->id,
             'type' => $conversation->type,
-            'title' => $otherUser?->login ?? 'Диалог',
+            'title' => $title,
             'other_user' => $otherUser
                 ? [
                     'id' => $otherUser->id,
                     'login' => $otherUser->login,
                 ]
                 : null,
+            'contacts' => $contacts,
         ];
     }
 
@@ -401,5 +500,81 @@ class AccountMessagesController extends Controller
                 'unread_messages' => app(MessageCountersService::class)->getUnreadMessages($user),
             ],
         ]);
+    }
+
+    private function resolveSystemContacts(Conversation $conversation, User $user): array
+    {
+        if ($conversation->context_type !== EventBooking::class || !$conversation->context_id) {
+            return [];
+        }
+
+        $booking = EventBooking::query()
+            ->whereKey($conversation->context_id)
+            ->with([
+                'creator:id,login',
+                'venue:id,name',
+            ])
+            ->first();
+
+        if (!$booking) {
+            return [];
+        }
+
+        if ($booking->created_by === $user->id) {
+            $venue = $booking->venue;
+            if (!$venue) {
+                return [];
+            }
+
+            $permissionCodes = [
+                PermissionCode::VenueBookingConfirm->value,
+                PermissionCode::VenueBookingCancel->value,
+            ];
+
+            $contracts = Contract::query()
+                ->where('entity_type', $venue->getMorphClass())
+                ->where('entity_id', $venue->id)
+                ->where('status', ContractStatus::Active->value)
+                ->whereHas('permissions', function ($query) use ($permissionCodes) {
+                    $query->whereIn('permissions.code', $permissionCodes)
+                        ->where('contract_permissions.is_active', true);
+                })
+                ->with('user:id,login')
+                ->get();
+
+            if ($contracts->isEmpty()) {
+                $contracts = Contract::query()
+                    ->where('entity_type', $venue->getMorphClass())
+                    ->where('entity_id', $venue->id)
+                    ->where('status', ContractStatus::Active->value)
+                    ->with('user:id,login')
+                    ->get();
+            }
+
+            return $contracts
+                ->map(fn (Contract $contract) => $contract->user
+                    ? [
+                        'id' => $contract->user->id,
+                        'login' => $contract->user->login,
+                        'role' => $contract->contract_type?->label(),
+                    ]
+                    : null
+                )
+                ->filter(fn ($contact) => $contact && $contact['id'] !== $user->id)
+                ->unique('id')
+                ->values()
+                ->all();
+        }
+
+        $creator = $booking->creator;
+        if (!$creator || $creator->id === $user->id) {
+            return [];
+        }
+
+        return [[
+            'id' => $creator->id,
+            'login' => $creator->login,
+            'role' => 'Заказчик',
+        ]];
     }
 }

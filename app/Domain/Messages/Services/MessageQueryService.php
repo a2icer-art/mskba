@@ -45,11 +45,14 @@ class MessageQueryService
             $otherUser = $otherParticipant?->user;
             $lastMessage = $conversation->lastMessage;
             $unread = $unreadCounts[$conversation->id] ?? 0;
+            $isSystem = $conversation->type === 'system';
+            $title = $isSystem ? ($conversation->context_label ?? 'Системное уведомление') : ($otherUser?->login ?? 'Диалог');
+            $lastPreview = $lastMessage?->title ?: $lastMessage?->body;
 
             return [
                 'id' => $conversation->id,
                 'type' => $conversation->type,
-                'title' => $otherUser?->login ?? 'Диалог',
+                'title' => $title,
                 'other_user' => $otherUser
                     ? [
                         'id' => $otherUser->id,
@@ -59,7 +62,7 @@ class MessageQueryService
                 'last_message' => $lastMessage
                     ? [
                         'id' => $lastMessage->id,
-                        'body' => $lastMessage->body,
+                        'body' => $lastPreview,
                         'created_at' => $lastMessage->created_at?->toDateTimeString(),
                         'sender' => $lastMessage->sender
                             ? [
@@ -75,9 +78,15 @@ class MessageQueryService
         })->all();
     }
 
-    public function getMessages(Conversation $conversation, User $user): array
+    public function getMessages(
+        Conversation $conversation,
+        User $user,
+        int $limit = 10,
+        ?int $beforeId = null,
+        ?int $afterId = null
+    ): array
     {
-        $messages = Message::query()
+        $query = Message::query()
             ->where('conversation_id', $conversation->id)
             ->whereHas('receipts', function ($query) use ($user) {
                 $query->where('user_id', $user->id)
@@ -85,18 +94,36 @@ class MessageQueryService
             })
             ->with([
                 'sender:id,login',
-                'receipts' => fn ($query) => $query->where('user_id', $user->id),
+                'contactUser:id,login',
+                'receipts' => fn ($query) => $query->whereNull('deleted_at'),
             ])
-            ->orderBy('id')
-            ->get();
+            ->when($beforeId, fn ($q) => $q->where('id', '<', $beforeId))
+            ->when($afterId, fn ($q) => $q->where('id', '>', $afterId))
+            ->orderByDesc('id')
+            ->limit($limit);
 
-        return $messages->map(function (Message $message) use ($user): array {
-            $receipt = $message->receipts->first();
+        $messages = $query->get()->reverse()->values();
+
+        $payload = $messages->map(function (Message $message) use ($user): array {
+            $receipt = $message->receipts->firstWhere('user_id', $user->id);
+            $readByOthersAt = $message->receipts
+                ->filter(fn ($item) => $item->user_id !== $user->id && $item->read_at)
+                ->max('read_at');
 
             return [
                 'id' => $message->id,
+                'title' => $message->title,
                 'body' => $message->body,
+                'link_url' => $message->link_url,
+                'contact_user' => $message->contactUser
+                    ? [
+                        'id' => $message->contactUser->id,
+                        'login' => $message->contactUser->login,
+                    ]
+                    : null,
                 'created_at' => $message->created_at?->toDateTimeString(),
+                'read_at' => $receipt?->read_at?->toDateTimeString(),
+                'read_by_others_at' => $readByOthersAt?->toDateTimeString(),
                 'sender' => $message->sender
                     ? [
                         'id' => $message->sender->id,
@@ -107,6 +134,40 @@ class MessageQueryService
                 'is_read' => (bool) $receipt?->read_at,
             ];
         })->all();
+
+        $oldestId = $messages->first()?->id;
+        if ($afterId) {
+            return [
+                'messages' => $payload,
+                'meta' => null,
+            ];
+        }
+        if (!$oldestId) {
+            return [
+                'messages' => $payload,
+                'meta' => [
+                    'has_more' => false,
+                    'oldest_id' => null,
+                ],
+            ];
+        }
+
+        $hasMore = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->whereHas('receipts', function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->whereNull('deleted_at');
+            })
+            ->where('id', '<', $oldestId)
+            ->exists();
+
+        return [
+            'messages' => $payload,
+            'meta' => [
+                'has_more' => $hasMore,
+                'oldest_id' => $oldestId,
+            ],
+        ];
     }
 
     public function markConversationRead(Conversation $conversation, User $user): int

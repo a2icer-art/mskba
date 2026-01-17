@@ -5,13 +5,14 @@ namespace App\Domain\Events\Services;
 use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Payments\Enums\PaymentStatus;
 use App\Domain\Payments\Models\Payment;
 use Illuminate\Support\Facades\Cache;
 
 class BookingPaymentExpiryService
 {
-    private const THROTTLE_SECONDS = 300;
+    private const THROTTLE_SECONDS = 30;
     private const THROTTLE_KEY = 'booking_payment_expiry_throttle';
     private const BATCH_LIMIT = 50;
 
@@ -74,5 +75,7 @@ class BookingPaymentExpiryService
             ->update([
                 'status' => PaymentStatus::Cancelled,
             ]);
+
+        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::Cancelled, null);
     }
 }

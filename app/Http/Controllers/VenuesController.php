@@ -17,6 +17,7 @@ use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Services\BookingPaymentExpiryService;
+use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
@@ -728,6 +729,8 @@ class VenuesController extends Controller
             'moderated_at' => now(),
         ]);
 
+        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::Approved, $user);
+
         return back()->with('notice', 'Бронирование подтверждено.');
     }
 
@@ -833,6 +836,8 @@ class VenuesController extends Controller
             ]
         );
 
+        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::AwaitingPayment, $user);
+
         return back()->with('notice', 'Бронирование переведено в ожидание оплаты.');
     }
 
@@ -899,6 +904,8 @@ class VenuesController extends Controller
                 'status' => PaymentStatus::Paid,
                 'paid_at' => now(),
             ]);
+
+        app(BookingNotificationService::class)->notifyStatus($booking, $nextStatus, $user);
 
         $notice = $nextStatus === EventBookingStatus::Approved
             ? 'Бронирование оплачено и подтверждено.'
@@ -967,6 +974,8 @@ class VenuesController extends Controller
             ->update([
                 'status' => PaymentStatus::Cancelled,
             ]);
+
+        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::Cancelled, $user);
 
         return back()->with('notice', 'Бронирование отменено.');
     }

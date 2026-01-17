@@ -58,6 +58,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::prefix('messages')->name('account.messages.')->group(function () {
         Route::get('/poll', [AccountMessagesController::class, 'poll'])->name('poll');
         Route::post('/conversations', [AccountMessagesController::class, 'startConversation'])->name('conversations.start');
+        Route::post('/direct', [AccountMessagesController::class, 'sendDirect'])->name('direct.send');
         Route::post('/conversations/{conversation}/messages', [AccountMessagesController::class, 'sendMessage'])
             ->name('conversations.messages.store');
         Route::post('/conversations/{conversation}/read', [AccountMessagesController::class, 'markRead'])
@@ -72,6 +73,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
         Route::post('/block-list', [AccountMessagesController::class, 'storeBlockList'])->name('block.store');
         Route::delete('/block-list/{user}', [AccountMessagesController::class, 'destroyBlockList'])->name('block.destroy');
     });
+
 });
 
 Route::prefix('venues')->group(function () {
