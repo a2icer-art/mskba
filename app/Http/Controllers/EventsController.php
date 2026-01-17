@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventType;
+use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Events\Services\EventBookingService;
 use App\Domain\Admin\Services\EventDefaultsService;
 use App\Domain\Permissions\Enums\PermissionCode;
@@ -24,6 +25,8 @@ class EventsController extends Controller
     {
         $user = $request->user();
         $checker = app(PermissionChecker::class);
+
+        app(BookingPaymentExpiryService::class)->runIfDue();
 
         $events = Event::query()
             ->with(['type', 'organizer', 'bookings'])
@@ -110,13 +113,6 @@ class EventsController extends Controller
         $startsAt = Carbon::parse($data['starts_at'], $timezone);
         $endsAt = Carbon::parse($data['ends_at'], $timezone);
 
-        $eventMinDuration = (int) ($eventDefaults['min_duration_minutes'] ?? 15);
-        if ($endsAt->lt($startsAt->copy()->addMinutes($eventMinDuration))) {
-            return back()->withErrors([
-                'ends_at' => 'Длительность события должна быть не менее ' . $eventMinDuration . ' минут.',
-            ]);
-        }
-
         $type = EventType::query()->find($data['event_type_id']);
         if (!$type) {
             return back()->withErrors(['event_type_id' => 'Тип события не найден.']);
@@ -145,11 +141,23 @@ class EventsController extends Controller
             }
         }
 
+        $settings = null;
         if ($venue) {
             $settings = $venue->settings()->first();
             $leadMinutes = $settings?->booking_lead_time_minutes ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES;
         } else {
             $leadMinutes = (int) ($eventDefaults['lead_time_minutes'] ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES);
+        }
+
+        $eventMinDuration = (int) ($eventDefaults['min_duration_minutes'] ?? 15);
+        if ($venue) {
+            $minInterval = $settings?->booking_min_interval_minutes ?? VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES;
+            $eventMinDuration = max($eventMinDuration, (int) $minInterval);
+        }
+        if ($endsAt->lt($startsAt->copy()->addMinutes($eventMinDuration))) {
+            return back()->withErrors([
+                'ends_at' => 'Длительность события должна быть не менее ' . $eventMinDuration . ' минут.',
+            ]);
         }
         $minStart = Carbon::now($timezone)->addMinutes($leadMinutes);
         if ($startsAt->lt($minStart)) {
@@ -192,6 +200,8 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
+        app(BookingPaymentExpiryService::class)->runIfDue();
+
         $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder', 'bookings.payment']);
 
         $bookings = $event->bookings
@@ -205,6 +215,7 @@ class EventsController extends Controller
                   'moderation_comment' => $booking->moderation_comment,
                   'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
                   'payment_code' => $booking->payment?->payment_code,
+                  'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
                   'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,

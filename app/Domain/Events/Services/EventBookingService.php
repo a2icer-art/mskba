@@ -4,6 +4,7 @@ namespace App\Domain\Events\Services;
 
 use App\Domain\Events\Models\Event;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
@@ -25,6 +26,7 @@ class EventBookingService
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
             'status' => EventBookingStatus::Pending,
+            'moderation_source' => EventBookingModerationSource::Manual,
             'created_by' => $createdBy,
         ]);
 

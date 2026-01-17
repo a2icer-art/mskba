@@ -19,6 +19,7 @@ class VenueSettings extends Model
     public const DEFAULT_RENTAL_DURATION_MINUTES = 60;
     public const DEFAULT_RENTAL_PRICE_RUB = 0;
     public const DEFAULT_BOOKING_MODE = VenueBookingMode::Instant;
+    public const DEFAULT_PAYMENT_WAIT_MINUTES = 60;
 
     protected $fillable = [
         'venue_id',
@@ -28,6 +29,7 @@ class VenueSettings extends Model
         'rental_duration_minutes',
         'rental_price_rub',
         'booking_mode',
+        'payment_wait_minutes',
     ];
 
     protected function casts(): array
@@ -39,6 +41,7 @@ class VenueSettings extends Model
             'rental_duration_minutes' => 'integer',
             'rental_price_rub' => 'integer',
             'booking_mode' => VenueBookingMode::class,
+            'payment_wait_minutes' => 'integer',
         ];
     }
 

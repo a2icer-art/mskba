@@ -118,12 +118,22 @@ const statusLabel = (status) => {
     }
     return 'Ожидает';
 };
+const moderationSourceLabel = (source) => {
+    if (source === 'auto') {
+        return 'Автоматически';
+    }
+    if (source === 'manual') {
+        return 'Модератор';
+    }
+    return '';
+};
 
 const confirmOpen = ref(false);
 const cancelOpen = ref(false);
 const awaitPaymentOpen = ref(false);
 const paidOpen = ref(false);
 const activeBooking = ref(null);
+const hasModalOpen = computed(() => confirmOpen.value || cancelOpen.value || awaitPaymentOpen.value || paidOpen.value);
 const confirmForm = useForm({ comment: '' });
 const cancelForm = useForm({ comment: '' });
 const awaitPaymentForm = useForm({ comment: '' });
@@ -264,7 +274,10 @@ const submitPaid = () => {
                     <div v-if="actionNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                         {{ actionNotice }}
                     </div>
-                    <div v-if="actionError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div
+                        v-if="actionError && !hasModalOpen"
+                        class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+                    >
                         {{ actionError }}
                     </div>
 
@@ -297,6 +310,12 @@ const submitPaid = () => {
                                     <p v-if="booking.moderated_at" class="mt-1 text-xs text-slate-500">
                                         Модерация: {{ formatDateTime(booking.moderated_at) }}
                                     </p>
+                                    <p v-if="booking.moderation_comment" class="mt-1 text-xs text-slate-500">
+                                        Комментарий: {{ booking.moderation_comment }}
+                                    </p>
+                                    <p v-if="booking.moderation_source && booking.moderated_at" class="mt-1 text-xs text-slate-500">
+                                        Источник: {{ moderationSourceLabel(booking.moderation_source) }}
+                                    </p>
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
                                     <span
@@ -318,6 +337,10 @@ const submitPaid = () => {
                                     </span>
                                     <span v-if="booking.payment_code" class="text-xs text-slate-500">
                                         Платеж № {{ booking.payment_code }}
+                                    </span>
+                                    <span v-if="booking.status === 'awaiting_payment'" class="text-xs text-slate-500">
+                                        Оплатить до:
+                                        {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'бессрочно' }}
                                     </span>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <button
@@ -412,6 +435,9 @@ const submitPaid = () => {
                         <div v-if="confirmForm.errors.comment" class="text-xs text-rose-700">
                             {{ confirmForm.errors.comment }}
                         </div>
+                        <div v-else-if="actionError" class="text-xs text-rose-700">
+                            {{ actionError }}
+                        </div>
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
@@ -464,6 +490,9 @@ const submitPaid = () => {
                         </label>
                         <div v-if="awaitPaymentForm.errors.comment" class="text-xs text-rose-700">
                             {{ awaitPaymentForm.errors.comment }}
+                        </div>
+                        <div v-else-if="actionError" class="text-xs text-rose-700">
+                            {{ actionError }}
                         </div>
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
@@ -518,6 +547,9 @@ const submitPaid = () => {
                         <div v-if="paidForm.errors.comment" class="text-xs text-rose-700">
                             {{ paidForm.errors.comment }}
                         </div>
+                        <div v-else-if="actionError" class="text-xs text-rose-700">
+                            {{ actionError }}
+                        </div>
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
@@ -570,6 +602,9 @@ const submitPaid = () => {
                         </label>
                         <div v-if="cancelForm.errors.comment" class="text-xs text-rose-700">
                             {{ cancelForm.errors.comment }}
+                        </div>
+                        <div v-else-if="actionError" class="text-xs text-rose-700">
+                            {{ actionError }}
                         </div>
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">

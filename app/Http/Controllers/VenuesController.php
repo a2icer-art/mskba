@@ -13,8 +13,10 @@ use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Permissions\Registry\PermissionRegistry;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
@@ -422,6 +424,8 @@ class VenuesController extends Controller
             abort(403);
         }
 
+        app(BookingPaymentExpiryService::class)->runIfDue();
+
         $now = now();
         $status = $request->string('status')->toString();
         $allowedStatuses = [
@@ -445,6 +449,7 @@ class VenuesController extends Controller
               ->through(function (EventBooking $booking) use ($canConfirm, $canCancel, $isAdmin, $now): array {
                 $status = $booking->status?->value;
                 $isPast = $booking->starts_at && $booking->starts_at->lt($now);
+                $isPaymentOverdue = $booking->payment_due_at && $booking->payment_due_at->lte($now);
                 $paymentSnapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 return [
                     'id' => $booking->id,
@@ -453,6 +458,7 @@ class VenuesController extends Controller
                       'ends_at' => $booking->ends_at?->toDateTimeString(),
                       'payment_order' => $paymentSnapshot['label'] ?? $booking->paymentOrder?->label,
                       'payment_code' => $booking->payment?->payment_code,
+                      'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
                       'event' => $booking->event
                         ? [
                             'id' => $booking->event->id,
@@ -484,8 +490,10 @@ class VenuesController extends Controller
                         ]
                         : null,
                     'moderated_at' => $booking->moderated_at?->toDateTimeString(),
+                    'moderation_comment' => $booking->moderation_comment,
+                    'moderation_source' => $booking->moderation_source?->value,
                     'can_await_payment' => !$isPast && $canConfirm && $status === EventBookingStatus::Pending->value,
-                    'can_mark_paid' => !$isPast && $canConfirm && $status === EventBookingStatus::AwaitingPayment->value,
+                    'can_mark_paid' => !$isPast && !$isPaymentOverdue && $canConfirm && $status === EventBookingStatus::AwaitingPayment->value,
                     'can_confirm' => !$isPast && $canConfirm && $status === EventBookingStatus::Paid->value,
                     'can_cancel' => !$isPast && $canCancel && (in_array($status, [EventBookingStatus::Pending->value, EventBookingStatus::AwaitingPayment->value], true)
                         || ($status === EventBookingStatus::Approved->value && $isAdmin)),
@@ -567,6 +575,7 @@ class VenuesController extends Controller
                 'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
                 'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
                 'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
+                'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
             ]
         );
 
@@ -593,6 +602,7 @@ class VenuesController extends Controller
                 'rental_duration_minutes' => $settings->rental_duration_minutes,
                 'rental_price_rub' => $settings->rental_price_rub,
                 'booking_mode' => $settings->booking_mode?->value ?? VenueSettings::DEFAULT_BOOKING_MODE->value,
+                'payment_wait_minutes' => $settings->payment_wait_minutes,
             ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
@@ -624,10 +634,11 @@ class VenuesController extends Controller
             [
               'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
               'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
-              'rental_duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
-              'rental_price_rub' => ['required', 'integer', 'min:0'],
+            'rental_duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+            'rental_price_rub' => ['required', 'integer', 'min:0'],
             'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
             'booking_mode' => ['required', 'string', 'in:instant,approval_required'],
+            'payment_wait_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
         ],
         [
             'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
@@ -642,13 +653,17 @@ class VenuesController extends Controller
               'rental_duration_minutes.integer' => 'Длительность аренды должна быть числом.',
               'rental_duration_minutes.min' => 'Длительность аренды должна быть больше 0 минут.',
               'rental_duration_minutes.max' => 'Длительность аренды не может превышать 1440 минут.',
-              'rental_price_rub.required' => 'Укажите стоимость аренды.',
-              'rental_price_rub.integer' => 'Стоимость аренды должна быть числом.',
-              'rental_price_rub.min' => 'Стоимость аренды не может быть отрицательной.',
+            'rental_price_rub.required' => 'Укажите стоимость аренды.',
+            'rental_price_rub.integer' => 'Стоимость аренды должна быть числом.',
+            'rental_price_rub.min' => 'Стоимость аренды не может быть отрицательной.',
             'payment_order_id.required' => 'Выберите порядок оплаты.',
             'payment_order_id.exists' => 'Выберите корректный порядок оплаты.',
             'booking_mode.required' => 'Выберите режим бронирования.',
             'booking_mode.in' => 'Выберите корректный режим бронирования.',
+            'payment_wait_minutes.required' => 'Укажите срок ожидания оплаты.',
+            'payment_wait_minutes.integer' => 'Срок ожидания оплаты должен быть числом.',
+            'payment_wait_minutes.min' => 'Срок ожидания оплаты не может быть отрицательным.',
+            'payment_wait_minutes.max' => 'Срок ожидания оплаты не может превышать 10080 минут.',
         ]
     );
 
@@ -661,6 +676,7 @@ class VenuesController extends Controller
                 'rental_duration_minutes' => $data['rental_duration_minutes'],
                 'rental_price_rub' => $data['rental_price_rub'],
                 'booking_mode' => $data['booking_mode'],
+                'payment_wait_minutes' => $data['payment_wait_minutes'],
             ]
         );
 
@@ -707,6 +723,7 @@ class VenuesController extends Controller
         $booking->update([
             'status' => EventBookingStatus::Approved,
             'moderation_comment' => $data['comment'] ?? null,
+            'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);
@@ -747,6 +764,12 @@ class VenuesController extends Controller
             ]);
         }
 
+        if (app(BookingPaymentExpiryService::class)->cancelIfExpired($booking)) {
+            return back()->withErrors([
+                'booking' => 'Срок оплаты истек.',
+            ]);
+        }
+
         $data = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -758,20 +781,25 @@ class VenuesController extends Controller
                 ->first();
         }
 
+        $settings = $venue->settings ?: new VenueSettings([
+            'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+            'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+            'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+        ]);
+        $waitMinutes = (int) $settings->payment_wait_minutes;
+        $paymentDueAt = $waitMinutes > 0 ? now()->addMinutes($waitMinutes) : null;
+
         $booking->update([
             'status' => EventBookingStatus::AwaitingPayment,
             'payment_order_id' => $paymentOrder?->id,
             'payment_order_snapshot' => $paymentOrder
                 ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
                 : null,
+            'payment_due_at' => $paymentDueAt,
             'moderation_comment' => $data['comment'] ?? null,
+            'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
             'moderated_at' => now(),
-        ]);
-
-        $settings = $venue->settings ?: new VenueSettings([
-            'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
-            'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
         ]);
         $durationMinutes = $booking->starts_at && $booking->ends_at
             ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
@@ -841,6 +869,12 @@ class VenuesController extends Controller
             ]);
         }
 
+        if (app(BookingPaymentExpiryService::class)->cancelIfExpired($booking)) {
+            return back()->withErrors([
+                'booking' => 'Срок оплаты истек.',
+            ]);
+        }
+
         $data = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -853,6 +887,7 @@ class VenuesController extends Controller
         $booking->update([
             'status' => $nextStatus,
             'moderation_comment' => $data['comment'] ?? null,
+            'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);
@@ -921,6 +956,7 @@ class VenuesController extends Controller
         $booking->update([
             'status' => EventBookingStatus::Cancelled,
             'moderation_comment' => $data['comment'] ?? null,
+            'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);

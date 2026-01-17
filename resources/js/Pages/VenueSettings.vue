@@ -69,6 +69,31 @@ watch(isMinutes, (value) => {
     rentalDurationValue.value = value ? current * 60 : Number((current / 60).toFixed(2));
 });
 
+const isPaymentWaitMinutes = ref(false);
+const paymentWaitValue = ref(1);
+const initialPaymentWait = props.settings?.payment_wait_minutes ?? 60;
+if (initialPaymentWait === 0) {
+    isPaymentWaitMinutes.value = false;
+    paymentWaitValue.value = 0;
+} else if (initialPaymentWait % 60 === 0) {
+    isPaymentWaitMinutes.value = false;
+    paymentWaitValue.value = initialPaymentWait / 60;
+} else {
+    isPaymentWaitMinutes.value = true;
+    paymentWaitValue.value = initialPaymentWait;
+}
+const paymentWaitMax = computed(() => (isPaymentWaitMinutes.value ? 10080 : 168));
+const paymentWaitStep = computed(() => (isPaymentWaitMinutes.value ? 1 : 0.25));
+
+watch(isPaymentWaitMinutes, (value) => {
+    const current = Number(paymentWaitValue.value);
+    if (!Number.isFinite(current) || current === 0) {
+        return;
+    }
+
+    paymentWaitValue.value = value ? current * 60 : Number((current / 60).toFixed(2));
+});
+
 const form = useForm({
     booking_lead_time_minutes: props.settings?.booking_lead_time_minutes ?? 15,
     booking_min_interval_minutes: props.settings?.booking_min_interval_minutes ?? 30,
@@ -76,6 +101,7 @@ const form = useForm({
     rental_price_rub: props.settings?.rental_price_rub ?? 0,
     payment_order_id: props.settings?.payment_order_id ?? '',
     booking_mode: props.settings?.booking_mode ?? 'instant',
+    payment_wait_minutes: props.settings?.payment_wait_minutes ?? 60,
 });
 
 const submit = () => {
@@ -84,6 +110,12 @@ const submit = () => {
         ? isMinutes.value
             ? durationValue
             : durationValue * 60
+        : null;
+    const waitValue = Number(paymentWaitValue.value);
+    form.payment_wait_minutes = Number.isFinite(waitValue)
+        ? isPaymentWaitMinutes.value
+            ? waitValue
+            : waitValue * 60
         : null;
     form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/settings`, {
         preserveScroll: true,
@@ -178,6 +210,28 @@ const submit = () => {
                                 </select>
                                 <p v-if="actionError.booking_mode" class="text-xs text-rose-700">
                                     {{ actionError.booking_mode }}
+                                </p>
+                            </div>
+
+                            <div class="grid gap-2">
+                                <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                    Срок ожидания оплаты
+                                </label>
+                                <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                    <input v-model="isPaymentWaitMinutes" type="checkbox" class="input-switch" />
+                                    <span>В минутах</span>
+                                </label>
+                                <input
+                                    v-model="paymentWaitValue"
+                                    type="number"
+                                    min="0"
+                                    :step="paymentWaitStep"
+                                    :max="paymentWaitMax"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                />
+                                <p class="text-xs text-slate-500">0 — бессрочно.</p>
+                                <p v-if="actionError.payment_wait_minutes" class="text-xs text-rose-700">
+                                    {{ actionError.payment_wait_minutes }}
                                 </p>
                             </div>
 

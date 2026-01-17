@@ -394,6 +394,12 @@ const bookingClientError = computed(() => {
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
                                     <p class="mt-1">{{ booking.payment_code }}</p>
                                 </div>
+                                <div v-if="booking.status === 'awaiting_payment'" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Оплатить до</span>
+                                    <p class="mt-1">
+                                        {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'Бессрочно' }}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </section>

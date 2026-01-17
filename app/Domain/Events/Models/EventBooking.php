@@ -3,6 +3,7 @@
 namespace App\Domain\Events\Models;
 
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
@@ -25,7 +26,9 @@ class EventBooking extends Model
         'status',
         'payment_order_id',
         'payment_order_snapshot',
+        'payment_due_at',
         'moderation_comment',
+        'moderation_source',
         'moderated_by',
         'moderated_at',
         'created_by',
@@ -39,6 +42,8 @@ class EventBooking extends Model
             'moderated_at' => 'datetime',
             'payment_order_snapshot' => 'array',
             'status' => EventBookingStatus::class,
+            'payment_due_at' => 'datetime',
+            'moderation_source' => EventBookingModerationSource::class,
         ];
     }
 
