@@ -25,7 +25,7 @@ class AdminController extends Controller
         return Inertia::render('Admin/Index', [
             'appName' => config('app.name'),
             'navigation' => $navigation,
-            'activeHref' => $this->resolveActiveHref($navigation),
+            'activeHref' => '',
             'breadcrumbs' => $breadcrumbs,
         ]);
     }

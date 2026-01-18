@@ -75,6 +75,7 @@ const statusFilter = ref('');
 const addressFilter = ref('');
 const metroFilter = ref('');
 const sortBy = ref('name_asc');
+const myVenuesOnly = ref(false);
 const groupByType = ref(false);
 const pageIndex = ref(1);
 const perPage = 6;
@@ -146,6 +147,10 @@ const filtered = computed(() => {
             return false;
         }
 
+        if (myVenuesOnly.value && !hall.is_my_venue) {
+            return false;
+        }
+
         if (statusFilter.value && hall.status !== statusFilter.value) {
             return false;
         }
@@ -188,8 +193,14 @@ const sorted = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / perPage)));
 
-watch([typeFilter, statusFilter, addressFilter, metroFilter, sortBy, groupByType], () => {
+watch([typeFilter, statusFilter, addressFilter, metroFilter, sortBy, myVenuesOnly, groupByType], () => {
     pageIndex.value = 1;
+});
+
+watch(isAuthenticated, (value) => {
+    if (!value) {
+        myVenuesOnly.value = false;
+    }
 });
 
 watch(totalPages, (value) => {
@@ -467,6 +478,16 @@ const applyAddressSuggestion = (suggestion) => {
                             <input v-model="groupByType" class="h-4 w-4 rounded border-slate-300" type="checkbox" />
                             Группировать по типу
                         </label>
+
+                        <label class="flex items-center gap-2 text-sm text-slate-600">
+                            <input
+                                v-model="myVenuesOnly"
+                                class="h-4 w-4 rounded border-slate-300"
+                                type="checkbox"
+                                :disabled="!isAuthenticated"
+                            />
+                            Мои площадки
+                        </label>
                     </div>
 
                     <div v-if="paged.length" class="mt-6 grid gap-4">
@@ -700,4 +721,3 @@ const applyAddressSuggestion = (suggestion) => {
         </div>
     </div>
 </template>
-

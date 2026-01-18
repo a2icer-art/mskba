@@ -5,6 +5,8 @@ namespace App\Domain\Venues\Services;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueType;
 use App\Domain\Metros\Models\Metro;
+use App\Domain\Contracts\Models\Contract;
+use App\Domain\Contracts\Enums\ContractStatus;
 use App\Support\DateFormatter;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -94,7 +96,11 @@ class VenueCatalogService
 
         $query->visibleFor($user);
 
-        return $query->get(['id', 'name', 'alias', 'venue_type_id', 'created_at', 'status', 'created_by'])
+        $venues = $query->get(['id', 'name', 'alias', 'venue_type_id', 'created_at', 'status', 'created_by']);
+        $myVenueIds = $this->resolveMyVenueIds($user, $venues);
+        $myVenueLookup = array_fill_keys($myVenueIds, true);
+
+        return $venues
             ->map(fn (Venue $venue) => [
                 'id' => $venue->id,
                 'name' => $venue->name,
@@ -105,8 +111,41 @@ class VenueCatalogService
                 'created_at' => DateFormatter::dateTime($venue->created_at),
                 'type' => $venue->venueType?->only(['id', 'name', 'alias']),
                 'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,
+                'is_my_venue' => (bool) ($myVenueLookup[$venue->id] ?? false),
             ])
             ->values()
             ->all();
+    }
+
+    private function resolveMyVenueIds(?User $user, $venues): array
+    {
+        if (!$user) {
+            return [];
+        }
+
+        $now = now();
+        $entityType = (new Venue())->getMorphClass();
+
+        $contractVenueIds = Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $entityType)
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($dateQuery) use ($now): void {
+                $dateQuery->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($dateQuery) use ($now): void {
+                $dateQuery->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->pluck('entity_id')
+            ->all();
+
+        $createdVenueIds = $venues
+            ->where('created_by', $user->id)
+            ->pluck('id')
+            ->all();
+
+        return array_values(array_unique(array_merge($createdVenueIds, $contractVenueIds)));
     }
 }
