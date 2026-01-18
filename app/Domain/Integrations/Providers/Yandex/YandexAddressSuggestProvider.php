@@ -96,6 +96,7 @@ class YandexAddressSuggestProvider implements AddressSuggestProviderInterface
             $street = $this->findComponent($components, ['street']);
             $building = $this->findComponent($components, ['house']);
             $metroNames = $this->findComponents($components, ['metro']);
+            [$longitude, $latitude] = $this->extractCoordinates($geo);
 
             if (!$city || !$street || !$building) {
                 continue;
@@ -111,7 +112,9 @@ class YandexAddressSuggestProvider implements AddressSuggestProviderInterface
                 $city,
                 $street,
                 $building,
-                $metroNames
+                $metroNames,
+                $latitude,
+                $longitude
             );
         }
 
@@ -215,5 +218,20 @@ class YandexAddressSuggestProvider implements AddressSuggestProviderInterface
         }
 
         return null;
+    }
+
+    private function extractCoordinates(array $geo): array
+    {
+        $point = Arr::get($geo, 'Point.pos');
+        if (!is_string($point) || $point === '') {
+            return [null, null];
+        }
+
+        [$longitude, $latitude] = array_pad(explode(' ', $point), 2, null);
+        if ($longitude === null || $latitude === null) {
+            return [null, null];
+        }
+
+        return [(float) $longitude, (float) $latitude];
     }
 }

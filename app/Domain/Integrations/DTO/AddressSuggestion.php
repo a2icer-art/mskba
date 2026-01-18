@@ -11,6 +11,8 @@ class AddressSuggestion
         public readonly ?string $street,
         public readonly ?string $building,
         public readonly array $metroNames = [],
+        public readonly ?float $latitude = null,
+        public readonly ?float $longitude = null,
     ) {
     }
 }

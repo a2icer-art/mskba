@@ -24,11 +24,18 @@ class Metro extends Model
         'line_name',
         'line_color',
         'city',
+        'latitude',
+        'longitude',
         'status',
         'commentary',
         'created_by',
         'updated_by',
         'deleted_by',
+    ];
+
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function venues(): HasMany

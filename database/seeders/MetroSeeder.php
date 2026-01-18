@@ -60,6 +60,8 @@ class MetroSeeder extends Seeder
                     'line_name' => $lineName,
                     'line_color' => $lineColor,
                     'city' => 'Москва',
+                    'latitude' => isset($station['lat']) ? (float) $station['lat'] : null,
+                    'longitude' => isset($station['lng']) ? (float) $station['lng'] : null,
                     'status' => 1,
                     'commentary' => null,
                     'created_by' => null,
@@ -79,7 +81,7 @@ class MetroSeeder extends Seeder
         Metro::query()->upsert(
             $rows,
             ['alias'],
-            ['name', 'line_name', 'line_color', 'city', 'status', 'commentary', 'updated_at']
+            ['name', 'line_name', 'line_color', 'city', 'latitude', 'longitude', 'status', 'commentary', 'updated_at']
         );
     }
 }
