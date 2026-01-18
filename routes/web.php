@@ -79,6 +79,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
     Route::get('/{type}/{venue}', [VenuesController::class, 'show'])->name('venues.show');
+    Route::get('/{type}/{venue}/feed', [VenuesController::class, 'feed'])->name('venues.feed');
     Route::post('/', [VenuesController::class, 'store'])
         ->middleware(['auth', 'can:venue.create'])
         ->name('venues.store');

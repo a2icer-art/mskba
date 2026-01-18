@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
@@ -44,6 +44,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    about: {
+        type: Object,
+        default: () => ({}),
+    },
     breadcrumbs: {
         type: Array,
         default: () => [],
@@ -79,6 +83,13 @@ const editForm = useForm({
 });
 
 const availableTypes = computed(() => props.types ?? []);
+const aboutData = computed(() => props.about ?? {});
+const scheduleDays = computed(() => aboutData.value?.schedule_days ?? []);
+const scheduleUrl = computed(() => aboutData.value?.schedule_url ?? '');
+const feedUrl = computed(() => aboutData.value?.feed_url ?? '');
+const bookingUrl = computed(() => aboutData.value?.booking_url ?? '/events');
+const ratingValue = computed(() => aboutData.value?.rating ?? null);
+const mapApiKey = computed(() => aboutData.value?.map_api_key ?? '');
 const editableFields = computed(() => props.editableFields ?? []);
 const addressEditable = computed(() =>
     ['city', 'street', 'building', 'metro_id'].some((field) => editableFields.value.includes(field))
@@ -131,6 +142,187 @@ const nonEditableItems = computed(() => {
     }
 
     return items;
+});
+
+watch(
+    () => scheduleDays.value.length,
+    () => {
+        nextTick(() => {
+            refreshAnchorMetrics();
+        });
+    }
+);
+
+const anchorSections = [
+    { id: 'address', label: 'Адрес' },
+    { id: 'schedule', label: 'Расписание' },
+    { id: 'posts', label: 'Посты' },
+    { id: 'reviews', label: 'Отзывы' },
+];
+const activeSectionId = ref('address');
+const sectionRefs = ref({});
+const setSectionRef = (id) => (element) => {
+    if (element) {
+        sectionRefs.value[id] = element;
+    }
+};
+const anchorNavRef = ref(null);
+const anchorNavHeight = ref(0);
+const anchorNavOffsetTop = ref(0);
+const anchorNavLeft = ref(0);
+const anchorNavWidth = ref(0);
+const isAnchorSticky = ref(false);
+
+const scrollToSection = (id) => {
+    const element = sectionRefs.value[id];
+    if (!element) {
+        return;
+    }
+    const topOffset = 96;
+    const top = window.scrollY + element.getBoundingClientRect().top - topOffset;
+    window.scrollTo({ top, behavior: 'smooth' });
+};
+
+let scrollFrame = null;
+const refreshAnchorMetrics = () => {
+    if (!anchorNavRef.value) {
+        return;
+    }
+    const rect = anchorNavRef.value.getBoundingClientRect();
+    anchorNavHeight.value = rect.height;
+    anchorNavOffsetTop.value = window.scrollY + rect.top;
+    anchorNavLeft.value = rect.left;
+    anchorNavWidth.value = rect.width;
+};
+
+const updateActiveSection = () => {
+    if (scrollFrame) {
+        return;
+    }
+    scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = null;
+        const stickyThreshold = anchorNavOffsetTop.value + anchorNavHeight.value;
+        if (anchorNavHeight.value > 0) {
+            isAnchorSticky.value = window.scrollY >= stickyThreshold;
+        }
+        let current = anchorSections[0]?.id ?? '';
+        const offset = 120;
+        anchorSections.forEach((section) => {
+            const element = sectionRefs.value[section.id];
+            if (!element) {
+                return;
+            }
+            const top = element.getBoundingClientRect().top;
+            if (top - offset <= 0) {
+                current = section.id;
+            }
+        });
+        if (current) {
+            activeSectionId.value = current;
+        }
+    });
+};
+
+onMounted(() => {
+    nextTick(() => {
+        refreshAnchorMetrics();
+        updateActiveSection();
+    });
+    window.addEventListener('scroll', updateActiveSection, { passive: true });
+    window.addEventListener('resize', refreshAnchorMetrics);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('scroll', updateActiveSection);
+    window.removeEventListener('resize', refreshAnchorMetrics);
+    if (scrollFrame) {
+        window.cancelAnimationFrame(scrollFrame);
+        scrollFrame = null;
+    }
+});
+
+const selectedDay = ref(null);
+const openDayDetails = (day) => {
+    selectedDay.value = day;
+};
+const closeDayDetails = () => {
+    selectedDay.value = null;
+};
+
+const formatDayLabel = (date) =>
+    new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(date));
+const formatWeekdayLabel = (date) =>
+    new Intl.DateTimeFormat('ru-RU', { weekday: 'short' }).format(new Date(date));
+
+const mapRef = ref(null);
+const mapError = ref('');
+let mapInstance = null;
+
+const loadYandexMaps = () =>
+    new Promise((resolve, reject) => {
+        if (window.ymaps) {
+            resolve(window.ymaps);
+            return;
+        }
+        if (!mapApiKey.value) {
+            reject(new Error('API key not provided'));
+            return;
+        }
+        const existing = document.querySelector('script[data-ymaps]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window.ymaps));
+            existing.addEventListener('error', () => reject(new Error('failed')));
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = `https://api-maps.yandex.ru/2.1/?apikey=${mapApiKey.value}&lang=ru_RU`;
+        script.async = true;
+        script.dataset.ymaps = 'true';
+        script.onload = () => resolve(window.ymaps);
+        script.onerror = () => reject(new Error('failed'));
+        document.head.appendChild(script);
+    });
+
+const initMap = async () => {
+    if (!mapRef.value) {
+        return;
+    }
+    const address = props.venue?.address?.display;
+    if (!address) {
+        mapError.value = 'Адрес не указан.';
+        return;
+    }
+    try {
+        const ymaps = await loadYandexMaps();
+        await ymaps.ready();
+        const result = await ymaps.geocode(address);
+        const first = result.geoObjects.get(0);
+        if (!first) {
+            mapError.value = 'Не удалось определить координаты.';
+            return;
+        }
+        const coords = first.geometry.getCoordinates();
+        mapInstance = new ymaps.Map(
+            mapRef.value,
+            {
+                center: coords,
+                zoom: 15,
+                controls: [],
+            },
+            {
+                suppressMapOpenBlock: true,
+            }
+        );
+        mapInstance.behaviors.disable('scrollZoom');
+        const placemark = new ymaps.Placemark(coords, {}, { preset: 'islands#redIcon' });
+        mapInstance.geoObjects.add(placemark);
+    } catch (error) {
+        mapError.value = 'Не удалось загрузить карту.';
+    }
+};
+
+onMounted(() => {
+    initMap();
 });
 
 const moderationRequest = computed(() => props.moderationRequest ?? null);
@@ -332,7 +524,7 @@ const submitModerationRequest = () => {
 </script>
 
 <template>
-    <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
+    <div class="relative min-h-screen overflow-x-hidden bg-[#f7f1e6] text-slate-900">
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
 
@@ -349,7 +541,7 @@ const submitModerationRequest = () => {
                     v-if="hasSidebar"
                     :title="navigation.title"
                     :data="navigationData"
-                    :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
+                    :active-href="activeTypeSlug && venue?.alias ? `/venues/${activeTypeSlug}/${venue?.alias}` : ''"
                 />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
@@ -357,6 +549,12 @@ const submitModerationRequest = () => {
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 class="text-3xl font-semibold text-slate-900">{{ venue?.name || 'Площадка' }}</h1>
+                            <div v-if="ratingValue !== null" class="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                                <div class="flex items-center gap-1 text-amber-400">
+                                    <span v-for="index in 5" :key="index">★</span>
+                                </div>
+                                <span class="font-semibold">{{ ratingValue }}</span>
+                            </div>
                         </div>
                         <button
                             v-if="canEdit"
@@ -366,6 +564,136 @@ const submitModerationRequest = () => {
                         >
                             Редактировать
                         </button>
+                    </div>
+
+                    <div class="mt-6">
+                        <div v-if="isAnchorSticky" :style="{ height: `${anchorNavHeight}px` }"></div>
+                        <div
+                            ref="anchorNavRef"
+                            class="border-b border-slate-200/80 bg-white/90 py-3 backdrop-blur"
+                            :class="isAnchorSticky ? 'fixed z-30' : 'relative'"
+                            :style="
+                                isAnchorSticky
+                                    ? { top: '0px', left: `${anchorNavLeft}px`, width: `${anchorNavWidth}px` }
+                                    : {}
+                            "
+                        >
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Навигация</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <button
+                                    v-for="section in anchorSections"
+                                    :key="section.id"
+                                    type="button"
+                                    class="rounded-full border px-4 py-2 text-sm font-semibold transition"
+                                    :class="
+                                        activeSectionId === section.id
+                                            ? 'border-slate-900 bg-slate-900 text-white'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                    "
+                                    @click="scrollToSection(section.id)"
+                                >
+                                    {{ section.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 space-y-10">
+                            <section :id="anchorSections[0].id" :ref="setSectionRef('address')" class="scroll-mt-24 space-y-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <h2 class="text-lg font-semibold text-slate-900">Адрес</h2>
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-400">Карта</span>
+                                </div>
+                                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                    <div ref="mapRef" class="h-64 w-full"></div>
+                                    <div v-if="mapError" class="border-t border-slate-200 px-4 py-3 text-sm text-rose-700">
+                                        {{ mapError }}
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <div v-if="venue?.address?.metro" class="flex items-center gap-2 text-sm text-slate-700">
+                                        <span
+                                            class="h-2.5 w-2.5 rounded-full"
+                                            :style="{ backgroundColor: venue?.address?.metro?.line_color || '#94a3b8' }"
+                                        ></span>
+                                        <span>{{ formatMetroLabel(venue?.address?.metro) }}</span>
+                                    </div>
+                                    <p class="text-sm text-slate-700">{{ venue?.address?.display || 'Адрес не указан.' }}</p>
+                                </div>
+                            </section>
+
+                            <section :id="anchorSections[1].id" :ref="setSectionRef('schedule')" class="scroll-mt-24 space-y-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h2 class="text-lg font-semibold text-slate-900">Расписание</h2>
+                                        <p class="mt-1 text-sm text-slate-600">Ближайшие две недели.</p>
+                                    </div>
+                                    <a
+                                        :href="scheduleUrl"
+                                        class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                                    >
+                                        Подробнее
+                                    </a>
+                                </div>
+                                <div v-if="scheduleDays.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    <button
+                                        v-for="day in scheduleDays"
+                                        :key="day.date"
+                                        type="button"
+                                        class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-slate-300"
+                                        :class="{ 'ring-2 ring-emerald-200': day.is_today }"
+                                        @click="openDayDetails(day)"
+                                    >
+                                        <div class="flex items-center justify-between text-xs uppercase tracking-[0.15em] text-slate-500">
+                                            <span>{{ formatWeekdayLabel(day.date) }}</span>
+                                            <span>{{ formatDayLabel(day.date) }}</span>
+                                        </div>
+                                        <div class="text-sm text-slate-700">
+                                            <p v-if="day.is_closed" class="text-rose-700">Закрыто</p>
+                                            <div v-else-if="day.intervals?.length" class="space-y-1">
+                                                <div v-for="(interval, index) in day.intervals" :key="index" class="text-sm font-medium text-slate-800">
+                                                    {{ interval.starts_at }}–{{ interval.ends_at }}
+                                                </div>
+                                            </div>
+                                            <p v-else class="text-slate-500">Интервалы не заданы.</p>
+                                        </div>
+                                        <p v-if="day.bookings?.length" class="text-xs text-slate-500">
+                                            Брони: {{ day.bookings.length }}
+                                        </p>
+                                    </button>
+                                </div>
+                                <p v-else class="text-sm text-slate-500">Расписание пока не задано.</p>
+                            </section>
+
+                            <section :id="anchorSections[2].id" :ref="setSectionRef('posts')" class="scroll-mt-24 space-y-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <h2 class="text-lg font-semibold text-slate-900">Последние посты</h2>
+                                    <a
+                                        :href="feedUrl"
+                                        class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                                    >
+                                        Подробнее
+                                    </a>
+                                </div>
+                                <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                                    Раздел в разработке.
+                                </div>
+                            </section>
+
+                            <section :id="anchorSections[3].id" :ref="setSectionRef('reviews')" class="scroll-mt-24 space-y-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <h2 class="text-lg font-semibold text-slate-900">Отзывы</h2>
+                                    <a
+                                        :href="feedUrl"
+                                        class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                                    >
+                                        Подробнее
+                                    </a>
+                                </div>
+                                <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                                    Раздел в разработке.
+                                </div>
+                            </section>
+                        </div>
                     </div>
 
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" :class="{ loading: moderationForm.processing }">
@@ -471,6 +799,69 @@ const submitModerationRequest = () => {
             </main>
 
             <MainFooter :app-name="appName" />
+        </div>
+
+        <div v-if="selectedDay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeDayDetails">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Расписание на день</h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            {{ formatDayLabel(selectedDay.date) }}
+                        </p>
+                    </div>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeDayDetails"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                    <div v-if="selectedDay.is_closed" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        Площадка закрыта.
+                    </div>
+                    <div v-else class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">График работы</p>
+                        <div v-if="selectedDay.intervals?.length" class="mt-2 space-y-1">
+                            <div v-for="(interval, index) in selectedDay.intervals" :key="index">
+                                {{ interval.starts_at }}–{{ interval.ends_at }}
+                            </div>
+                        </div>
+                        <p v-else class="mt-2 text-slate-500">Интервалы не заданы.</p>
+                    </div>
+
+                    <div class="mt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Занятые интервалы</p>
+                        <div v-if="selectedDay.bookings?.length" class="mt-2 space-y-2">
+                            <div
+                                v-for="(booking, index) in selectedDay.bookings"
+                                :key="index"
+                                class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            >
+                                {{ booking.starts_at }}–{{ booking.ends_at }}
+                            </div>
+                        </div>
+                        <p v-else class="mt-2 text-sm text-slate-500">Бронирований нет.</p>
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <a
+                        :href="scheduleUrl"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    >
+                        Подробнее
+                    </a>
+                    <a
+                        :href="bookingUrl"
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                    >
+                        Забронировать
+                    </a>
+                </div>
+            </div>
         </div>
 
         <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeEdit">
@@ -645,5 +1036,3 @@ const submitModerationRequest = () => {
         />
     </div>
 </template>
-
-

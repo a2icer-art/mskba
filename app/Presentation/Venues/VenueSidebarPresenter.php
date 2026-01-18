@@ -34,12 +34,16 @@ class VenueSidebarPresenter extends BasePresenter
                 'title' => 'Общее',
                 'items' => [
                     [
-                        'label' => 'Общая информация',
+                        'label' => 'О площадке',
                         'href' => "/venues/{$typeSlug}/{$venue->alias}",
                     ],
                     [
                         'label' => 'Расписание',
                         'href' => "/venues/{$typeSlug}/{$venue->alias}/schedule",
+                    ],
+                    [
+                        'label' => 'Лента',
+                        'href' => "/venues/{$typeSlug}/{$venue->alias}/feed",
                     ],
                 ],
             ],
