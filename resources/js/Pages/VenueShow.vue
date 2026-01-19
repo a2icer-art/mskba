@@ -761,7 +761,7 @@ const submitModerationRequest = () => {
                                         Подробнее
                                     </a>
                                 </div>
-                                <div class="grid grid-cols-7 gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                                <div class="hidden grid-cols-7 gap-3 text-xs uppercase tracking-[0.2em] text-slate-400 sm:grid">
                                     <span v-for="label in weekdayHeaders" :key="label" class="text-center">{{ label }}</span>
                                 </div>
                                 <div v-if="scheduleDays.length" class="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
@@ -774,6 +774,7 @@ const submitModerationRequest = () => {
                                         @click="openDayDetails(day)"
                                     >
                                         <div class="text-xs uppercase tracking-[0.2em] text-slate-500">
+                                            <span class="sm:hidden">{{ formatWeekdayLabel(day.date) }}, </span>
                                             {{ formatDayLabel(day.date) }}
                                         </div>
                                         <span
