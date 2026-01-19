@@ -181,13 +181,20 @@ const anchorNavOffsetTop = ref(0);
 const anchorNavLeft = ref(0);
 const anchorNavWidth = ref(0);
 const isAnchorSticky = ref(false);
+const pageContentRef = ref(null);
+const headerOffset = ref(0);
+const updateHeaderOffset = () => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
+    const parsed = parseInt(value, 10);
+    headerOffset.value = Number.isFinite(parsed) ? parsed : 0;
+};
 
 const scrollToSection = (id) => {
     const element = sectionRefs.value[id];
     if (!element) {
         return;
     }
-    const topOffset = 96;
+    const topOffset = headerOffset.value + anchorNavHeight.value + 16;
     const top = window.scrollY + element.getBoundingClientRect().top - topOffset;
     window.scrollTo({ top, behavior: 'smooth' });
 };
@@ -198,10 +205,11 @@ const refreshAnchorMetrics = () => {
         return;
     }
     const rect = anchorNavRef.value.getBoundingClientRect();
+    const contentRect = pageContentRef.value?.getBoundingClientRect?.();
     anchorNavHeight.value = rect.height;
     anchorNavOffsetTop.value = window.scrollY + rect.top;
-    anchorNavLeft.value = rect.left;
-    anchorNavWidth.value = rect.width;
+    anchorNavLeft.value = contentRect?.left ?? rect.left;
+    anchorNavWidth.value = contentRect?.width ?? rect.width;
 };
 
 const updateActiveSection = () => {
@@ -215,7 +223,7 @@ const updateActiveSection = () => {
             isAnchorSticky.value = window.scrollY >= stickyThreshold;
         }
         let current = anchorSections[0]?.id ?? '';
-        const offset = 120;
+        const offset = headerOffset.value + anchorNavHeight.value + 24;
         anchorSections.forEach((section) => {
             const element = sectionRefs.value[section.id];
             if (!element) {
@@ -234,16 +242,19 @@ const updateActiveSection = () => {
 
 onMounted(() => {
     nextTick(() => {
+        updateHeaderOffset();
         refreshAnchorMetrics();
         updateActiveSection();
     });
     window.addEventListener('scroll', updateActiveSection, { passive: true });
     window.addEventListener('resize', refreshAnchorMetrics);
+    window.addEventListener('resize', updateHeaderOffset);
 });
 
 onBeforeUnmount(() => {
     window.removeEventListener('scroll', updateActiveSection);
     window.removeEventListener('resize', refreshAnchorMetrics);
+    window.removeEventListener('resize', updateHeaderOffset);
     if (scrollFrame) {
         window.cancelAnimationFrame(scrollFrame);
         scrollFrame = null;
@@ -661,7 +672,7 @@ const submitModerationRequest = () => {
                     :active-href="activeTypeSlug && venue?.alias ? `/venues/${activeTypeSlug}/${venue?.alias}` : ''"
                 />
 
-                <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
+                <div ref="pageContentRef" class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -689,10 +700,10 @@ const submitModerationRequest = () => {
                         <div
                             ref="anchorNavRef"
                             class="border-b border-slate-200/80 bg-white/90 py-3 backdrop-blur"
-                            :class="isAnchorSticky ? 'fixed z-30' : 'relative'"
+                            :class="isAnchorSticky ? 'fixed z-30 px-6 shadow-[0_6px_18px_rgba(15,23,42,0.06)]' : 'relative'"
                             :style="
                                 isAnchorSticky
-                                    ? { top: '0px', left: `${anchorNavLeft}px`, width: `${anchorNavWidth}px` }
+                                    ? { top: `${headerOffset}px`, left: `${anchorNavLeft}px`, width: `${anchorNavWidth}px` }
                                     : {}
                             "
                         >

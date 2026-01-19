@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -70,10 +70,78 @@ const formatBadge = (value) => {
     }
     return String(value);
 };
+
+const wrapperRef = ref(null);
+const sidebarRef = ref(null);
+const sidebarHeight = ref(0);
+const sidebarLeft = ref(0);
+const sidebarWidth = ref(0);
+const sidebarInitialOffset = ref(0);
+const topOffset = ref(0);
+const gapOffset = 12;
+const isFixed = ref(false);
+
+const updateSidebarMetrics = () => {
+    if (!sidebarRef.value || !wrapperRef.value) {
+        return;
+    }
+    const rect = wrapperRef.value.getBoundingClientRect();
+    const sidebarRect = sidebarRef.value.getBoundingClientRect();
+    sidebarHeight.value = sidebarRect.height || 0;
+    sidebarLeft.value = rect.left || 0;
+    sidebarWidth.value = rect.width || 0;
+    if (!isFixed.value) {
+        sidebarInitialOffset.value = window.scrollY + rect.top;
+    }
+    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
+    const parsed = parseInt(cssOffset, 10);
+    topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
+};
+
+const updateSidebarFixed = () => {
+    if (!sidebarRef.value) {
+        return;
+    }
+    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
+    const parsed = parseInt(cssOffset, 10);
+    topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
+    isFixed.value = window.scrollY >= sidebarInitialOffset.value - topOffset.value;
+};
+
+onMounted(() => {
+    nextTick(() => {
+        updateSidebarMetrics();
+        updateSidebarFixed();
+    });
+    window.addEventListener('resize', updateSidebarMetrics);
+    window.addEventListener('resize', updateSidebarFixed);
+    window.addEventListener('scroll', updateSidebarFixed, { passive: true });
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateSidebarMetrics);
+    window.removeEventListener('resize', updateSidebarFixed);
+    window.removeEventListener('scroll', updateSidebarFixed);
+});
 </script>
 
 <template>
-    <aside v-if="hasItems" class="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm">
+    <div v-if="hasItems" ref="wrapperRef">
+        <div v-if="isFixed" :style="{ height: `${sidebarHeight}px` }"></div>
+        <aside
+            ref="sidebarRef"
+            class="self-start flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm"
+            :class="isFixed ? 'fixed z-30' : 'relative'"
+            :style="
+                isFixed
+                    ? {
+                          top: `${topOffset}px`,
+                          left: `${sidebarLeft}px`,
+                          width: `${sidebarWidth}px`,
+                      }
+                    : {}
+            "
+        >
         <p v-if="title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ title }}</p>
         <div class="space-y-4">
             <div v-for="group in groups" :key="group.title || group.items[0]?.href" class="space-y-3">
@@ -104,5 +172,6 @@ const formatBadge = (value) => {
                 </ul>
             </div>
         </div>
-    </aside>
+        </aside>
+    </div>
 </template>
