@@ -497,6 +497,9 @@ const deleteMessage = async (messageId) => {
                 :app-name="appName"
                 :is-authenticated="Boolean($page.props.auth?.user)"
                 :login-label="$page.props.auth?.user?.login"
+                :sidebar-title="navigation.title"
+                :sidebar-items="sidebarData"
+                :sidebar-active-href="activeHref"
             />
 
             <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">

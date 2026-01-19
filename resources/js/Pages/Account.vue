@@ -886,7 +886,14 @@ const logout = () => {
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
 
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
-            <MainHeader :app-name="appName" :is-authenticated="true" :login-label="user?.login" />
+            <MainHeader
+                :app-name="appName"
+                :is-authenticated="true"
+                :login-label="user?.login"
+                :sidebar-title="navigation?.title || 'Аккаунт'"
+                :sidebar-items="accountMenuItems"
+                :sidebar-active-href="activeAccountHref"
+            />
 
             <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
                 <MainSidebar

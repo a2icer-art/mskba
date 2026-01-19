@@ -18,6 +18,18 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    sidebarTitle: {
+        type: String,
+        default: '',
+    },
+    sidebarItems: {
+        type: Array,
+        default: () => [],
+    },
+    sidebarActiveHref: {
+        type: String,
+        default: '',
+    },
 });
 
 defineEmits(['open-login']);
@@ -27,6 +39,30 @@ const roleLevel = computed(() => Number(page.props.auth?.user?.role_level ?? 0))
 const canSeeControlPanel = computed(
     () => props.isAuthenticated && roleLevel.value > 10
 );
+const navItems = computed(() => {
+    const items = [
+        { label: 'Площадки', href: '/venues' },
+        { label: 'События', href: '/events' },
+        { label: 'Турниры', href: '#' },
+        { label: 'Сообщество', href: '#' },
+    ];
+    if (canSeeControlPanel.value) {
+        items.push({ label: 'Панель управления', href: '/admin', variant: 'admin' });
+    }
+    return items;
+});
+const isMenuOpen = ref(false);
+const isSidebarOpen = ref(false);
+const toggleMenu = () => {
+    isMenuOpen.value = !isMenuOpen.value;
+    if (!isMenuOpen.value) {
+        isSidebarOpen.value = false;
+    }
+};
+const closeMenu = () => {
+    isMenuOpen.value = false;
+    isSidebarOpen.value = false;
+};
 const { unreadCount } = useMessagePolling({
     enabled: props.isAuthenticated,
     pollUrl: '/account/messages/poll',
@@ -42,6 +78,57 @@ const unreadBadge = computed(() => {
     }
     return count > 9 ? '…' : String(count);
 });
+
+const sidebarItemsSource = computed(() => {
+    if (Array.isArray(props.sidebarItems) && props.sidebarItems.length > 0) {
+        return props.sidebarItems;
+    }
+    const navigation = page.props?.navigation;
+    if (Array.isArray(navigation?.data)) {
+        return navigation.data;
+    }
+    if (Array.isArray(navigation?.items)) {
+        return navigation.items;
+    }
+    return [];
+});
+
+const sidebarGroups = computed(() => {
+    const items = sidebarItemsSource.value;
+    if (!items.length) {
+        return [];
+    }
+    const isGrouped = items.some((item) => Array.isArray(item?.items));
+    if (!isGrouped) {
+        return [
+            {
+                title: '',
+                items,
+            },
+        ];
+    }
+    return items
+        .filter((group) => Array.isArray(group?.items) && group.items.length > 0)
+        .map((group) => ({
+            title: group?.title ?? '',
+            items: group.items,
+        }));
+});
+const hasSidebarItems = computed(() => sidebarGroups.value.length > 0);
+const sidebarTitleLabel = computed(() => props.sidebarTitle || page.props?.navigation?.title || 'Навигация');
+const formatSidebarBadge = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+        if (numeric <= 0) {
+            return '';
+        }
+        return numeric > 9 ? '…' : String(numeric);
+    }
+    return String(value);
+};
 
 const wrapperRef = ref(null);
 const headerRef = ref(null);
@@ -111,77 +198,215 @@ onBeforeUnmount(() => {
         >
             <div v-if="isFixed" class="w-full">
                 <div
-                    class="flex flex-col gap-6 rounded-3xl px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
+                    class="flex flex-col gap-4 rounded-3xl px-6 py-5"
                     :style="{ width: `${headerWidth}px`, marginLeft: `${headerLeft}px` }"
                 >
-                    <Link class="flex items-center gap-3" href="/" aria-label="Home">
-                        <BrandLogo />
-                        <div>
-                            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Баскетбольный портал</p>
-                            <p class="text-lg font-semibold">{{ appName }}</p>
-                        </div>
-                    </Link>
-
-                    <MainHeaderNav :show-control-panel="canSeeControlPanel" />
-
-                    <div class="flex items-center gap-3">
-                        <Link
-                            v-if="isAuthenticated"
-                            class="relative rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                            href="/account"
-                        >
-                            {{ loginLabel || 'login' }}
-                            <span
-                                v-if="unreadBadge"
-                                class="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
-                            >
-                                {{ unreadBadge }}
-                            </span>
+                    <div class="flex w-full items-center justify-between gap-4">
+                        <Link class="flex items-center gap-3" href="/" aria-label="Home">
+                            <BrandLogo />
+                            <div>
+                                <p class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 sm:block">Баскетбольный портал</p>
+                                <p class="text-lg font-semibold">{{ appName }}</p>
+                            </div>
                         </Link>
-                        <button
-                            v-else
-                            class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                            type="button"
-                            @click="$emit('open-login')"
+
+                        <div class="flex items-center gap-3">
+                            <MainHeaderNav class="hidden sm:flex" :show-control-panel="canSeeControlPanel" />
+                            <Link
+                                v-if="isAuthenticated"
+                                class="relative rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                href="/account"
+                            >
+                                {{ loginLabel || 'login' }}
+                                <span
+                                    v-if="unreadBadge"
+                                    class="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                                >
+                                    {{ unreadBadge }}
+                                </span>
+                            </Link>
+                            <button
+                                v-else
+                                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                type="button"
+                                @click="$emit('open-login')"
+                            >
+                                Аккаунт
+                            </button>
+                            <button
+                                class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300 sm:hidden"
+                                type="button"
+                                aria-label="Открыть меню"
+                                @click="toggleMenu"
+                            >
+                                <span class="flex flex-col gap-1">
+                                    <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                                    <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                                    <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="isMenuOpen" class="mt-4 flex flex-col gap-2 sm:hidden">
+                        <Link
+                            v-for="item in navItems"
+                            :key="item.href"
+                            :href="item.href"
+                            class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            :class="item.variant === 'admin' ? 'border-blue-200 bg-blue-50 text-blue-700' : ''"
+                            @click="closeMenu"
                         >
-                            Аккаунт
-                        </button>
+                            {{ item.label }}
+                        </Link>
+                        <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
+                            <button
+                                class="flex w-full items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
+                                type="button"
+                                :aria-expanded="isSidebarOpen"
+                                @click="isSidebarOpen = !isSidebarOpen"
+                            >
+                                <span>{{ sidebarTitleLabel }}</span>
+                                <span class="text-xs transition" :class="isSidebarOpen ? 'rotate-180' : 'rotate-0'">▾</span>
+                            </button>
+                            <div v-if="isSidebarOpen" class="mt-2 space-y-3">
+                                <div
+                                    v-for="group in sidebarGroups"
+                                    :key="group.title || group.items[0]?.href"
+                                    class="space-y-2"
+                                >
+                                    <p v-if="group.title" class="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                        {{ group.title }}
+                                    </p>
+                                    <div class="flex flex-col gap-2">
+                                        <Link
+                                            v-for="item in group.items"
+                                            :key="item.href"
+                                            :href="item.href"
+                                            class="flex items-center justify-between gap-3 rounded-2xl border px-4 py-2 text-sm font-medium transition"
+                                            :class="
+                                                item.href === (sidebarActiveHref || page.url)
+                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                    : 'border-slate-200 bg-white/80 text-slate-700 hover:border-slate-300'
+                                            "
+                                            @click="closeMenu"
+                                        >
+                                            <span>{{ item.label }}</span>
+                                            <span
+                                                v-if="formatSidebarBadge(item.badge)"
+                                                class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                                            >
+                                                {{ formatSidebarBadge(item.badge) }}
+                                            </span>
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <template v-else>
-        <Link class="flex items-center gap-3" href="/" aria-label="Home">
-            <BrandLogo />
-            <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Баскетбольный портал</p>
-                <p class="text-lg font-semibold">{{ appName }}</p>
-            </div>
-        </Link>
-
-        <MainHeaderNav :show-control-panel="canSeeControlPanel" />
-
-        <div class="flex items-center gap-3">
-            <Link
-                v-if="isAuthenticated"
-                class="relative rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                href="/account"
-            >
-                {{ loginLabel || 'login' }}
-                <span
-                    v-if="unreadBadge"
-                    class="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
-                >
-                    {{ unreadBadge }}
-                </span>
+        <div class="flex w-full items-center justify-between gap-4">
+            <Link class="flex items-center gap-3" href="/" aria-label="Home">
+                <BrandLogo />
+                <div>
+                    <p class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 sm:block">Баскетбольный портал</p>
+                    <p class="text-lg font-semibold">{{ appName }}</p>
+                </div>
             </Link>
-            <button
-                v-else
-                class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                type="button"
-                @click="$emit('open-login')"
+
+            <div class="flex items-center gap-3">
+                <MainHeaderNav class="hidden sm:flex" :show-control-panel="canSeeControlPanel" />
+                <Link
+                    v-if="isAuthenticated"
+                    class="relative rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                    href="/account"
+                >
+                    {{ loginLabel || 'login' }}
+                    <span
+                        v-if="unreadBadge"
+                        class="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                    >
+                        {{ unreadBadge }}
+                    </span>
+                </Link>
+                <button
+                    v-else
+                    class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                    type="button"
+                    @click="$emit('open-login')"
+                >
+                    Аккаунт
+                </button>
+                <button
+                    class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300 sm:hidden"
+                    type="button"
+                    aria-label="Открыть меню"
+                    @click="toggleMenu"
+                >
+                    <span class="flex flex-col gap-1">
+                        <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                        <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                        <span class="h-0.5 w-4 rounded-full bg-slate-600"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+        <div v-if="isMenuOpen" class="mt-4 flex flex-col gap-2 sm:hidden">
+            <Link
+                v-for="item in navItems"
+                :key="item.href"
+                :href="item.href"
+                class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
+                :class="item.variant === 'admin' ? 'border-blue-200 bg-blue-50 text-blue-700' : ''"
+                @click="closeMenu"
             >
-                Аккаунт
-            </button>
+                {{ item.label }}
+            </Link>
+            <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
+                <button
+                    class="flex w-full items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
+                    type="button"
+                    :aria-expanded="isSidebarOpen"
+                    @click="isSidebarOpen = !isSidebarOpen"
+                >
+                    <span>{{ sidebarTitleLabel }}</span>
+                    <span class="text-xs transition" :class="isSidebarOpen ? 'rotate-180' : 'rotate-0'">▾</span>
+                </button>
+                <div v-if="isSidebarOpen" class="mt-2 space-y-3">
+                    <div
+                        v-for="group in sidebarGroups"
+                        :key="group.title || group.items[0]?.href"
+                        class="space-y-2"
+                    >
+                        <p v-if="group.title" class="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                            {{ group.title }}
+                        </p>
+                        <div class="flex flex-col gap-2">
+                            <Link
+                                v-for="item in group.items"
+                                :key="item.href"
+                                :href="item.href"
+                                class="flex items-center justify-between gap-3 rounded-2xl border px-4 py-2 text-sm font-medium transition"
+                                :class="
+                                    item.href === (sidebarActiveHref || page.url)
+                                        ? 'border-slate-900 bg-slate-900 text-white'
+                                        : 'border-slate-200 bg-white/80 text-slate-700 hover:border-slate-300'
+                                "
+                                @click="closeMenu"
+                            >
+                                <span>{{ item.label }}</span>
+                                <span
+                                    v-if="formatSidebarBadge(item.badge)"
+                                    class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                                >
+                                    {{ formatSidebarBadge(item.badge) }}
+                                </span>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
             </template>
         </header>
