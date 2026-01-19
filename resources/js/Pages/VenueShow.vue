@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
+import EventCreateModal from '../Components/EventCreateModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -87,9 +88,16 @@ const aboutData = computed(() => props.about ?? {});
 const scheduleDays = computed(() => aboutData.value?.schedule_days ?? []);
 const scheduleUrl = computed(() => aboutData.value?.schedule_url ?? '');
 const feedUrl = computed(() => aboutData.value?.feed_url ?? '');
-const bookingUrl = computed(() => aboutData.value?.booking_url ?? '/events');
 const ratingValue = computed(() => aboutData.value?.rating ?? null);
+const ratingCount = computed(() => aboutData.value?.rating_count ?? null);
 const mapApiKey = computed(() => aboutData.value?.map_api_key ?? '');
+const addressRouteUrl = computed(() => {
+    const address = props.venue?.address?.display;
+    if (!address) {
+        return '';
+    }
+    return `https://yandex.ru/maps/?text=${encodeURIComponent(address)}`;
+});
 const editableFields = computed(() => props.editableFields ?? []);
 const addressEditable = computed(() =>
     ['city', 'street', 'building', 'metro_id'].some((field) => editableFields.value.includes(field))
@@ -98,6 +106,7 @@ const canEdit = computed(() => props.canEdit);
 const canSubmitModeration = computed(() => props.canSubmitModeration);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
 const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
+const isVenueUnavailableForBooking = computed(() => props.venue?.status && props.venue?.status !== 'confirmed');
 const nonEditableItems = computed(() => {
     const addressFields = ['city', 'street', 'building', 'metro_id'];
     const labels = {
@@ -242,17 +251,125 @@ onBeforeUnmount(() => {
 });
 
 const selectedDay = ref(null);
+const showDayBookingForm = ref(false);
+const dayLoading = ref(false);
+const dayError = ref('');
 const openDayDetails = (day) => {
-    selectedDay.value = day;
+    selectedDay.value = {
+        date: day.date,
+        is_today: day.is_today,
+        is_closed: false,
+        is_closed_by_exception: false,
+        intervals: [],
+        bookings: [],
+        comment: null,
+    };
+    dayLoading.value = true;
+    dayError.value = '';
+    showDayBookingForm.value = false;
+    fetchDayDetails(day.date);
 };
 const closeDayDetails = () => {
     selectedDay.value = null;
+    showDayBookingForm.value = false;
+    createPrefill.value = {};
+    dayLoading.value = false;
+    dayError.value = '';
 };
+const closeDayBookingForm = () => {
+    showDayBookingForm.value = false;
+};
+const createPrefill = ref({});
+const embeddedCreateRef = ref(null);
+const bookingFormRef = ref(null);
+const popupBodyRef = ref(null);
+const scrollPopupToBookingForm = () => {
+    const container = popupBodyRef.value;
+    const target = bookingFormRef.value;
+    if (!container || !target) {
+        return;
+    }
+    const offset = Math.max(target.offsetTop - container.offsetTop - 8, 0);
+    container.scrollTo({ top: offset, behavior: 'smooth' });
+};
+const refreshDayBookings = async () => {
+    if (!selectedDay.value?.date || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    try {
+        const params = new URLSearchParams({ date: selectedDay.value.date });
+        const response = await fetch(
+            `/venues/${props.activeTypeSlug}/${props.venue.alias}/schedule-day-bookings?${params.toString()}`
+        );
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        selectedDay.value.bookings = data?.bookings ?? [];
+    } catch (error) {
+        return;
+    }
+};
+const fetchDayDetails = async (date) => {
+    if (!date || !props.venue?.alias || !props.activeTypeSlug) {
+        dayLoading.value = false;
+        return;
+    }
+    try {
+        const params = new URLSearchParams({ date });
+        const response = await fetch(
+            `/venues/${props.activeTypeSlug}/${props.venue.alias}/schedule-day?${params.toString()}`
+        );
+        if (!response.ok) {
+            throw new Error('day_failed');
+        }
+        const data = await response.json();
+        selectedDay.value = {
+            date,
+            is_today: data?.is_today ?? false,
+            is_closed: data?.is_closed ?? false,
+            is_closed_by_exception: data?.is_closed_by_exception ?? false,
+            intervals: data?.intervals ?? [],
+            bookings: data?.bookings ?? [],
+            comment: data?.comment ?? null,
+        };
+    } catch (error) {
+        dayError.value = 'Не удалось загрузить данные дня.';
+    } finally {
+        dayLoading.value = false;
+    }
+};
+const openBookingFromDay = () => {
+    if (!selectedDay.value) {
+        return;
+    }
+    createPrefill.value = {
+        venue: props.venue?.alias || '',
+        date: selectedDay.value.date || '',
+    };
+    showDayBookingForm.value = true;
+    nextTick(() => {
+        scrollPopupToBookingForm();
+    });
+};
+const handleBookingFormLoaded = () => {
+    nextTick(() => {
+        embeddedCreateRef.value?.focusType?.();
+    });
+};
+const submitEmbeddedBooking = () => {
+    if (!embeddedCreateRef.value || embeddedCreateRef.value.isDisabled) {
+        return;
+    }
+    embeddedCreateRef.value.submit();
+};
+const isEmbeddedSubmitDisabled = computed(() => embeddedCreateRef.value?.isDisabled ?? true);
 
 const formatDayLabel = (date) =>
     new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(date));
 const formatWeekdayLabel = (date) =>
     new Intl.DateTimeFormat('ru-RU', { weekday: 'short' }).format(new Date(date));
+const weekdayHeaders = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const mapRef = ref(null);
 const mapError = ref('');
@@ -554,6 +671,7 @@ const submitModerationRequest = () => {
                                     <span v-for="index in 5" :key="index">★</span>
                                 </div>
                                 <span class="font-semibold">{{ ratingValue }}</span>
+                                <span v-if="ratingCount !== null" class="text-slate-500">({{ ratingCount }} отзывов)</span>
                             </div>
                         </div>
                         <button
@@ -618,6 +736,15 @@ const submitModerationRequest = () => {
                                         <span>{{ formatMetroLabel(venue?.address?.metro) }}</span>
                                     </div>
                                     <p class="text-sm text-slate-700">{{ venue?.address?.display || 'Адрес не указан.' }}</p>
+                                    <a
+                                        v-if="addressRouteUrl"
+                                        :href="addressRouteUrl"
+                                        class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-900"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Маршрут
+                                    </a>
                                 </div>
                             </section>
 
@@ -634,34 +761,62 @@ const submitModerationRequest = () => {
                                         Подробнее
                                     </a>
                                 </div>
-                                <div v-if="scheduleDays.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div class="grid grid-cols-7 gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                                    <span v-for="label in weekdayHeaders" :key="label" class="text-center">{{ label }}</span>
+                                </div>
+                                <div v-if="scheduleDays.length" class="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
                                     <button
                                         v-for="day in scheduleDays"
                                         :key="day.date"
                                         type="button"
-                                        class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-slate-300"
+                                        class="relative flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-slate-300"
                                         :class="{ 'ring-2 ring-emerald-200': day.is_today }"
                                         @click="openDayDetails(day)"
                                     >
-                                        <div class="flex items-center justify-between text-xs uppercase tracking-[0.15em] text-slate-500">
-                                            <span>{{ formatWeekdayLabel(day.date) }}</span>
-                                            <span>{{ formatDayLabel(day.date) }}</span>
+                                        <div class="text-xs uppercase tracking-[0.2em] text-slate-500">
+                                            {{ formatDayLabel(day.date) }}
                                         </div>
+                                        <span
+                                            class="absolute right-4 top-3.5 h-2.5 w-2.5 rounded-full"
+                                            :class="
+                                                day.is_closed_by_exception
+                                                    ? 'bg-rose-500'
+                                                    : day.intervals?.length
+                                                        ? 'bg-emerald-500'
+                                                        : 'bg-slate-400'
+                                            "
+                                        ></span>
+                                        <span v-if="day.bookings?.length" class="absolute right-4 top-7.5 h-2 w-2 rounded-full bg-violet-500"></span>
                                         <div class="text-sm text-slate-700">
-                                            <p v-if="day.is_closed" class="text-rose-700">Закрыто</p>
+                                            <p v-if="day.is_closed_by_exception" class="text-rose-700">Закрыто</p>
                                             <div v-else-if="day.intervals?.length" class="space-y-1">
-                                                <div v-for="(interval, index) in day.intervals" :key="index" class="text-sm font-medium text-slate-800">
+                                                <div v-for="(interval, index) in day.intervals" :key="index" class="text-xs font-normal text-slate-700">
                                                     {{ interval.starts_at }}–{{ interval.ends_at }}
                                                 </div>
                                             </div>
-                                            <p v-else class="text-slate-500">Интервалы не заданы.</p>
+                                            <p v-else class="text-slate-500">-</p>
                                         </div>
-                                        <p v-if="day.bookings?.length" class="text-xs text-slate-500">
-                                            Брони: {{ day.bookings.length }}
-                                        </p>
                                     </button>
                                 </div>
                                 <p v-else class="text-sm text-slate-500">Расписание пока не задано.</p>
+                                <div v-if="scheduleDays.length" class="mt-4 flex flex-wrap gap-3 text-xs text-slate-600">
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                        Открыто
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2 w-2 rounded-full bg-violet-500"></span>
+                                        Есть бронирования
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2 w-2 rounded-full bg-slate-400"></span>
+                                        Нет интервалов
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                                        Закрыто
+                                    </div>
+                                </div>
                             </section>
 
                             <section :id="anchorSections[2].id" :ref="setSectionRef('posts')" class="scroll-mt-24 space-y-4">
@@ -674,8 +829,17 @@ const submitModerationRequest = () => {
                                         Подробнее
                                     </a>
                                 </div>
-                                <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                                    Раздел в разработке.
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                        <p class="text-sm font-semibold text-slate-900">Турнир выходного дня</p>
+                                        <p class="mt-1 text-sm text-slate-600">Скоро анонсируем новые события площадки.</p>
+                                        <p class="mt-3 text-xs uppercase tracking-[0.15em] text-slate-400">Раздел в разработке</p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                        <p class="text-sm font-semibold text-slate-900">Обновление расписания</p>
+                                        <p class="mt-1 text-sm text-slate-600">Следите за свежими новостями и изменениями.</p>
+                                        <p class="mt-3 text-xs uppercase tracking-[0.15em] text-slate-400">Раздел в разработке</p>
+                                    </div>
                                 </div>
                             </section>
 
@@ -689,8 +853,17 @@ const submitModerationRequest = () => {
                                         Подробнее
                                     </a>
                                 </div>
-                                <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                                    Раздел в разработке.
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                        <p class="text-sm font-semibold text-slate-900">Отличный зал</p>
+                                        <p class="mt-1 text-sm text-slate-600">Покрытие и освещение — супер.</p>
+                                        <p class="mt-3 text-xs uppercase tracking-[0.15em] text-slate-400">Раздел в разработке</p>
+                                    </div>
+                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                        <p class="text-sm font-semibold text-slate-900">Удобная локация</p>
+                                        <p class="mt-1 text-sm text-slate-600">Рядом метро и парковка.</p>
+                                        <p class="mt-3 text-xs uppercase tracking-[0.15em] text-slate-400">Раздел в разработке</p>
+                                    </div>
                                 </div>
                             </section>
                         </div>
@@ -819,11 +992,24 @@ const submitModerationRequest = () => {
                         x
                     </button>
                 </div>
-                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                <div ref="popupBodyRef" class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4" :class="{ loading: dayLoading }">
+                    <div v-if="dayError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {{ dayError }}
+                    </div>
+                    <div v-else-if="dayLoading" class="flex min-h-[180px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+                        <div class="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"></div>
+                    </div>
+                    <template v-else>
                     <div v-if="selectedDay.is_closed" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                         Площадка закрыта.
                     </div>
-                    <div v-else class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div
+                        v-else-if="isVenueUnavailableForBooking"
+                        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                    >
+                        Бронирование недоступно для неподтвержденной площадки.
+                    </div>
+                    <div v-else class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-normal text-slate-600">
                         <p class="text-xs uppercase tracking-[0.15em] text-slate-500">График работы</p>
                         <div v-if="selectedDay.intervals?.length" class="mt-2 space-y-1">
                             <div v-for="(interval, index) in selectedDay.intervals" :key="index">
@@ -833,33 +1019,85 @@ const submitModerationRequest = () => {
                         <p v-else class="mt-2 text-slate-500">Интервалы не заданы.</p>
                     </div>
 
-                    <div class="mt-4">
+                    <div v-if="selectedDay.is_closed">
+                        <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                            <p v-if="!selectedDay.is_closed_by_exception" class="text-sm text-slate-600">Интервалы не заданы.</p>
+                            <p v-if="selectedDay.comment" class="mt-2 text-sm text-slate-700">{{ selectedDay.comment }}</p>
+                        </div>
+                    </div>
+                    <div v-else-if="!isVenueUnavailableForBooking" class="mt-4">
                         <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Занятые интервалы</p>
-                        <div v-if="selectedDay.bookings?.length" class="mt-2 space-y-2">
-                            <div
+                        <div v-if="selectedDay.bookings?.length" class="mt-2 flex flex-wrap gap-2">
+                            <span
                                 v-for="(booking, index) in selectedDay.bookings"
                                 :key="index"
-                                class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700"
                             >
                                 {{ booking.starts_at }}–{{ booking.ends_at }}
-                            </div>
+                            </span>
                         </div>
                         <p v-else class="mt-2 text-sm text-slate-500">Бронирований нет.</p>
                     </div>
+
+                    <div v-if="showDayBookingForm" ref="bookingFormRef" class="mt-6">
+                        <hr class="my-4 border-slate-200/80" />
+                        <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Забронировать</p>
+                        <div class="mt-2"></div>
+                        <EventCreateModal
+                            ref="embeddedCreateRef"
+                            embedded
+                            :prefill="createPrefill"
+                            :can-book-fallback="false"
+                            :hide-submit="true"
+                            @close="closeDayDetails"
+                            @loaded="handleBookingFormLoaded"
+                            @booking-conflict="refreshDayBookings"
+                        />
+                    </div>
+                    </template>
                 </div>
                 <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
-                    <a
-                        :href="scheduleUrl"
+                    <button
+                        v-if="dayLoading"
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeDayDetails"
                     >
-                        Подробнее
-                    </a>
-                    <a
-                        :href="bookingUrl"
-                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        Закрыть
+                    </button>
+                    <button
+                        v-if="selectedDay.is_closed"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeDayDetails"
                     >
-                        Забронировать
-                    </a>
+                        Закрыть
+                    </button>
+                    <button
+                        v-if="!dayLoading && !selectedDay.is_closed && isVenueUnavailableForBooking"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeDayDetails"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        v-if="showDayBookingForm && !selectedDay.is_closed"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeDayBookingForm"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        v-if="!selectedDay.is_closed && !dayLoading && !isVenueUnavailableForBooking"
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="button"
+                        :disabled="showDayBookingForm ? isEmbeddedSubmitDisabled : false"
+                        @click="showDayBookingForm ? submitEmbeddedBooking() : openBookingFromDay()"
+                    >
+                        {{ showDayBookingForm ? 'Подтвердить' : 'Забронировать' }}
+                    </button>
                 </div>
             </div>
         </div>

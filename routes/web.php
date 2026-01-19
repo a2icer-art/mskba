@@ -92,9 +92,13 @@ Route::prefix('venues')->group(function () {
     Route::get('/{type}/{venue}/schedule', [VenuesController::class, 'schedule'])
         ->middleware('auth')
         ->name('venues.schedule');
+    Route::get('/{type}/{venue}/schedule-day', [VenuesController::class, 'scheduleDay'])
+        ->name('venues.schedule.day');
     Route::post('/{type}/{venue}/schedule/intervals', [VenuesController::class, 'storeScheduleInterval'])
         ->middleware('auth')
         ->name('venues.schedule.intervals.store');
+    Route::get('/{type}/{venue}/schedule-day-bookings', [VenuesController::class, 'scheduleDayBookings'])
+        ->name('venues.schedule.day-bookings');
     Route::patch('/{type}/{venue}/schedule/intervals/{interval}', [VenuesController::class, 'updateScheduleInterval'])
         ->middleware('auth')
         ->name('venues.schedule.intervals.update');
@@ -158,6 +162,9 @@ Route::get('/integrations/venue-suggest', VenueSuggestController::class)
 
 Route::get('/events', [EventsController::class, 'index'])
     ->name('events.index');
+Route::get('/events/create-modal', [EventsController::class, 'createModal'])
+    ->middleware('auth')
+    ->name('events.create-modal');
 Route::post('/events', [EventsController::class, 'store'])
     ->middleware(['auth', 'can:event.create'])
     ->name('events.store');

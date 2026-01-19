@@ -13,6 +13,7 @@ use App\Domain\Payments\Enums\PaymentStatus;
 use App\Domain\Payments\Models\Payment;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
+use App\Domain\Venues\Enums\VenueStatus;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,12 @@ class EventBookingService
 
     private function ensureBookingValid(Event $event, Venue $venue, CarbonInterface $startsAt, CarbonInterface $endsAt): void
     {
+        if ($venue->status !== VenueStatus::Confirmed) {
+            throw ValidationException::withMessages([
+                'venue_id' => 'Бронирование недоступно для неподтвержденной площадки.',
+            ]);
+        }
+
         if ($startsAt->greaterThanOrEqualTo($endsAt)) {
             throw ValidationException::withMessages([
                 'starts_at' => 'Время начала должно быть меньше времени окончания.',

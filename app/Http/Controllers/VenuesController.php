@@ -45,6 +45,7 @@ use App\Presentation\Venues\VenueTypeOptionsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -1570,10 +1571,14 @@ class VenuesController extends Controller
         return ((int) $hours) * 60 + (int) $minutes;
     }
 
-    private function formatTime(?string $time): string
+    private function formatTime($time): string
     {
         if (!$time) {
             return '';
+        }
+
+        if ($time instanceof CarbonInterface) {
+            return $time->format('H:i');
         }
 
         return substr($time, 0, 5);
@@ -1646,9 +1651,13 @@ class VenuesController extends Controller
             $exception = $exceptionsByDate[$dateKey] ?? null;
             $intervals = [];
             $isClosed = false;
+            $isClosedByException = false;
+            $comment = null;
 
             if ($exception) {
                 $isClosed = (bool) $exception->is_closed;
+                $isClosedByException = $isClosed;
+                $comment = $exception->comment;
                 if (!$isClosed) {
                     $intervals = $exception->intervals
                         ->sortBy('starts_at')
@@ -1670,6 +1679,8 @@ class VenuesController extends Controller
                 'day_of_week' => $date->dayOfWeekIso,
                 'is_today' => $date->isToday(),
                 'is_closed' => $isClosed,
+                'is_closed_by_exception' => $isClosedByException,
+                'comment' => $comment,
                 'intervals' => $intervals,
                 'bookings' => $bookingsByDate[$dateKey] ?? [],
             ];
@@ -1677,12 +1688,128 @@ class VenuesController extends Controller
 
         return [
             'rating' => 5,
+            'rating_count' => 12,
             'schedule_days' => $scheduleDays,
             'schedule_url' => "/venues/{$typeSlug}/{$venue->alias}/schedule",
             'feed_url' => "/venues/{$typeSlug}/{$venue->alias}/feed",
             'booking_url' => "/events?venue={$venue->alias}",
             'map_api_key' => config('integrations.yandex.api_key'),
         ];
+    }
+
+    public function scheduleDayBookings(Request $request, string $type, Venue $venue)
+    {
+        $date = $request->string('date')->toString();
+        if ($date === '') {
+            return response()->json(['bookings' => []]);
+        }
+
+        $dateValue = Carbon::parse($date)->toDateString();
+        $bookings = EventBooking::query()
+            ->where('venue_id', $venue->id)
+            ->whereIn('status', [
+                EventBookingStatus::Pending->value,
+                EventBookingStatus::AwaitingPayment->value,
+                EventBookingStatus::Paid->value,
+                EventBookingStatus::Approved->value,
+            ])
+            ->whereDate('starts_at', $dateValue)
+            ->orderBy('starts_at')
+            ->get(['starts_at', 'ends_at'])
+            ->map(fn (EventBooking $booking) => [
+                'starts_at' => $this->formatTime($booking->starts_at),
+                'ends_at' => $this->formatTime($booking->ends_at),
+            ])
+            ->all();
+
+        return response()->json(['bookings' => $bookings]);
+    }
+
+    public function scheduleDay(Request $request, string $type, Venue $venue)
+    {
+        $date = $request->string('date')->toString();
+        if ($date === '') {
+            return response()->json([
+                'is_today' => false,
+                'is_closed' => true,
+                'is_closed_by_exception' => false,
+                'intervals' => [],
+                'bookings' => [],
+                'comment' => null,
+            ]);
+        }
+
+        $targetDate = Carbon::parse($date);
+        $schedule = VenueSchedule::query()
+            ->where('venue_id', $venue->id)
+            ->with(['intervals', 'exceptions.intervals'])
+            ->first();
+
+        $intervals = [];
+        $isClosed = true;
+        $isClosedByException = false;
+        $comment = null;
+
+        if ($schedule) {
+            $exception = $schedule->exceptions->first(function ($item) use ($targetDate) {
+                return $item->date?->toDateString() === $targetDate->toDateString();
+            });
+
+            if ($exception) {
+                $isClosed = (bool) $exception->is_closed;
+                $isClosedByException = $isClosed;
+                $comment = $exception->comment;
+                if (!$isClosed) {
+                    $intervals = $exception->intervals
+                        ->sortBy('starts_at')
+                        ->map(fn (VenueScheduleExceptionInterval $interval) => [
+                            'starts_at' => $this->formatTime($interval->starts_at),
+                            'ends_at' => $this->formatTime($interval->ends_at),
+                        ])
+                        ->values()
+                        ->all();
+                    $isClosed = $intervals === [];
+                }
+            } else {
+                $dayOfWeek = (int) $targetDate->isoWeekday();
+                $intervals = $schedule->intervals
+                    ->where('day_of_week', $dayOfWeek)
+                    ->sortBy('starts_at')
+                    ->map(fn (VenueScheduleInterval $interval) => [
+                        'starts_at' => $this->formatTime($interval->starts_at),
+                        'ends_at' => $this->formatTime($interval->ends_at),
+                    ])
+                    ->values()
+                    ->all();
+                $isClosed = $intervals === [];
+            }
+        }
+
+        $bookings = EventBooking::query()
+            ->where('venue_id', $venue->id)
+            ->whereIn('status', [
+                EventBookingStatus::Pending->value,
+                EventBookingStatus::AwaitingPayment->value,
+                EventBookingStatus::Paid->value,
+                EventBookingStatus::Approved->value,
+            ])
+            ->whereDate('starts_at', $targetDate->toDateString())
+            ->orderBy('starts_at')
+            ->get(['starts_at', 'ends_at'])
+            ->map(fn (EventBooking $booking) => [
+                'starts_at' => $this->formatTime($booking->starts_at),
+                'ends_at' => $this->formatTime($booking->ends_at),
+            ])
+            ->all();
+
+        return response()->json([
+            'is_today' => $targetDate->isToday(),
+            'is_closed' => $isClosed,
+            'is_closed_by_exception' => $isClosedByException,
+            'intervals' => $intervals,
+            'bookings' => $bookings,
+            'comment' => $comment,
+        ]);
     }
 
     private function weekDays(): array

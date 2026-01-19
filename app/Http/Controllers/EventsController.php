@@ -65,6 +65,31 @@ class EventsController extends Controller
             })
             ->all();
 
+        $canCreate = $user && $checker->can($user, PermissionCode::EventCreate);
+        $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
+        $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present()['data'];
+
+        return Inertia::render('Events', [
+            'appName' => config('app.name'),
+            'events' => $events,
+            'canCreate' => $canCreate,
+            'canBook' => $canBook,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function createModal(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::EventCreate)) {
+            abort(403);
+        }
+
         $eventTypes = EventType::query()
             ->orderBy('label')
             ->get(['id', 'code', 'label'])
@@ -75,17 +100,32 @@ class EventsController extends Controller
             ])
             ->all();
 
-        $canCreate = $user && $checker->can($user, PermissionCode::EventCreate);
-        $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
-        $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present()['data'];
+        $venue = null;
+        $venueAlias = $request->string('venue')->toString();
+        if ($venueAlias !== '') {
+            $venue = Venue::query()
+                ->visibleFor($user)
+                ->where('alias', $venueAlias)
+                ->first(['id', 'name', 'alias']);
+        }
 
-        return Inertia::render('Events', [
-            'appName' => config('app.name'),
-            'events' => $events,
+        $context = $request->string('context')->toString();
+
+        return response()->json([
             'eventTypes' => $eventTypes,
-            'canCreate' => $canCreate,
-            'canBook' => $canBook,
-            'breadcrumbs' => $breadcrumbs,
+            'canBook' => $checker->can($user, PermissionCode::VenueBooking),
+            'context' => $context,
+            'prefill' => [
+                'venue' => $venue
+                    ? [
+                        'id' => $venue->id,
+                        'label' => $venue->name,
+                    ]
+                    : null,
+                'date' => $request->string('date')->toString() ?: null,
+                'starts_time' => $request->string('starts_time')->toString() ?: null,
+                'ends_time' => $request->string('ends_time')->toString() ?: null,
+            ],
         ]);
     }
 
