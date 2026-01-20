@@ -467,8 +467,6 @@ class VenuesController extends Controller
             abort(403);
         }
 
-        app(BookingPaymentExpiryService::class)->runIfDue();
-
         $now = now();
         $status = $request->string('status')->toString();
         $allowedStatuses = [

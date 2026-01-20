@@ -166,8 +166,6 @@ class AccountMessagesController extends Controller
             abort(403);
         }
 
-        app(BookingPaymentExpiryService::class)->runIfDue();
-
         $messagesService = app(MessageQueryService::class);
         $countersService = app(MessageCountersService::class);
 
