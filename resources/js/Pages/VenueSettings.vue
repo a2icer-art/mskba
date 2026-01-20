@@ -5,6 +5,7 @@ import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
+import SystemNoticeStack from '../Components/SystemNoticeStack.vue';
 
 const props = defineProps({
     appName: {
@@ -48,6 +49,12 @@ const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const localNotice = ref('');
 const successNotice = computed(() => actionNotice.value || localNotice.value);
 const actionError = computed(() => page.props?.errors ?? {});
+const formErrorNotice = computed(() => {
+    if (!actionError.value || !Object.keys(actionError.value).length) {
+        return '';
+    }
+    return 'Не удалось сохранить изменения. Проверьте значения.';
+});
 
 const isMinutes = ref(false);
 const rentalDurationValue = ref(1);
@@ -272,6 +279,7 @@ const submit = () => {
     <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
+        <SystemNoticeStack :success="successNotice" :error="formErrorNotice" />
 
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
@@ -556,18 +564,6 @@ const submit = () => {
                             </div>
 
                             <div class="flex flex-wrap items-center justify-end gap-3">
-                                <div
-                                    v-if="successNotice"
-                                    class="mr-auto rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700"
-                                >
-                                    {{ successNotice }}
-                                </div>
-                                <div
-                                    v-if="actionError && Object.keys(actionError).length"
-                                    class="mr-auto rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700"
-                                >
-                                    Не удалось сохранить изменения. Проверьте значения.
-                                </div>
                                 <button
                                     type="submit"
                                     class="rounded-full border border-slate-900 bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"

@@ -5,6 +5,7 @@ import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
+import SystemNoticeStack from '../Components/SystemNoticeStack.vue';
 
 const props = defineProps({
     appName: {
@@ -421,6 +422,7 @@ watch(
     <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
+        <SystemNoticeStack :success="actionNotice" :error="actionError" />
 
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
@@ -452,15 +454,7 @@ watch(
                         </label>
                     </div>
 
-                    <div v-if="actionNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                        {{ actionNotice }}
-                    </div>
-                    <div
-                        v-if="actionError && !hasModalOpen"
-                        class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
-                    >
-                        {{ actionError }}
-                    </div>
+                    
 
                     <div v-if="!filteredBookings.length" class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
                         Бронирования не найдены.
@@ -619,9 +613,7 @@ watch(
                         <div v-if="confirmForm.errors.comment" class="text-xs text-rose-700">
                             {{ confirmForm.errors.comment }}
                         </div>
-                        <div v-else-if="actionError" class="text-xs text-rose-700">
-                            {{ actionError }}
-                        </div>
+                        
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
@@ -728,9 +720,7 @@ watch(
                         <div v-if="awaitPaymentForm.errors.comment" class="text-xs text-rose-700">
                             {{ awaitPaymentForm.errors.comment }}
                         </div>
-                        <div v-else-if="actionError" class="text-xs text-rose-700">
-                            {{ actionError }}
-                        </div>
+                        
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
@@ -784,9 +774,7 @@ watch(
                         <div v-if="paidForm.errors.comment" class="text-xs text-rose-700">
                             {{ paidForm.errors.comment }}
                         </div>
-                        <div v-else-if="actionError" class="text-xs text-rose-700">
-                            {{ actionError }}
-                        </div>
+                        
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button
@@ -840,9 +828,7 @@ watch(
                         <div v-if="cancelForm.errors.comment" class="text-xs text-rose-700">
                             {{ cancelForm.errors.comment }}
                         </div>
-                        <div v-else-if="actionError" class="text-xs text-rose-700">
-                            {{ actionError }}
-                        </div>
+                        
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
                         <button

@@ -5,6 +5,7 @@ import Breadcrumbs from '../../Components/Breadcrumbs.vue';
 import MainFooter from '../../Components/MainFooter.vue';
 import MainHeader from '../../Components/MainHeader.vue';
 import MainSidebar from '../../Components/MainSidebar.vue';
+import SystemNoticeStack from '../../Components/SystemNoticeStack.vue';
 
 const props = defineProps({
     appName: {
@@ -312,6 +313,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
     <div class="relative min-h-screen overflow-hidden bg-[#f7f1e6] text-slate-900">
         <div class="pointer-events-none absolute -left-28 top-12 h-72 w-72 rounded-full bg-emerald-200/70 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/70 blur-3xl"></div>
+        <SystemNoticeStack :success="actionNotice" :error="actionError" />
 
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
@@ -354,12 +356,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                         </div>
                     </div>
 
-                    <div v-if="actionNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
-                        {{ actionNotice }}
-                    </div>
-                    <div v-else-if="actionError" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
-                        {{ actionError }}
-                    </div>
+                    
 
                     <div v-if="hasRequests" class="mt-6 w-full overflow-x-auto rounded-2xl border border-slate-200">
                         <div class="min-w-max">
@@ -799,5 +796,4 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
         </div>
     </div>
 </template>
-
 
