@@ -59,10 +59,19 @@ if (initialRentalMinutes % 60 === 0) {
 }
 const rentalDurationMax = computed(() => (isMinutes.value ? 1440 : 24));
 const rentalDurationStep = computed(() => (isMinutes.value ? 1 : 0.25));
+const canUseRentalHours = computed(() => {
+    const current = Number(rentalDurationValue.value);
+    return Number.isFinite(current) ? current >= 60 : false;
+});
 
 watch(isMinutes, (value) => {
     const current = Number(rentalDurationValue.value);
     if (!Number.isFinite(current)) {
+        return;
+    }
+
+    if (!value && current < 60) {
+        isMinutes.value = true;
         return;
     }
 
@@ -84,10 +93,19 @@ if (initialPaymentWait === 0) {
 }
 const paymentWaitMax = computed(() => (isPaymentWaitMinutes.value ? 10080 : 168));
 const paymentWaitStep = computed(() => (isPaymentWaitMinutes.value ? 1 : 0.25));
+const canUsePaymentWaitHours = computed(() => {
+    const current = Number(paymentWaitValue.value);
+    return Number.isFinite(current) ? current >= 60 : false;
+});
 
 watch(isPaymentWaitMinutes, (value) => {
     const current = Number(paymentWaitValue.value);
     if (!Number.isFinite(current) || current === 0) {
+        return;
+    }
+
+    if (!value && current < 60) {
+        isPaymentWaitMinutes.value = true;
         return;
     }
 
@@ -218,7 +236,12 @@ const submit = () => {
                                     Срок ожидания оплаты
                                 </label>
                                 <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-                                    <input v-model="isPaymentWaitMinutes" type="checkbox" class="input-switch" />
+                                    <input
+                                        v-model="isPaymentWaitMinutes"
+                                        type="checkbox"
+                                        class="input-switch"
+                                        :disabled="!canUsePaymentWaitHours"
+                                    />
                                     <span>В минутах</span>
                                 </label>
                                 <input
@@ -241,7 +264,12 @@ const submit = () => {
                                         Длительность аренды
                                     </label>
                                     <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-                                        <input v-model="isMinutes" type="checkbox" class="input-switch" />
+                                        <input
+                                            v-model="isMinutes"
+                                            type="checkbox"
+                                            class="input-switch"
+                                            :disabled="!canUseRentalHours"
+                                        />
                                         <span>В минутах</span>
                                     </label>
                                     <input

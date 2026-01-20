@@ -183,9 +183,9 @@ class EventBookingService
             ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
             : 0;
         $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
-        $units = $durationMinutes > 0 ? (int) ceil($durationMinutes / $unitMinutes) : 0;
+        $units = $durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0;
         $unitPrice = (int) $settings->rental_price_rub;
-        $amount = $units * $unitPrice;
+        $amount = (int) round($units * $unitPrice);
 
         Payment::query()->create([
             'user_id' => $createdBy,

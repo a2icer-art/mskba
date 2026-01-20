@@ -458,6 +458,31 @@ class VenuesController extends Controller
             ->firstOrFail();
         $venue->loadMissing(['venueType:id,name,plural_name,alias']);
 
+        $defaultPaymentOrderId = PaymentOrder::query()
+            ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
+            ->value('id');
+        $settings = VenueSettings::query()->firstOrCreate(
+            ['venue_id' => $venue->id],
+            [
+                'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+                'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
+                'payment_order_id' => $defaultPaymentOrderId,
+                'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+                'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+                'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
+                'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+            ]
+        );
+        $paymentOrders = PaymentOrder::query()
+            ->orderBy('label')
+            ->get(['id', 'label', 'code'])
+            ->map(fn (PaymentOrder $order) => [
+                'value' => $order->id,
+                'label' => $order->label,
+                'code' => $order->code,
+            ])
+            ->all();
+
         $checker = app(PermissionChecker::class);
         $canConfirm = $checker->can($user, PermissionCode::VenueBookingConfirm, $venue);
         $canCancel = $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
@@ -492,13 +517,24 @@ class VenuesController extends Controller
                 $isPast = $booking->starts_at && $booking->starts_at->lt($now);
                 $isPaymentOverdue = $booking->payment_due_at && $booking->payment_due_at->lte($now);
                 $paymentSnapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
+                $paymentMeta = is_array($booking->payment?->meta) ? $booking->payment->meta : [];
+                $paymentOrderCode = $paymentSnapshot['code'] ?? $booking->paymentOrder?->code;
+                $canConfirmPostpayment = $status === EventBookingStatus::Pending->value
+                    && $paymentOrderCode === VenuePaymentOrder::Postpayment->value;
+                $canMarkPaidPostpayment = $status === EventBookingStatus::Approved->value
+                    && $paymentOrderCode === VenuePaymentOrder::Postpayment->value;
                 return [
                     'id' => $booking->id,
                     'status' => $status,
+                    'payment_order_id' => $booking->payment_order_id,
+                    'payment_order_code' => $paymentOrderCode,
                       'starts_at' => $booking->starts_at?->toDateTimeString(),
                       'ends_at' => $booking->ends_at?->toDateTimeString(),
                       'payment_order' => $paymentSnapshot['label'] ?? $booking->paymentOrder?->label,
                       'payment_code' => $booking->payment?->payment_code,
+                      'payment_amount_minor' => $booking->payment?->amount_minor,
+                      'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
+                      'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
                       'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
                       'event' => $booking->event
                         ? [
@@ -533,9 +569,17 @@ class VenuesController extends Controller
                     'moderated_at' => $booking->moderated_at?->toDateTimeString(),
                     'moderation_comment' => $booking->moderation_comment,
                     'moderation_source' => $booking->moderation_source?->value,
-                    'can_await_payment' => !$isPast && $canConfirm && $status === EventBookingStatus::Pending->value,
-                    'can_mark_paid' => !$isPast && !$isPaymentOverdue && $canConfirm && $status === EventBookingStatus::AwaitingPayment->value,
-                    'can_confirm' => !$isPast && $canConfirm && $status === EventBookingStatus::Paid->value,
+                    'can_await_payment' => !$isPast && $canConfirm && in_array($status, [
+                        EventBookingStatus::Pending->value,
+                        EventBookingStatus::AwaitingPayment->value,
+                    ], true),
+                    'can_mark_paid' => !$isPast && $canConfirm && (
+                        ($status === EventBookingStatus::AwaitingPayment->value && !$isPaymentOverdue)
+                        || $canMarkPaidPostpayment
+                    ),
+                    'can_confirm' => !$isPast && $canConfirm && (
+                        $status === EventBookingStatus::Paid->value || $canConfirmPostpayment
+                    ),
                     'can_cancel' => !$isPast && $canCancel && (in_array($status, [EventBookingStatus::Pending->value, EventBookingStatus::AwaitingPayment->value], true)
                         || ($status === EventBookingStatus::Approved->value && $isAdmin)),
                 ];
@@ -563,6 +607,13 @@ class VenuesController extends Controller
             'bookings' => $bookings,
             'filters' => [
                 'status' => $status,
+            ],
+            'paymentOrderOptions' => $paymentOrders,
+            'paymentDefaults' => [
+                'payment_order_id' => $settings->payment_order_id,
+                'payment_wait_minutes' => $settings->payment_wait_minutes,
+                'rental_duration_minutes' => $settings->rental_duration_minutes,
+                'rental_price_rub' => $settings->rental_price_rub,
             ],
             'canConfirm' => $canConfirm,
             'canCancel' => $canCancel,
@@ -751,7 +802,12 @@ class VenuesController extends Controller
             ]);
         }
 
-        if ($booking->status !== EventBookingStatus::Paid) {
+        $orderCode = $booking->payment_order_snapshot['code']
+            ?? $booking->paymentOrder?->code;
+        $canConfirmPostpayment = $booking->status === EventBookingStatus::Pending
+            && $orderCode === VenuePaymentOrder::Postpayment->value;
+
+        if ($booking->status !== EventBookingStatus::Paid && !$canConfirmPostpayment) {
             return back()->withErrors([
                 'booking' => 'Подтверждение возможно только после оплаты.',
             ]);
@@ -795,7 +851,7 @@ class VenuesController extends Controller
             abort(404);
         }
 
-        if ($booking->status !== EventBookingStatus::Pending) {
+        if (!in_array($booking->status, [EventBookingStatus::Pending, EventBookingStatus::AwaitingPayment], true)) {
             return back()->withErrors([
                 'booking' => 'Бронирование уже обработано.',
             ]);
@@ -815,45 +871,56 @@ class VenuesController extends Controller
 
         $data = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
+            'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
+            'payment_wait_minutes' => ['nullable', 'integer', 'min:0', 'max:10080'],
+            'partial_amount_minor' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $paymentOrder = $venue->settings?->paymentOrder;
-        if (!$paymentOrder) {
-            $paymentOrder = PaymentOrder::query()
-                ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
-                ->first();
-        }
+        $paymentOrder = PaymentOrder::query()->find($data['payment_order_id']);
+        $paymentOrderCode = $paymentOrder?->code ?? VenueSettings::DEFAULT_PAYMENT_ORDER->value;
 
         $settings = $venue->settings ?: new VenueSettings([
             'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
             'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
             'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
         ]);
-        $waitMinutes = (int) $settings->payment_wait_minutes;
-        $paymentDueAt = $waitMinutes > 0 ? now()->addMinutes($waitMinutes) : null;
+        $waitMinutes = array_key_exists('payment_wait_minutes', $data)
+            ? (int) $data['payment_wait_minutes']
+            : (int) $settings->payment_wait_minutes;
+        $paymentDueAt = $paymentOrderCode === VenuePaymentOrder::Postpayment->value
+            ? null
+            : ($waitMinutes > 0 ? now()->addMinutes($waitMinutes) : null);
+
+        $durationMinutes = $booking->starts_at && $booking->ends_at
+            ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
+            : 0;
+        $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
+        $units = $durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0;
+        $unitPrice = (int) $settings->rental_price_rub;
+        $amount = (int) round($units * $unitPrice);
+        $partialAmount = null;
+        if ($paymentOrderCode === VenuePaymentOrder::PartialPrepayment->value) {
+            $partialAmount = (int) ($data['partial_amount_minor'] ?? (int) ceil($amount * 0.5));
+            $partialAmount = max(1, min($partialAmount, $amount));
+        }
+        $snapshot = $paymentOrder
+            ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
+            : null;
+
+        $nextStatus = $paymentOrderCode === VenuePaymentOrder::Postpayment->value
+            ? EventBookingStatus::Pending
+            : EventBookingStatus::AwaitingPayment;
 
         $booking->update([
-            'status' => EventBookingStatus::AwaitingPayment,
+            'status' => $nextStatus,
             'payment_order_id' => $paymentOrder?->id,
-            'payment_order_snapshot' => $paymentOrder
-                ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
-                : null,
+            'payment_order_snapshot' => $snapshot,
             'payment_due_at' => $paymentDueAt,
             'moderation_comment' => $data['comment'] ?? null,
             'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
             'moderated_at' => now(),
         ]);
-        $durationMinutes = $booking->starts_at && $booking->ends_at
-            ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
-            : 0;
-        $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
-        $units = $durationMinutes > 0 ? (int) ceil($durationMinutes / $unitMinutes) : 0;
-        $unitPrice = (int) $settings->rental_price_rub;
-        $amount = $units * $unitPrice;
-        $snapshot = $paymentOrder
-            ? ['id' => $paymentOrder->id, 'code' => $paymentOrder->code, 'label' => $paymentOrder->label]
-            : null;
 
         Payment::query()->updateOrCreate(
             [
@@ -872,13 +939,22 @@ class VenuesController extends Controller
                     'unit_minutes' => $unitMinutes,
                     'unit_price_rub' => $unitPrice,
                     'units' => $units,
+                    'total_amount_minor' => $amount,
+                    'partial_amount_minor' => $partialAmount,
+                    'payment_order_code' => $paymentOrderCode,
                 ],
             ]
         );
 
-        app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::AwaitingPayment, $user);
+        if ($nextStatus === EventBookingStatus::AwaitingPayment) {
+            app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::AwaitingPayment, $user);
+        }
 
-        return back()->with('notice', 'Бронирование переведено в ожидание оплаты.');
+        $notice = $nextStatus === EventBookingStatus::AwaitingPayment
+            ? 'Бронирование переведено в ожидание оплаты.'
+            : 'Порядок оплаты сохранен.';
+
+        return back()->with('notice', $notice);
     }
 
     public function markPaidBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
@@ -902,7 +978,12 @@ class VenuesController extends Controller
             abort(404);
         }
 
-        if ($booking->status !== EventBookingStatus::AwaitingPayment) {
+        $orderCode = $booking->payment_order_snapshot['code']
+            ?? $booking->paymentOrder?->code;
+        $canMarkPaidPostpayment = $booking->status === EventBookingStatus::Approved
+            && $orderCode === VenuePaymentOrder::Postpayment->value;
+
+        if ($booking->status !== EventBookingStatus::AwaitingPayment && !$canMarkPaidPostpayment) {
             return back()->withErrors([
                 'booking' => 'Бронирование уже обработано.',
             ]);
@@ -929,13 +1010,22 @@ class VenuesController extends Controller
             ? EventBookingStatus::Approved
             : EventBookingStatus::Paid;
 
-        $booking->update([
-            'status' => $nextStatus,
-            'moderation_comment' => $data['comment'] ?? null,
-            'moderation_source' => EventBookingModerationSource::Manual,
-            'moderated_by' => $user->id,
-            'moderated_at' => now(),
-        ]);
+        if (!$canMarkPaidPostpayment) {
+            $booking->update([
+                'status' => $nextStatus,
+                'moderation_comment' => $data['comment'] ?? null,
+                'moderation_source' => EventBookingModerationSource::Manual,
+                'moderated_by' => $user->id,
+                'moderated_at' => now(),
+            ]);
+        } else {
+            $booking->update([
+                'moderation_comment' => $data['comment'] ?? null,
+                'moderation_source' => EventBookingModerationSource::Manual,
+                'moderated_by' => $user->id,
+                'moderated_at' => now(),
+            ]);
+        }
 
         Payment::query()
             ->where('payable_type', $booking->getMorphClass())

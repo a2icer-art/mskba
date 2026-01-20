@@ -58,6 +58,29 @@ const bookingStatusLabel = (status) => {
     return 'Ожидает';
 };
 
+const formatAmount = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return '—';
+    }
+    return `${Number(value)} ₽`;
+};
+
+const resolvePaymentAmount = (booking) => {
+    if (!booking) {
+        return null;
+    }
+    if (booking.payment_partial_amount_minor) {
+        return booking.payment_partial_amount_minor;
+    }
+    if (booking.payment_amount_minor) {
+        return booking.payment_amount_minor;
+    }
+    if (booking.payment_total_amount_minor) {
+        return booking.payment_total_amount_minor;
+    }
+    return null;
+};
+
 const bookingOpen = ref(false);
 const deleteOpen = ref(false);
 const bookingForm = useForm({
@@ -393,6 +416,10 @@ const bookingClientError = computed(() => {
                                 <div v-if="booking.payment_code" class="mt-3 text-sm text-slate-700">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
                                     <p class="mt-1">{{ booking.payment_code }}</p>
+                                </div>
+                                <div v-if="resolvePaymentAmount(booking)" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">К оплате</span>
+                                    <p class="mt-1">{{ formatAmount(resolvePaymentAmount(booking)) }}</p>
                                 </div>
                                 <div v-if="booking.status === 'awaiting_payment'" class="mt-3 text-sm text-slate-700">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Оплатить до</span>

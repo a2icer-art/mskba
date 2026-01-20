@@ -19,6 +19,14 @@ const props = defineProps({
         type: Object,
         default: () => ({ data: [], links: [] }),
     },
+    paymentOrderOptions: {
+        type: Array,
+        default: () => [],
+    },
+    paymentDefaults: {
+        type: Object,
+        default: () => ({}),
+    },
     filters: {
         type: Object,
         default: () => ({ status: '' }),
@@ -65,6 +73,12 @@ const statuses = [
 ];
 
 const filteredBookings = computed(() => props.bookings?.data ?? []);
+const paymentOrders = computed(() => props.paymentOrderOptions ?? []);
+const paymentDefaults = computed(() => props.paymentDefaults ?? {});
+const canUseWaitHours = computed(() => {
+    const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
+    return minutes >= 60;
+});
 
 watch(statusFilter, (value) => {
     if (!props.venue?.alias || !props.activeTypeSlug) {
@@ -128,6 +142,99 @@ const moderationSourceLabel = (source) => {
     return '';
 };
 
+const resolvePaymentOrder = (id) => paymentOrders.value.find((order) => order.value === id);
+const selectedPaymentOrder = computed(() => resolvePaymentOrder(awaitPaymentForm.payment_order_id));
+const isPostpayment = computed(() => selectedPaymentOrder.value?.code === 'postpayment');
+const isPartialPrepayment = computed(() => selectedPaymentOrder.value?.code === 'partial_prepayment');
+const isPrepayment = computed(() => selectedPaymentOrder.value?.code === 'prepayment');
+
+const isPaymentWaitMinutes = ref(false);
+const highlightPartialSwap = ref(false);
+const highlightTimer = ref(null);
+const originalTotalAmount = ref(0);
+
+const formatAmount = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return '—';
+    }
+    return `${Number(value)} ₽`;
+};
+
+const resolvePaymentAmount = (booking) => {
+    if (!booking) {
+        return null;
+    }
+    if (booking.payment_partial_amount_minor) {
+        return booking.payment_partial_amount_minor;
+    }
+    if (booking.payment_amount_minor) {
+        return booking.payment_amount_minor;
+    }
+    if (booking.payment_total_amount_minor) {
+        return booking.payment_total_amount_minor;
+    }
+    return null;
+};
+
+const calcDurationMinutes = (booking) => {
+    if (!booking?.starts_at || !booking?.ends_at) {
+        return 0;
+    }
+    const start = new Date(booking.starts_at);
+    const end = new Date(booking.ends_at);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return 0;
+    }
+    const diff = Math.ceil((end.getTime() - start.getTime()) / 60000);
+    return diff > 0 ? diff : 0;
+};
+
+const calcTotalAmount = (booking) => {
+    const durationMinutes = calcDurationMinutes(booking);
+    const unitMinutes = Math.max(1, Number(paymentDefaults.value.rental_duration_minutes || 0));
+    const unitPrice = Number(paymentDefaults.value.rental_price_rub || 0);
+    if (!durationMinutes || !unitPrice) {
+        return 0;
+    }
+    const units = durationMinutes / unitMinutes;
+    return Math.round(units * unitPrice);
+};
+
+const resolveTotalAmount = () => {
+    const fallback = calcTotalAmount(activeBooking.value);
+    return originalTotalAmount.value > 0 ? originalTotalAmount.value : fallback;
+};
+
+const isPartialAmountOverTotal = computed(() => {
+    if (!isPartialPrepayment.value) {
+        return false;
+    }
+    const current = Number(awaitPaymentForm.partial_amount_minor ?? 0);
+    const total = resolveTotalAmount();
+    return total > 0 && current >= total;
+});
+
+const syncWaitUnit = () => {
+    const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
+    if (minutes > 0 && minutes % 60 === 0) {
+        isPaymentWaitMinutes.value = false;
+        awaitPaymentForm.payment_wait_hours = minutes / 60;
+    } else {
+        isPaymentWaitMinutes.value = true;
+        awaitPaymentForm.payment_wait_hours = null;
+    }
+};
+
+const triggerPartialSwapHighlight = () => {
+    highlightPartialSwap.value = true;
+    if (highlightTimer.value) {
+        clearTimeout(highlightTimer.value);
+    }
+    highlightTimer.value = setTimeout(() => {
+        highlightPartialSwap.value = false;
+    }, 2000);
+};
+
 const confirmOpen = ref(false);
 const cancelOpen = ref(false);
 const awaitPaymentOpen = ref(false);
@@ -136,7 +243,13 @@ const activeBooking = ref(null);
 const hasModalOpen = computed(() => confirmOpen.value || cancelOpen.value || awaitPaymentOpen.value || paidOpen.value);
 const confirmForm = useForm({ comment: '' });
 const cancelForm = useForm({ comment: '' });
-const awaitPaymentForm = useForm({ comment: '' });
+const awaitPaymentForm = useForm({
+    comment: '',
+    payment_order_id: null,
+    payment_wait_minutes: null,
+    payment_wait_hours: null,
+    partial_amount_minor: null,
+});
 const paidForm = useForm({ comment: '' });
 
 const openConfirm = (booking) => {
@@ -169,7 +282,24 @@ const closeCancel = () => {
 
 const openAwaitPayment = (booking) => {
     activeBooking.value = booking;
-    awaitPaymentForm.reset('comment');
+    const defaultPaymentOrderId =
+        booking?.payment_order_id
+        ?? paymentDefaults.value.payment_order_id
+        ?? paymentOrders.value[0]?.value
+        ?? null;
+    awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
+    awaitPaymentForm.payment_order_id = defaultPaymentOrderId;
+    awaitPaymentForm.payment_wait_minutes = paymentDefaults.value.payment_wait_minutes ?? null;
+    awaitPaymentForm.payment_wait_hours = null;
+    originalTotalAmount.value = booking?.payment_total_amount_minor ?? calcTotalAmount(booking);
+    syncWaitUnit();
+    if (selectedPaymentOrder.value?.code === 'partial_prepayment') {
+        const totalAmount = resolveTotalAmount();
+        awaitPaymentForm.partial_amount_minor = booking?.payment_partial_amount_minor
+            ?? (totalAmount ? Math.ceil(totalAmount * 0.5) : null);
+    } else {
+        awaitPaymentForm.partial_amount_minor = resolveTotalAmount() || null;
+    }
     awaitPaymentForm.clearErrors();
     awaitPaymentOpen.value = true;
 };
@@ -177,7 +307,10 @@ const openAwaitPayment = (booking) => {
 const closeAwaitPayment = () => {
     awaitPaymentOpen.value = false;
     activeBooking.value = null;
-    awaitPaymentForm.reset('comment');
+    awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
+    awaitPaymentForm.reset('payment_wait_hours');
+    isPaymentWaitMinutes.value = false;
+    originalTotalAmount.value = 0;
     awaitPaymentForm.clearErrors();
 };
 
@@ -219,6 +352,12 @@ const submitAwaitPayment = () => {
     if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
         return;
     }
+    if (isPartialAmountOverTotal.value) {
+        const confirmed = window.confirm('Введенная стоимость равна или больше полной. Продолжить?');
+        if (!confirmed) {
+            return;
+        }
+    }
     awaitPaymentForm.post(
         `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/await-payment`,
         { preserveScroll: true, onSuccess: closeAwaitPayment }
@@ -234,6 +373,81 @@ const submitPaid = () => {
         { preserveScroll: true, onSuccess: closePaid }
     );
 };
+
+watch(
+    () => awaitPaymentForm.payment_order_id,
+    (value) => {
+        const order = resolvePaymentOrder(value);
+        if (!order || order.code === 'postpayment') {
+            awaitPaymentForm.payment_wait_minutes = null;
+            awaitPaymentForm.partial_amount_minor = null;
+            return;
+        }
+        if (awaitPaymentForm.payment_wait_minutes === null) {
+            awaitPaymentForm.payment_wait_minutes = paymentDefaults.value.payment_wait_minutes ?? null;
+        }
+        syncWaitUnit();
+        if (order.code === 'partial_prepayment' && awaitPaymentForm.partial_amount_minor === null) {
+            const totalAmount = resolveTotalAmount();
+            awaitPaymentForm.partial_amount_minor = totalAmount ? Math.ceil(totalAmount * 0.5) : null;
+        }
+        if (order.code !== 'partial_prepayment') {
+            awaitPaymentForm.partial_amount_minor = resolveTotalAmount() || null;
+        } else if (awaitPaymentForm.partial_amount_minor === null && activeBooking.value) {
+            awaitPaymentForm.partial_amount_minor = activeBooking.value.payment_partial_amount_minor ?? null;
+        } else if (isPartialAmountOverTotal.value) {
+            triggerPartialSwapHighlight();
+        }
+    }
+);
+
+watch(
+    () => awaitPaymentForm.partial_amount_minor,
+    (value) => {
+        if (!isPartialPrepayment.value || value === null || value === undefined) {
+            return;
+        }
+        const totalAmount = resolveTotalAmount();
+        if (totalAmount && Number(value) >= totalAmount) {
+            triggerPartialSwapHighlight();
+        }
+    }
+);
+
+watch(
+    () => isPaymentWaitMinutes.value,
+    (value) => {
+        if (!value) {
+            const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
+            awaitPaymentForm.payment_wait_hours = minutes ? minutes / 60 : null;
+        } else {
+            const hours = Number(awaitPaymentForm.payment_wait_hours ?? 0);
+            awaitPaymentForm.payment_wait_minutes = hours ? Math.round(hours * 60) : awaitPaymentForm.payment_wait_minutes;
+            awaitPaymentForm.payment_wait_hours = null;
+        }
+    }
+);
+
+watch(
+    () => awaitPaymentForm.payment_wait_hours,
+    (value) => {
+        if (isPaymentWaitMinutes.value) {
+            return;
+        }
+        awaitPaymentForm.payment_wait_minutes = value ? Math.max(0, Math.round(Number(value) * 60)) : 0;
+    }
+);
+
+watch(
+    () => awaitPaymentForm.payment_wait_minutes,
+    (value) => {
+        const minutes = Number(value ?? 0);
+        if (minutes < 60 && !isPaymentWaitMinutes.value) {
+            isPaymentWaitMinutes.value = true;
+            awaitPaymentForm.payment_wait_hours = null;
+        }
+    }
+);
 </script>
 
 <template>
@@ -310,11 +524,11 @@ const submitPaid = () => {
                                     <p v-if="booking.moderated_at" class="mt-1 text-xs text-slate-500">
                                         Модерация: {{ formatDateTime(booking.moderated_at) }}
                                     </p>
+                                    <p v-if="booking.moderation_source && booking.moderated_at" class="mt-1 text-xs text-slate-500">
+                                        Изменено: {{ moderationSourceLabel(booking.moderation_source) }}
+                                    </p>
                                     <p v-if="booking.moderation_comment" class="mt-1 text-xs text-slate-500">
                                         Комментарий: {{ booking.moderation_comment }}
-                                    </p>
-                                    <p v-if="booking.moderation_source && booking.moderated_at" class="mt-1 text-xs text-slate-500">
-                                        Источник: {{ moderationSourceLabel(booking.moderation_source) }}
                                     </p>
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
@@ -338,6 +552,9 @@ const submitPaid = () => {
                                     <span v-if="booking.payment_code" class="text-xs text-slate-500">
                                         Платеж № {{ booking.payment_code }}
                                     </span>
+                                    <span v-if="resolvePaymentAmount(booking)" class="text-xs text-slate-500">
+                                        К оплате: {{ formatAmount(resolvePaymentAmount(booking)) }}
+                                    </span>
                                     <span v-if="booking.status === 'awaiting_payment'" class="text-xs text-slate-500">
                                         Оплатить до:
                                         {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'бессрочно' }}
@@ -350,7 +567,7 @@ const submitPaid = () => {
                                             :disabled="awaitPaymentForm.processing"
                                             @click="openAwaitPayment(booking)"
                                         >
-                                            Ожидает оплату
+                                            Просмотр заявки
                                         </button>
                                         <button
                                             v-if="booking.can_mark_paid"
@@ -464,7 +681,7 @@ const submitPaid = () => {
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
                 <form :class="{ loading: awaitPaymentForm.processing }" @submit.prevent="submitAwaitPayment">
                     <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
-                        <h2 class="text-lg font-semibold text-slate-900">Ожидание оплаты</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">Просмотр заявки</h2>
                         <button
                             class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
                             type="button"
@@ -481,6 +698,67 @@ const submitPaid = () => {
                         <p class="mt-1 text-sm text-slate-600">
                             {{ formatDateTime(activeBooking?.starts_at) }} – {{ formatDateTime(activeBooking?.ends_at) }}
                         </p>
+                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Порядок оплаты
+                            <select
+                                v-model="awaitPaymentForm.payment_order_id"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                :class="highlightPartialSwap ? 'border-amber-400 bg-amber-50' : ''"
+                            >
+                                <option v-for="order in paymentOrders" :key="order.value" :value="order.value">
+                                    {{ order.label }}
+                                </option>
+                            </select>
+                        </label>
+                        <div v-if="awaitPaymentForm.errors.payment_order_id" class="text-xs text-rose-700">
+                            {{ awaitPaymentForm.errors.payment_order_id }}
+                        </div>
+                        <div v-if="!isPostpayment" class="mt-4 space-y-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Срок ожидания оплаты</span>
+                            <label class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                <input
+                                    v-model="isPaymentWaitMinutes"
+                                    type="checkbox"
+                                    class="input-switch"
+                                    :disabled="!canUseWaitHours"
+                                />
+                                <span>В минутах</span>
+                            </label>
+                            <input
+                                v-if="isPaymentWaitMinutes"
+                                v-model.number="awaitPaymentForm.payment_wait_minutes"
+                                type="number"
+                                min="0"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            />
+                            <input
+                                v-else
+                                v-model.number="awaitPaymentForm.payment_wait_hours"
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            />
+                        </div>
+                        <div v-if="awaitPaymentForm.errors.payment_wait_minutes" class="text-xs text-rose-700">
+                            {{ awaitPaymentForm.errors.payment_wait_minutes }}
+                        </div>
+                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Стоимость
+                            <input
+                                v-model.number="awaitPaymentForm.partial_amount_minor"
+                                type="number"
+                                min="1"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                :class="highlightPartialSwap || isPartialAmountOverTotal ? 'border-amber-400 bg-amber-50' : ''"
+                            />
+                        </label>
+                        <p v-if="isPartialAmountOverTotal" class="text-xs text-amber-700">
+                            Стоимость равна или превышает полную. Проверьте порядок оплаты.
+                        </p>
+                        <div v-if="awaitPaymentForm.errors.partial_amount_minor" class="text-xs text-rose-700">
+                            {{ awaitPaymentForm.errors.partial_amount_minor }}
+                        </div>
                         <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                             Комментарий (опционально)
                             <textarea
@@ -509,7 +787,7 @@ const submitPaid = () => {
                             type="submit"
                             :disabled="awaitPaymentForm.processing"
                         >
-                            Перевести
+                            Сохранить
                         </button>
                     </div>
                 </form>

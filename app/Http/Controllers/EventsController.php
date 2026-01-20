@@ -240,9 +240,16 @@ class EventsController extends Controller
 
         $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder', 'bookings.payment']);
 
+        if (!$this->canViewEvent($user, $event, $checker)) {
+            return redirect()
+                ->route('events.index')
+                ->withErrors(['event' => 'Недостаточно прав для просмотра заявки.']);
+        }
+
         $bookings = $event->bookings
             ->map(static function ($booking): array {
                 $snapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
+                $paymentMeta = is_array($booking->payment?->meta) ? $booking->payment->meta : [];
                 return [
                     'id' => $booking->id,
                   'status' => $booking->status?->value,
@@ -251,6 +258,9 @@ class EventsController extends Controller
                   'moderation_comment' => $booking->moderation_comment,
                   'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
                   'payment_code' => $booking->payment?->payment_code,
+                  'payment_amount_minor' => $booking->payment?->amount_minor,
+                  'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
+                  'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
                   'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
                   'venue' => $booking->venue
                         ? [
@@ -375,5 +385,40 @@ class EventsController extends Controller
         $isAdmin = $user->roles()->where('alias', 'admin')->exists();
 
         return $isAdmin || $event->organizer_id === $user->id;
+    }
+
+    private function canViewEvent(?\App\Models\User $user, Event $event, PermissionChecker $checker): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->roles()->where('alias', 'admin')->exists()) {
+            return true;
+        }
+
+        if ($event->organizer_id === $user->id) {
+            return true;
+        }
+
+        $venueIds = $event->bookings
+            ->pluck('venue_id')
+            ->filter()
+            ->unique()
+            ->all();
+        if ($venueIds === []) {
+            return false;
+        }
+
+        foreach (Venue::query()->whereIn('id', $venueIds)->get() as $venue) {
+            if ($checker->can($user, PermissionCode::VenueBookingConfirm, $venue)) {
+                return true;
+            }
+            if ($checker->can($user, PermissionCode::VenueBookingCancel, $venue)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
