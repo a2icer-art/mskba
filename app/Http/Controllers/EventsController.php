@@ -26,8 +26,6 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        app(BookingPaymentExpiryService::class)->runIfDue();
-
         $events = Event::query()
             ->with(['type', 'organizer', 'bookings'])
             ->orderByDesc('created_at')
@@ -239,8 +237,6 @@ class EventsController extends Controller
     {
         $user = $request->user();
         $checker = app(PermissionChecker::class);
-
-        app(BookingPaymentExpiryService::class)->runIfDue();
 
         $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder', 'bookings.payment']);
 

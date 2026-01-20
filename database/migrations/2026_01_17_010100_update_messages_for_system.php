@@ -14,12 +14,18 @@ return new class extends Migration
             $table->string('link_url', 255)->nullable()->after('body');
         });
 
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement('ALTER TABLE messages MODIFY sender_id BIGINT UNSIGNED NULL');
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE messages MODIFY sender_id BIGINT UNSIGNED NOT NULL');
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE messages MODIFY sender_id BIGINT UNSIGNED NOT NULL');
+        }
 
         Schema::table('messages', function (Blueprint $table) {
             $table->dropColumn(['title', 'link_url']);
