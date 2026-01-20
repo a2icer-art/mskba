@@ -26,43 +26,24 @@ class BookingNotificationService
 
         $title = $this->titleForStatus($status);
         $body = $booking->moderation_comment ?: null;
-        $bookingCode = $this->resolveBookingCode($booking);
-        $query = $bookingCode ? ('?booking=' . $bookingCode) : '';
+        return $this->sendSystemMessage($booking, $title, $body, $actor);
+    }
 
-        $creator = $booking->creator;
-        $venueRecipients = $this->resolveVenueRecipients($booking);
+    public function notifyPendingWarning(EventBooking $booking, int $minutes): int
+    {
+        $booking->loadMissing([
+            'event:id',
+            'venue:id,alias,venue_type_id',
+            'venue.venueType:id,alias',
+            'creator:id,login',
+            'payment:id,payment_code',
+            'paymentOrder:id,code',
+        ]);
 
-        $recipientIds = collect([$creator?->id, ...array_map(static fn (User $user) => $user->id, $venueRecipients)])
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $title = 'Заявка на бронирование скоро будет отменена';
+        $body = 'Заявка будет автоматически отменена через ' . $minutes . ' мин., если не будет подтверждена.';
 
-        if ($recipientIds === []) {
-            return 0;
-        }
-
-        $venueName = $booking->venue?->name;
-        $label = 'Бронирование №' . ($bookingCode ?? $booking->id);
-        if ($venueName) {
-            $label .= ' — ' . $venueName;
-        }
-        $conversation = app(ConversationService::class)->findOrCreateSystem(
-            EventBooking::class,
-            $booking->id,
-            $label,
-            $recipientIds
-        );
-
-        $linkUrl = $booking->event?->id
-            ? "/events/{$booking->event->id}{$query}"
-            : ($booking->venue && $booking->venue->venueType
-                ? "/venues/{$booking->venue->venueType->alias}/{$booking->venue->alias}/bookings{$query}"
-                : null);
-
-        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor);
-
-        return count($recipientIds);
+        return $this->sendSystemMessage($booking, $title, $body, null);
     }
 
     private function resolveBookingCode(EventBooking $booking): ?string
@@ -109,5 +90,46 @@ class BookingNotificationService
             EventBookingStatus::Approved => 'Бронирование подтверждено',
             EventBookingStatus::Cancelled => 'Бронирование отменено',
         };
+    }
+
+    private function sendSystemMessage(EventBooking $booking, string $title, ?string $body, ?User $actor = null): int
+    {
+        $bookingCode = $this->resolveBookingCode($booking);
+        $query = $bookingCode ? ('?booking=' . $bookingCode) : '';
+
+        $creator = $booking->creator;
+        $venueRecipients = $this->resolveVenueRecipients($booking);
+
+        $recipientIds = collect([$creator?->id, ...array_map(static fn (User $user) => $user->id, $venueRecipients)])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($recipientIds === []) {
+            return 0;
+        }
+
+        $venueName = $booking->venue?->name;
+        $label = 'Бронирование №' . ($bookingCode ?? $booking->id);
+        if ($venueName) {
+            $label .= ' — ' . $venueName;
+        }
+        $conversation = app(ConversationService::class)->findOrCreateSystem(
+            EventBooking::class,
+            $booking->id,
+            $label,
+            $recipientIds
+        );
+
+        $linkUrl = $booking->event?->id
+            ? "/events/{$booking->event->id}{$query}"
+            : ($booking->venue && $booking->venue->venueType
+                ? "/venues/{$booking->venue->venueType->alias}/{$booking->venue->alias}/bookings{$query}"
+                : null);
+
+        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor);
+
+        return count($recipientIds);
     }
 }

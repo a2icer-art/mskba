@@ -42,6 +42,7 @@ use App\Presentation\Navigation\VenueNavigationPresenter;
 use App\Presentation\Venues\MetroOptionsPresenter;
 use App\Presentation\Venues\VenueShowPresenter;
 use App\Presentation\Venues\VenueSidebarPresenter;
+use App\Support\TimeValueNormalizer;
 use App\Presentation\Venues\VenueTypeOptionsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -471,6 +472,9 @@ class VenuesController extends Controller
                 'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
                 'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
                 'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+                'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
+                'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
+                'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
             ]
         );
         $paymentOrders = PaymentOrder::query()
@@ -614,6 +618,9 @@ class VenuesController extends Controller
                 'payment_wait_minutes' => $settings->payment_wait_minutes,
                 'rental_duration_minutes' => $settings->rental_duration_minutes,
                 'rental_price_rub' => $settings->rental_price_rub,
+                'pending_review_minutes' => $settings->pending_review_minutes,
+                'pending_before_start_minutes' => $settings->pending_before_start_minutes,
+                'pending_warning_minutes' => $settings->pending_warning_minutes,
             ],
             'canConfirm' => $canConfirm,
             'canCancel' => $canCancel,
@@ -668,6 +675,9 @@ class VenuesController extends Controller
                 'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
                 'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
                 'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+                'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
+                'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
+                'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
             ]
         );
 
@@ -695,6 +705,9 @@ class VenuesController extends Controller
                 'rental_price_rub' => $settings->rental_price_rub,
                 'booking_mode' => $settings->booking_mode?->value ?? VenueSettings::DEFAULT_BOOKING_MODE->value,
                 'payment_wait_minutes' => $settings->payment_wait_minutes,
+                'pending_review_minutes' => $settings->pending_review_minutes,
+                'pending_before_start_minutes' => $settings->pending_before_start_minutes,
+                'pending_warning_minutes' => $settings->pending_warning_minutes,
             ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
@@ -724,27 +737,31 @@ class VenuesController extends Controller
 
         $data = $request->validate(
             [
-              'booking_lead_time_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
-              'booking_min_interval_minutes' => ['required', 'integer', 'min:30', 'max:1440'],
-            'rental_duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+              'booking_lead_time_minutes' => ['required', 'numeric', 'min:0'],
+              'booking_min_interval_minutes' => ['required', 'numeric', 'min:0'],
+            'rental_duration_minutes' => ['required', 'numeric', 'min:0'],
             'rental_price_rub' => ['required', 'integer', 'min:0'],
             'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
             'booking_mode' => ['required', 'string', 'in:instant,approval_required'],
-            'payment_wait_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+            'payment_wait_minutes' => ['required', 'numeric', 'min:0'],
+            'pending_review_minutes' => ['required', 'numeric', 'min:0'],
+            'pending_before_start_minutes' => ['required', 'numeric', 'min:0'],
+            'pending_warning_minutes' => ['required', 'numeric', 'min:0'],
+            'booking_lead_time_is_minutes' => ['nullable', 'boolean'],
+            'booking_min_interval_is_minutes' => ['nullable', 'boolean'],
+            'rental_duration_is_minutes' => ['nullable', 'boolean'],
+            'payment_wait_is_minutes' => ['nullable', 'boolean'],
+            'pending_review_is_minutes' => ['nullable', 'boolean'],
+            'pending_before_start_is_minutes' => ['nullable', 'boolean'],
+            'pending_warning_is_minutes' => ['nullable', 'boolean'],
         ],
         [
             'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
-            'booking_lead_time_minutes.integer' => 'Допустимое время до начала бронирования должно быть числом.',
-            'booking_lead_time_minutes.min' => 'Допустимое время до начала бронирования не может быть отрицательным.',
-            'booking_lead_time_minutes.max' => 'Допустимое время до начала бронирования не может превышать 1440 минут.',
+            'booking_lead_time_minutes.numeric' => 'Допустимое время до начала бронирования должно быть числом.',
               'booking_min_interval_minutes.required' => 'Укажите минимальный интервал бронирования.',
-              'booking_min_interval_minutes.integer' => 'Минимальный интервал бронирования должен быть числом.',
-              'booking_min_interval_minutes.min' => 'Минимальный интервал бронирования не может быть меньше 30 минут.',
-              'booking_min_interval_minutes.max' => 'Минимальный интервал бронирования не может превышать 1440 минут.',
+              'booking_min_interval_minutes.numeric' => 'Минимальный интервал бронирования должен быть числом.',
               'rental_duration_minutes.required' => 'Укажите длительность аренды.',
-              'rental_duration_minutes.integer' => 'Длительность аренды должна быть числом.',
-              'rental_duration_minutes.min' => 'Длительность аренды должна быть больше 0 минут.',
-              'rental_duration_minutes.max' => 'Длительность аренды не может превышать 1440 минут.',
+              'rental_duration_minutes.numeric' => 'Длительность аренды должна быть числом.',
             'rental_price_rub.required' => 'Укажите стоимость аренды.',
             'rental_price_rub.integer' => 'Стоимость аренды должна быть числом.',
             'rental_price_rub.min' => 'Стоимость аренды не может быть отрицательной.',
@@ -753,11 +770,71 @@ class VenuesController extends Controller
             'booking_mode.required' => 'Выберите режим бронирования.',
             'booking_mode.in' => 'Выберите корректный режим бронирования.',
             'payment_wait_minutes.required' => 'Укажите срок ожидания оплаты.',
-            'payment_wait_minutes.integer' => 'Срок ожидания оплаты должен быть числом.',
-            'payment_wait_minutes.min' => 'Срок ожидания оплаты не может быть отрицательным.',
-            'payment_wait_minutes.max' => 'Срок ожидания оплаты не может превышать 10080 минут.',
+            'payment_wait_minutes.numeric' => 'Срок ожидания оплаты должен быть числом.',
+            'pending_review_minutes.required' => 'Укажите срок рассмотрения заявки.',
+            'pending_review_minutes.numeric' => 'Срок рассмотрения заявки должен быть числом.',
+            'pending_before_start_minutes.required' => 'Укажите срок автоотмены до начала.',
+            'pending_before_start_minutes.numeric' => 'Срок автоотмены до начала должен быть числом.',
+            'pending_warning_minutes.required' => 'Укажите срок предупреждения автоотмены.',
+            'pending_warning_minutes.numeric' => 'Срок предупреждения автоотмены должен быть числом.',
         ]
     );
+
+        $data['booking_lead_time_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['booking_lead_time_minutes'],
+            $data['booking_lead_time_is_minutes'] ?? null
+        );
+        $data['booking_min_interval_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['booking_min_interval_minutes'],
+            $data['booking_min_interval_is_minutes'] ?? null
+        );
+        $data['rental_duration_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['rental_duration_minutes'],
+            $data['rental_duration_is_minutes'] ?? null
+        );
+        $data['payment_wait_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['payment_wait_minutes'],
+            $data['payment_wait_is_minutes'] ?? null
+        );
+        $data['pending_review_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['pending_review_minutes'],
+            $data['pending_review_is_minutes'] ?? null
+        );
+        $data['pending_before_start_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['pending_before_start_minutes'],
+            $data['pending_before_start_is_minutes'] ?? null
+        );
+        $data['pending_warning_minutes'] = TimeValueNormalizer::toMinutes(
+            (float) $data['pending_warning_minutes'],
+            $data['pending_warning_is_minutes'] ?? null
+        );
+
+        $errors = [];
+        if ($data['booking_lead_time_minutes'] < 0 || $data['booking_lead_time_minutes'] > 1440) {
+            $errors['booking_lead_time_minutes'] = 'Допустимое время до начала бронирования должно быть от 0 до 1440 минут.';
+        }
+        if ($data['booking_min_interval_minutes'] < 30 || $data['booking_min_interval_minutes'] > 1440) {
+            $errors['booking_min_interval_minutes'] = 'Минимальный интервал бронирования не может быть меньше 30 минут.';
+        }
+        if ($data['rental_duration_minutes'] < 1 || $data['rental_duration_minutes'] > 1440) {
+            $errors['rental_duration_minutes'] = 'Длительность аренды должна быть от 1 до 1440 минут.';
+        }
+        if ($data['payment_wait_minutes'] < 0 || $data['payment_wait_minutes'] > 10080) {
+            $errors['payment_wait_minutes'] = 'Срок ожидания оплаты должен быть от 0 до 10080 минут.';
+        }
+        if ($data['pending_review_minutes'] < 0 || $data['pending_review_minutes'] > 10080) {
+            $errors['pending_review_minutes'] = 'Срок рассмотрения заявки должен быть от 0 до 10080 минут.';
+        }
+        if ($data['pending_before_start_minutes'] < 0 || $data['pending_before_start_minutes'] > 10080) {
+            $errors['pending_before_start_minutes'] = 'Срок автоотмены до начала должен быть от 0 до 10080 минут.';
+        }
+        if ($data['pending_warning_minutes'] < 0 || $data['pending_warning_minutes'] > 10080) {
+            $errors['pending_warning_minutes'] = 'Срок предупреждения автоотмены должен быть от 0 до 10080 минут.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
 
         VenueSettings::query()->updateOrCreate(
             ['venue_id' => $venue->id],
@@ -769,11 +846,16 @@ class VenuesController extends Controller
                 'rental_price_rub' => $data['rental_price_rub'],
                 'booking_mode' => $data['booking_mode'],
                 'payment_wait_minutes' => $data['payment_wait_minutes'],
+                'pending_review_minutes' => $data['pending_review_minutes'],
+                'pending_before_start_minutes' => $data['pending_before_start_minutes'],
+                'pending_warning_minutes' => $data['pending_warning_minutes'],
             ]
         );
 
         return back()->with('notice', 'Настройки площадки обновлены.');
     }
+
+    
 
     public function confirmBooking(Request $request, string $type, Venue $venue, EventBooking $booking)
     {
@@ -872,7 +954,8 @@ class VenuesController extends Controller
         $data = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
             'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
-            'payment_wait_minutes' => ['nullable', 'integer', 'min:0', 'max:10080'],
+            'payment_wait_minutes' => ['nullable', 'numeric', 'min:0'],
+            'payment_wait_is_minutes' => ['nullable', 'boolean'],
             'partial_amount_minor' => ['nullable', 'integer', 'min:1'],
         ]);
 
@@ -885,8 +968,16 @@ class VenuesController extends Controller
             'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
         ]);
         $waitMinutes = array_key_exists('payment_wait_minutes', $data)
-            ? (int) $data['payment_wait_minutes']
+            ? TimeValueNormalizer::toMinutes(
+                $data['payment_wait_minutes'] !== null ? (float) $data['payment_wait_minutes'] : null,
+                $data['payment_wait_is_minutes'] ?? null
+            )
             : (int) $settings->payment_wait_minutes;
+        if ($waitMinutes < 0 || $waitMinutes > 10080) {
+            throw ValidationException::withMessages([
+                'payment_wait_minutes' => 'Срок ожидания оплаты должен быть от 0 до 10080 минут.',
+            ]);
+        }
         $paymentDueAt = $paymentOrderCode === VenuePaymentOrder::Postpayment->value
             ? null
             : ($waitMinutes > 0 ? now()->addMinutes($waitMinutes) : null);

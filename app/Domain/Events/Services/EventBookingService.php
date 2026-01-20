@@ -173,6 +173,9 @@ class EventBookingService
             'payment_order' => VenueSettings::DEFAULT_PAYMENT_ORDER->value,
             'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
             'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+            'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
+            'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
+            'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
         ]);
     }
 

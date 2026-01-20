@@ -75,10 +75,6 @@ const statuses = [
 const filteredBookings = computed(() => props.bookings?.data ?? []);
 const paymentOrders = computed(() => props.paymentOrderOptions ?? []);
 const paymentDefaults = computed(() => props.paymentDefaults ?? {});
-const canUseWaitHours = computed(() => {
-    const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
-    return minutes >= 60;
-});
 
 watch(statusFilter, (value) => {
     if (!props.venue?.alias || !props.activeTypeSlug) {
@@ -149,6 +145,8 @@ const isPartialPrepayment = computed(() => selectedPaymentOrder.value?.code === 
 const isPrepayment = computed(() => selectedPaymentOrder.value?.code === 'prepayment');
 
 const isPaymentWaitMinutes = ref(false);
+const paymentWaitStep = computed(() => (isPaymentWaitMinutes.value ? 1 : 0.25));
+const paymentWaitMax = computed(() => (isPaymentWaitMinutes.value ? 10080 : 168));
 const highlightPartialSwap = ref(false);
 const highlightTimer = ref(null);
 const originalTotalAmount = ref(0);
@@ -214,15 +212,20 @@ const isPartialAmountOverTotal = computed(() => {
     return total > 0 && current >= total;
 });
 
-const syncWaitUnit = () => {
-    const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
-    if (minutes > 0 && minutes % 60 === 0) {
+const initPaymentWaitValue = (minutesValue) => {
+    const minutes = Number(minutesValue ?? 0);
+    if (minutes === 0) {
         isPaymentWaitMinutes.value = false;
-        awaitPaymentForm.payment_wait_hours = minutes / 60;
-    } else {
-        isPaymentWaitMinutes.value = true;
-        awaitPaymentForm.payment_wait_hours = null;
+        awaitPaymentForm.payment_wait_minutes = 0;
+        return;
     }
+    if (minutes % 60 === 0) {
+        isPaymentWaitMinutes.value = false;
+        awaitPaymentForm.payment_wait_minutes = minutes / 60;
+        return;
+    }
+    isPaymentWaitMinutes.value = true;
+    awaitPaymentForm.payment_wait_minutes = minutes;
 };
 
 const triggerPartialSwapHighlight = () => {
@@ -247,7 +250,7 @@ const awaitPaymentForm = useForm({
     comment: '',
     payment_order_id: null,
     payment_wait_minutes: null,
-    payment_wait_hours: null,
+    payment_wait_is_minutes: null,
     partial_amount_minor: null,
 });
 const paidForm = useForm({ comment: '' });
@@ -289,10 +292,8 @@ const openAwaitPayment = (booking) => {
         ?? null;
     awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
     awaitPaymentForm.payment_order_id = defaultPaymentOrderId;
-    awaitPaymentForm.payment_wait_minutes = paymentDefaults.value.payment_wait_minutes ?? null;
-    awaitPaymentForm.payment_wait_hours = null;
+    initPaymentWaitValue(paymentDefaults.value.payment_wait_minutes ?? null);
     originalTotalAmount.value = booking?.payment_total_amount_minor ?? calcTotalAmount(booking);
-    syncWaitUnit();
     if (selectedPaymentOrder.value?.code === 'partial_prepayment') {
         const totalAmount = resolveTotalAmount();
         awaitPaymentForm.partial_amount_minor = booking?.payment_partial_amount_minor
@@ -308,7 +309,6 @@ const closeAwaitPayment = () => {
     awaitPaymentOpen.value = false;
     activeBooking.value = null;
     awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
-    awaitPaymentForm.reset('payment_wait_hours');
     isPaymentWaitMinutes.value = false;
     originalTotalAmount.value = 0;
     awaitPaymentForm.clearErrors();
@@ -358,6 +358,7 @@ const submitAwaitPayment = () => {
             return;
         }
     }
+    awaitPaymentForm.payment_wait_is_minutes = isPostpayment.value ? null : isPaymentWaitMinutes.value;
     awaitPaymentForm.post(
         `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/await-payment`,
         { preserveScroll: true, onSuccess: closeAwaitPayment }
@@ -380,13 +381,13 @@ watch(
         const order = resolvePaymentOrder(value);
         if (!order || order.code === 'postpayment') {
             awaitPaymentForm.payment_wait_minutes = null;
+            awaitPaymentForm.payment_wait_is_minutes = null;
             awaitPaymentForm.partial_amount_minor = null;
             return;
         }
         if (awaitPaymentForm.payment_wait_minutes === null) {
-            awaitPaymentForm.payment_wait_minutes = paymentDefaults.value.payment_wait_minutes ?? null;
+            initPaymentWaitValue(paymentDefaults.value.payment_wait_minutes ?? null);
         }
-        syncWaitUnit();
         if (order.code === 'partial_prepayment' && awaitPaymentForm.partial_amount_minor === null) {
             const totalAmount = resolveTotalAmount();
             awaitPaymentForm.partial_amount_minor = totalAmount ? Math.ceil(totalAmount * 0.5) : null;
@@ -414,40 +415,6 @@ watch(
     }
 );
 
-watch(
-    () => isPaymentWaitMinutes.value,
-    (value) => {
-        if (!value) {
-            const minutes = Number(awaitPaymentForm.payment_wait_minutes ?? 0);
-            awaitPaymentForm.payment_wait_hours = minutes ? minutes / 60 : null;
-        } else {
-            const hours = Number(awaitPaymentForm.payment_wait_hours ?? 0);
-            awaitPaymentForm.payment_wait_minutes = hours ? Math.round(hours * 60) : awaitPaymentForm.payment_wait_minutes;
-            awaitPaymentForm.payment_wait_hours = null;
-        }
-    }
-);
-
-watch(
-    () => awaitPaymentForm.payment_wait_hours,
-    (value) => {
-        if (isPaymentWaitMinutes.value) {
-            return;
-        }
-        awaitPaymentForm.payment_wait_minutes = value ? Math.max(0, Math.round(Number(value) * 60)) : 0;
-    }
-);
-
-watch(
-    () => awaitPaymentForm.payment_wait_minutes,
-    (value) => {
-        const minutes = Number(value ?? 0);
-        if (minutes < 60 && !isPaymentWaitMinutes.value) {
-            isPaymentWaitMinutes.value = true;
-            awaitPaymentForm.payment_wait_hours = null;
-        }
-    }
-);
 </script>
 
 <template>
@@ -720,23 +687,15 @@ watch(
                                     v-model="isPaymentWaitMinutes"
                                     type="checkbox"
                                     class="input-switch"
-                                    :disabled="!canUseWaitHours"
                                 />
                                 <span>В минутах</span>
                             </label>
                             <input
-                                v-if="isPaymentWaitMinutes"
                                 v-model.number="awaitPaymentForm.payment_wait_minutes"
                                 type="number"
                                 min="0"
-                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            />
-                            <input
-                                v-else
-                                v-model.number="awaitPaymentForm.payment_wait_hours"
-                                type="number"
-                                min="0"
-                                step="0.25"
+                                :step="paymentWaitStep"
+                                :max="paymentWaitMax"
                                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                             />
                         </div>
