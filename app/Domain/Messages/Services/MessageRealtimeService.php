@@ -13,7 +13,9 @@ class MessageRealtimeService
 {
     public function broadcastMessage(Message $message): void
     {
-        $conversation = $message->conversation;
+        $conversation = $message->relationLoaded('conversation')
+            ? $message->conversation
+            : Conversation::query()->whereKey($message->conversation_id)->first();
         if (!$conversation) {
             return;
         }

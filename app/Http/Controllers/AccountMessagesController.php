@@ -65,6 +65,7 @@ class AccountMessagesController extends Controller
             $updated = $messagesService->markConversationRead($conversation, $user);
             if ($updated > 0) {
                 app(MessageRealtimeService::class)->broadcastConversationRead($conversation, $user);
+                $conversations = $messagesService->getConversations($user);
             }
         }
 

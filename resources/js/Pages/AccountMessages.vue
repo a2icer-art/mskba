@@ -82,12 +82,22 @@ onMounted(() => {
             messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
         }
     });
+    if (activeConversationState.value?.id) {
+        const activeId = activeConversationState.value.id;
+        conversationsState.value = conversationsState.value.map((conversation) => (
+            conversation.id === activeId
+                ? { ...conversation, unread_count: 0 }
+                : conversation
+        ));
+        refreshUnreadCount();
+    }
 });
 
 watch(
     () => props.conversations,
     (value) => {
         conversationsState.value = [...(value ?? [])];
+        refreshUnreadCount();
     }
 );
 watch(
@@ -104,6 +114,18 @@ watch(
         directMessageBody.value = '';
         directMessageError.value = '';
     }
+);
+watch(
+    () => activeConversationState.value?.id,
+    (value) => {
+        if (!value) {
+            return;
+        }
+        nextTick(() => {
+            markRead(value);
+        });
+    },
+    { immediate: true }
 );
 watch(
     () => props.messages,
@@ -154,6 +176,7 @@ const mergeMessages = (current, incoming, mode) => {
 const handlePoll = (data) => {
     if (Array.isArray(data?.conversations)) {
         conversationsState.value = data.conversations;
+        refreshUnreadCount();
     }
     if (Array.isArray(data?.messages)) {
         const shouldStickToBottom = messagesContainer.value
@@ -265,6 +288,13 @@ const { unreadCount } = useMessageRealtime({
     onEvent: handleRealtimeEvent,
 });
 
+const refreshUnreadCount = () => {
+    const total = conversationsState.value.reduce((sum, conversation) => {
+        return sum + Number(conversation?.unread_count || 0);
+    }, 0);
+    unreadCount.value = total;
+};
+
 const { poll, pause, resume } = useMessagePolling({
     pollUrl: '/account/messages/poll',
     params: pollParams,
@@ -314,6 +344,7 @@ const markRead = async (conversationId) => {
                 ? { ...conversation, unread_count: 0 }
                 : conversation
         ));
+        refreshUnreadCount();
     } finally {
         isMarkingRead.value = false;
     }
@@ -589,13 +620,13 @@ const deleteMessage = async (messageId) => {
                     <Breadcrumbs :items="breadcrumbs" />
                     <h1 class="text-3xl font-semibold text-slate-900">Сообщения</h1>
 
-                    <div class="mt-6 grid gap-4 lg:grid-cols-[280px_1fr]">
-                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div class="mt-6 grid gap-4 lg:grid-cols-[280px_1fr] lg:h-[600px]">
+                        <div class="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-4">
                             <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Диалоги</p>
                             <div v-if="!conversationsState.length" class="mt-4 text-sm text-slate-500">
                                 Диалогов пока нет.
                             </div>
-                            <div v-else class="mt-4 space-y-3">
+                            <div v-else class="mt-4 flex-1 space-y-3 overflow-auto pr-2">
                                 <button
                                     v-for="conversation in sortedConversations"
                                     :key="conversation.id"
@@ -630,11 +661,11 @@ const deleteMessage = async (messageId) => {
                             </div>
                         </div>
 
-                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div class="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-4">
                             <div v-if="!activeConversationState" class="text-sm text-slate-500">
                                 Выберите диалог слева, чтобы увидеть переписку.
                             </div>
-                            <div v-else class="flex h-[600px] flex-col gap-4 overflow-hidden">
+                            <div v-else class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
                                 <div class="border-b border-slate-100 pb-3">
                                     <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Диалог</p>
                                     <p class="mt-1 text-lg font-semibold text-slate-900">
@@ -643,7 +674,7 @@ const deleteMessage = async (messageId) => {
                                 </div>
                                 <div
                                     ref="messagesContainer"
-                                    class="flex-1 space-y-3 overflow-y-auto pr-1"
+                                    class="min-h-0 flex-1 space-y-3 overflow-auto pr-1"
                                     @scroll="handleMessagesScroll"
                                 >
                                     <template v-if="isLoading">

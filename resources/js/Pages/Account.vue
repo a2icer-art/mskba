@@ -5,6 +5,7 @@ import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
+import { useMessageRealtime } from '../Composables/useMessageRealtime';
 
 const props = defineProps({
     appName: {
@@ -140,7 +141,30 @@ const nonEditableProfileItems = computed(() => {
         value: values[field],
     }));
 });
-const hasSidebar = computed(() => accountMenuItems.value.length > 0);
+const { unreadCount } = useMessageRealtime({
+    enabled: Boolean(props.user?.id),
+});
+
+const applyBadge = (item) => (item.key === 'messages'
+    ? {
+        ...item,
+        badge: unreadCount.value,
+    }
+    : item);
+
+const sidebarData = computed(() =>
+    accountMenuItems.value.map((item) => {
+        if (Array.isArray(item?.items)) {
+            return {
+                ...item,
+                items: item.items.map(applyBadge),
+            };
+        }
+        return applyBadge(item);
+    })
+);
+
+const hasSidebar = computed(() => sidebarData.value.length > 0);
 const logoutForm = useForm({});
 
 const formatDate = (value) => {
@@ -891,7 +915,7 @@ const logout = () => {
                 :is-authenticated="true"
                 :login-label="user?.login"
                 :sidebar-title="navigation?.title || 'Аккаунт'"
-                :sidebar-items="accountMenuItems"
+                :sidebar-items="sidebarData"
                 :sidebar-active-href="activeAccountHref"
             />
 
@@ -899,7 +923,7 @@ const logout = () => {
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation?.title || 'Аккаунт'"
-                    :data="accountMenuItems"
+                    :data="sidebarData"
                     :active-href="activeAccountHref"
                 />
 
