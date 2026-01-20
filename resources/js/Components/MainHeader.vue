@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import BrandLogo from './BrandLogo.vue';
 import MainHeaderNav from './MainHeaderNav.vue';
-import { useMessagePolling } from '../Composables/useMessagePolling';
+import { useMessageRealtime } from '../Composables/useMessageRealtime';
 
 const props = defineProps({
     appName: {
@@ -63,10 +63,8 @@ const closeMenu = () => {
     isMenuOpen.value = false;
     isSidebarOpen.value = false;
 };
-const { unreadCount } = useMessagePolling({
+const { unreadCount } = useMessageRealtime({
     enabled: props.isAuthenticated,
-    pollUrl: '/account/messages/poll',
-    params: { scope: 'counter' },
 });
 const unreadBadge = computed(() => {
     if (!props.isAuthenticated) {

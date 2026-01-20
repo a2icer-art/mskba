@@ -1,5 +1,5 @@
 # task_init_description
-Задача 1: перейти с polling на WebSocket для уведомлений и сообщений.
+Перевести уведомления и сообщения с polling на WebSocket.
 
 # task_short_description
-Перевести уведомления и сообщения с polling на WebSocket.
+Заменить polling сообщений и счетчиков уведомлений на WebSocket‑события.

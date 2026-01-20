@@ -6,6 +6,7 @@ import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
 import { useMessagePolling } from '../Composables/useMessagePolling';
+import { useMessageRealtime } from '../Composables/useMessageRealtime';
 
 const props = defineProps({
     appName: {
@@ -123,6 +124,7 @@ const pollParams = reactive({
     messages_after_id: props.messages?.length ? props.messages[props.messages.length - 1]?.id : '',
 });
 const isLoading = ref(false);
+const isMarkingRead = ref(false);
 
 const mergeMessages = (current, incoming, mode) => {
     const seen = new Set();
@@ -199,10 +201,76 @@ const handlePoll = (data) => {
     }
 };
 
-const { unreadCount, poll, pause, resume } = useMessagePolling({
+const upsertConversation = (incoming) => {
+    if (!incoming?.id) {
+        return;
+    }
+    const list = conversationsState.value;
+    const index = list.findIndex((item) => item.id === incoming.id);
+    if (index >= 0) {
+        conversationsState.value = list.map((item) => (
+            item.id === incoming.id ? { ...item, ...incoming } : item
+        ));
+        return;
+    }
+    conversationsState.value = [incoming, ...list];
+};
+
+const handleRealtimeEvent = (payload) => {
+    if (!payload?.event) {
+        return;
+    }
+    if (payload.event === 'messages.created') {
+        if (payload.conversation) {
+            upsertConversation(payload.conversation);
+        }
+        const activeId = activeConversationState.value?.id;
+        if (payload.conversation?.id && payload.conversation.id === activeId && payload.message) {
+            const shouldStickToBottom = messagesContainer.value
+                ? (messagesContainer.value.scrollHeight - messagesContainer.value.scrollTop - messagesContainer.value.clientHeight) < 40
+                : true;
+            messagesState.value = mergeMessages(messagesState.value, [payload.message], 'append');
+            pollParams.messages_after_id = payload.message?.id ?? pollParams.messages_after_id;
+            if (shouldStickToBottom) {
+                nextTick(() => {
+                    if (messagesContainer.value) {
+                        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+                    }
+                });
+            }
+            if (!payload.message.is_outgoing) {
+                markRead(activeId);
+            }
+        }
+        return;
+    }
+    if (payload.event === 'messages.read') {
+        if (payload.conversation) {
+            upsertConversation(payload.conversation);
+        }
+        const activeId = activeConversationState.value?.id;
+        if (payload.conversation_id && payload.conversation_id === activeId && payload.reader_id !== props.user?.id) {
+            messagesState.value = messagesState.value.map((message) => {
+                if (!message.is_outgoing || message.read_by_others_at) {
+                    return message;
+                }
+                return { ...message, read_by_others_at: payload.read_at };
+            });
+        }
+    }
+};
+
+const { unreadCount } = useMessageRealtime({
+    enabled: Boolean(props.user?.id),
+    onEvent: handleRealtimeEvent,
+});
+
+const { poll, pause, resume } = useMessagePolling({
     pollUrl: '/account/messages/poll',
     params: pollParams,
     onData: handlePoll,
+    autoStart: false,
+    intervalMs: 0,
 });
 
 const applyBadge = (item) => (item.key === 'messages'
@@ -228,19 +296,27 @@ const markRead = async (conversationId) => {
     if (!conversationId) {
         return;
     }
+    if (isMarkingRead.value) {
+        return;
+    }
+    isMarkingRead.value = true;
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    await fetch(`/account/messages/conversations/${conversationId}/read`, {
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            ...(token ? { 'X-CSRF-TOKEN': token } : {}),
-        },
-    });
-    conversationsState.value = conversationsState.value.map((conversation) => (
-        conversation.id === conversationId
-            ? { ...conversation, unread_count: 0 }
-            : conversation
-    ));
+    try {
+        await fetch(`/account/messages/conversations/${conversationId}/read`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+            },
+        });
+        conversationsState.value = conversationsState.value.map((conversation) => (
+            conversation.id === conversationId
+                ? { ...conversation, unread_count: 0 }
+                : conversation
+        ));
+    } finally {
+        isMarkingRead.value = false;
+    }
 };
 
 const openConversation = async (conversation) => {
@@ -454,7 +530,6 @@ const sendMessage = async () => {
                 || 'Не удалось отправить сообщение.';
             return;
         }
-        await poll({ conversation_id: conversationId });
     } catch (error) {
         messageError.value = 'Не удалось отправить сообщение.';
         messageBody.value = draft;

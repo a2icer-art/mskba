@@ -5,6 +5,7 @@ namespace App\Domain\Messages\Services;
 use App\Domain\Messages\Models\Conversation;
 use App\Domain\Messages\Models\Message;
 use App\Domain\Messages\Models\MessageReceipt;
+use App\Domain\Messages\Services\MessageRealtimeService;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +42,7 @@ class MessageService
         }
 
         $conversation->update(['updated_at' => $now]);
+        app(MessageRealtimeService::class)->broadcastMessage($message);
 
         return $message;
     }
@@ -78,6 +80,7 @@ class MessageService
         }
 
         $conversation->update(['updated_at' => $now]);
+        app(MessageRealtimeService::class)->broadcastMessage($message);
 
         return $message;
     }

@@ -11,11 +11,11 @@ use App\Domain\Messages\Services\ConversationService;
 use App\Domain\Messages\Services\MessageCountersService;
 use App\Domain\Messages\Services\MessagePrivacyService;
 use App\Domain\Messages\Services\MessageQueryService;
+use App\Domain\Messages\Services\MessageRealtimeService;
 use App\Domain\Messages\Services\MessageService;
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Events\Models\EventBooking;
-use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
@@ -62,7 +62,10 @@ class AccountMessagesController extends Controller
         $messages = $messagesPayload['messages'];
         $messagesMeta = $messagesPayload['meta'];
         if ($conversation) {
-            $messagesService->markConversationRead($conversation, $user);
+            $updated = $messagesService->markConversationRead($conversation, $user);
+            if ($updated > 0) {
+                app(MessageRealtimeService::class)->broadcastConversationRead($conversation, $user);
+            }
         }
 
         $participantRoles = app(\App\Domain\Users\Services\AccountPageService::class)->getParticipantRoles($user);
@@ -165,8 +168,6 @@ class AccountMessagesController extends Controller
         if (!$user) {
             abort(403);
         }
-
-        app(BookingPaymentExpiryService::class)->runIfDue();
 
         $messagesService = app(MessageQueryService::class);
         $countersService = app(MessageCountersService::class);
@@ -334,7 +335,10 @@ class AccountMessagesController extends Controller
             abort(403);
         }
 
-        $service->markConversationRead($conversation, $user);
+        $updated = $service->markConversationRead($conversation, $user);
+        if ($updated > 0) {
+            app(MessageRealtimeService::class)->broadcastConversationRead($conversation, $user);
+        }
 
         return response()->json([
             'success' => true,

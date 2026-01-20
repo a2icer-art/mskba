@@ -6,6 +6,8 @@ const unreadCount = ref(0);
 export const useMessagePolling = (options = {}) => {
     const page = usePage();
     const intervalMs = options.intervalMs ?? 5000;
+    const autoStart = options.autoStart ?? true;
+    const hasTimer = Number.isFinite(Number(intervalMs)) && Number(intervalMs) > 0;
     const pollUrl = options.pollUrl ?? '/account/messages/poll';
     const params = options.params ?? {};
     const enabled = options.enabled ?? true;
@@ -48,6 +50,9 @@ export const useMessagePolling = (options = {}) => {
         if (timer) {
             return;
         }
+        if (!hasTimer) {
+            return;
+        }
         timer = setInterval(poll, intervalMs);
     };
 
@@ -74,7 +79,7 @@ export const useMessagePolling = (options = {}) => {
 
     onMounted(() => {
         syncFromPage();
-        if (!isEnabled.value) {
+        if (!isEnabled.value || !autoStart) {
             return;
         }
         resume({ pollNow: true });

@@ -5,7 +5,7 @@ import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
-import { useMessagePolling } from '../Composables/useMessagePolling';
+import { useMessageRealtime } from '../Composables/useMessageRealtime';
 
 const props = defineProps({
     appName: {
@@ -68,10 +68,7 @@ watch(
     }
 );
 
-const { unreadCount } = useMessagePolling({
-    pollUrl: '/account/messages/poll',
-    params: { scope: 'counter' },
-});
+const { unreadCount } = useMessageRealtime({});
 
 const applyBadge = (item) => (item.key === 'messages'
     ? {
