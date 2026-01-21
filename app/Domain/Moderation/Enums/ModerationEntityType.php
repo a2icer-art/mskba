@@ -7,4 +7,5 @@ enum ModerationEntityType: string
     case User = 'user';
     case Venue = 'venue';
     case Event = 'event';
+    case VenueContract = 'venue_contract';
 }

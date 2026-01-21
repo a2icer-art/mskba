@@ -6,8 +6,7 @@ enum ContractType: string
 {
     case Creator = 'creator';
     case Owner = 'owner';
-    case Manager = 'manager';
-    case Controller = 'controller';
+    case Supervisor = 'supervisor';
     case Employee = 'employee';
 
     public function label(): string
@@ -15,8 +14,7 @@ enum ContractType: string
         return match ($this) {
             self::Creator => 'Создатель',
             self::Owner => 'Владелец',
-            self::Manager => 'Менеджер',
-            self::Controller => 'Контроллер',
+            self::Supervisor => 'Супервайзер',
             self::Employee => 'Сотрудник',
         };
     }
@@ -26,8 +24,8 @@ enum ContractType: string
         return match ($this) {
             self::Creator => 50,
             self::Owner => 40,
-            self::Manager => 30,
-            self::Controller, self::Employee => 20,
+            self::Supervisor => 30,
+            self::Employee => 20,
         };
     }
 }

@@ -4,6 +4,8 @@ namespace App\Presentation\Venues;
 
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Models\Contract;
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
+use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Venues\Models\Venue;
@@ -50,12 +52,15 @@ class VenueSidebarPresenter extends BasePresenter
         ];
 
         $canViewContracts = $this->canViewContracts($user, $venue);
+        $canRequestContracts = $this->canRequestContracts($user, $venue);
+        $showContracts = $canViewContracts || $canRequestContracts;
         $canManageBookings = $this->canManageBookings($user, $venue);
         $canManageSettings = $this->canManageSettings($user, $venue);
+        $canViewSupervisor = $this->canViewSupervisor($user, $venue);
 
-        if ($canViewContracts || $canManageBookings || $canManageSettings) {
+        if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor) {
             $adminItems = [];
-            if ($canViewContracts) {
+            if ($showContracts) {
                 $adminItems[] = [
                     'label' => 'Контракты',
                     'href' => "/venues/{$typeSlug}/{$venue->alias}/contracts",
@@ -65,6 +70,12 @@ class VenueSidebarPresenter extends BasePresenter
                 $adminItems[] = [
                     'label' => 'Бронирование',
                     'href' => "/venues/{$typeSlug}/{$venue->alias}/bookings",
+                ];
+            }
+            if ($canViewSupervisor) {
+                $adminItems[] = [
+                    'label' => 'Супервайзер',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/supervisor",
                 ];
             }
             if ($canManageSettings) {
@@ -115,6 +126,27 @@ class VenueSidebarPresenter extends BasePresenter
             ->exists();
     }
 
+    private function canRequestContracts(?User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return ParticipantRoleAssignment::query()
+            ->where('user_id', $user->id)
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+            ->whereHas('role', fn ($query) => $query->where('alias', 'venue-admin'))
+            ->where(function ($query) use ($venue) {
+                $query->whereNull('context_type')
+                    ->whereNull('context_id')
+                    ->orWhere(function ($subQuery) use ($venue) {
+                        $subQuery->where('context_type', $venue->getMorphClass())
+                            ->where('context_id', $venue->getKey());
+                    });
+            })
+            ->exists();
+    }
+
     private function canManageBookings(?User $user, Venue $venue): bool
     {
         if (!$user) {
@@ -144,5 +176,17 @@ class VenueSidebarPresenter extends BasePresenter
         $checker = app(PermissionChecker::class);
 
         return $checker->can($user, PermissionCode::VenueUpdate, $venue);
+    }
+
+    private function canViewSupervisor(?User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
+            || $checker->can($user, PermissionCode::VenueSupervisorManage, $venue);
     }
 }

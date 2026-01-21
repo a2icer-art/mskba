@@ -108,7 +108,7 @@
 
 - `Contract` (app/Domain/Contracts/Models/Contract)
   - Контракт пользователя на конкретную сущность (`entity_type` + `entity_id`).
-  - Поля: name, contract_type (creator/owner/manager/controller/employee), starts_at, ends_at, status (active/inactive), comment.
+  - Поля: name, contract_type (creator/owner/supervisor/employee), starts_at, ends_at, status (active/inactive), comment.
   - Связи: user (1:N), permissions (M:N через contract_permissions).
 - Контрактные права используются для действий над конкретными сущностями.
   Глобальные права остаются в `roles` и `user_permissions`.
@@ -147,11 +147,11 @@
   передаваться; при отсутствии они вычисляются внутри соответствующего слоя.
 ## Контракты: иерархия и делегирование
 
-- Иерархия типов (сверху вниз): admin > creator > owner > manager > controller/employee (один уровень).
+- Иерархия типов (сверху вниз): admin > creator > owner > supervisor > employee.
 - Тип контракта можно назначать только уровнем ниже.
-- Активный owner может быть только один на сущность.
-- Назначать/аннулировать контракты могут только admin/creator/owner/manager (manager — только ниже уровнем).
+- Активный owner и supervisor могут быть только по одному на сущность.
+- Назначать/аннулировать контракты могут только admin/creator/owner/supervisor (supervisor — только ниже уровнем).
 - Аннулировать можно только контракты, созданные самим назначателем (исключение: admin).
 - Права, назначаемые в контракте, фильтруются по правам назначателя.
-- Права contract.assign/contract.revoke разрешено назначать только при выдаче контрактов owner/manager и только admin/creator/owner.
+- Права contract.assign/contract.revoke разрешено назначать только при выдаче контрактов employee и только admin/creator/owner/supervisor.
 - Контракт хранит created_by для контроля делегирования и аннулирования.

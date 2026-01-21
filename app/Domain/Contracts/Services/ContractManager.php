@@ -30,8 +30,8 @@ class ContractManager
             return new ContractResult(false, null, 'Недостаточно прав для назначения контракта.');
         }
 
-        if ($type === ContractType::Creator) {
-            return new ContractResult(false, null, 'Нельзя назначать контракт типа "Создатель".');
+        if (in_array($type, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true)) {
+            return new ContractResult(false, null, 'Недоступный тип контракта для назначения.');
         }
 
         if (!$this->canAssignType($actor, $entity, $type)) {
@@ -155,7 +155,7 @@ class ContractManager
 
         $actorType = $this->resolveActorContractType($actor, $entity);
 
-        return in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Manager], true);
+        return in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true);
     }
 
     public function canRevoke(User $actor, Contract $contract, Model $entity): bool
@@ -179,7 +179,7 @@ class ContractManager
             return false;
         }
 
-        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Manager], true)) {
+        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true)) {
             return false;
         }
 
@@ -207,7 +207,7 @@ class ContractManager
             return false;
         }
 
-        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Manager], true)) {
+        if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true)) {
             return false;
         }
 
@@ -220,7 +220,14 @@ class ContractManager
             return [];
         }
 
-        $types = array_filter(ContractType::cases(), static fn (ContractType $type) => $type !== ContractType::Creator);
+        $types = array_filter(
+            ContractType::cases(),
+            static fn (ContractType $type) => !in_array(
+                $type,
+                [ContractType::Creator, ContractType::Owner, ContractType::Supervisor],
+                true
+            )
+        );
 
         if ($this->isAdmin($actor)) {
             return array_values($types);
@@ -280,7 +287,7 @@ class ContractManager
 
     public function canGrantContractAssign(User $actor, Model $entity, ContractType $targetType): bool
     {
-        if (!in_array($targetType, [ContractType::Owner, ContractType::Manager], true)) {
+        if ($targetType !== ContractType::Employee) {
             return false;
         }
 
@@ -290,16 +297,12 @@ class ContractManager
 
         $actorType = $this->resolveActorContractType($actor, $entity);
 
-        if ($targetType === ContractType::Owner) {
-            return $actorType === ContractType::Creator;
-        }
-
-        return in_array($actorType, [ContractType::Creator, ContractType::Owner], true);
+        return in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true);
     }
 
     public function canGrantContractRevoke(User $actor, Model $entity, ContractType $targetType): bool
     {
-        if (!in_array($targetType, [ContractType::Owner, ContractType::Manager], true)) {
+        if ($targetType !== ContractType::Employee) {
             return false;
         }
 
@@ -309,11 +312,7 @@ class ContractManager
 
         $actorType = $this->resolveActorContractType($actor, $entity);
 
-        if ($targetType === ContractType::Owner) {
-            return $actorType === ContractType::Creator;
-        }
-
-        return in_array($actorType, [ContractType::Creator, ContractType::Owner], true);
+        return in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true);
     }
 
     private function shouldAutoGrantContractAssign(User $actor, Model $entity, ContractType $targetType): bool

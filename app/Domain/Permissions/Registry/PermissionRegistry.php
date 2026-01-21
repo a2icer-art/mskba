@@ -114,6 +114,18 @@ class PermissionRegistry
                 'target_model' => Venue::class,
             ],
             [
+                'code' => PermissionCode::VenueSupervisorView,
+                'label' => 'Просмотр супервайзинга площадки',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
+                'code' => PermissionCode::VenueSupervisorManage,
+                'label' => 'Настройка супервайзинга площадки',
+                'scope' => PermissionScope::Resource,
+                'target_model' => Venue::class,
+            ],
+            [
                 'code' => PermissionCode::ContractAssign,
                 'label' => 'Назначение контрактов',
                 'scope' => PermissionScope::Resource,

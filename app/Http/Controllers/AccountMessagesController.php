@@ -16,6 +16,7 @@ use App\Domain\Messages\Services\MessageService;
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Presentation\Breadcrumbs\AccountBreadcrumbsPresenter;
 use App\Presentation\Navigation\AccountNavigationPresenter;
@@ -514,6 +515,39 @@ class AccountMessagesController extends Controller
 
     private function resolveSystemContacts(Conversation $conversation, User $user): array
     {
+        if ($conversation->context_type === ModerationRequest::class && $conversation->context_id) {
+            $request = ModerationRequest::query()
+                ->whereKey($conversation->context_id)
+                ->with(['submitter:id,login', 'reviewer:id,login'])
+                ->first();
+
+            if (!$request) {
+                return [];
+            }
+
+            $submitter = $request->submitter;
+            $reviewer = $request->reviewer;
+            $contacts = [];
+
+            if ($submitter && $submitter->id !== $user->id) {
+                $contacts[] = [
+                    'id' => $submitter->id,
+                    'login' => $submitter->login,
+                    'role' => 'Заявитель',
+                ];
+            }
+
+            if ($reviewer && $reviewer->id !== $user->id) {
+                $contacts[] = [
+                    'id' => $reviewer->id,
+                    'login' => $reviewer->login,
+                    'role' => 'Модератор',
+                ];
+            }
+
+            return $contacts;
+        }
+
         if ($conversation->context_type !== EventBooking::class || !$conversation->context_id) {
             return [];
         }

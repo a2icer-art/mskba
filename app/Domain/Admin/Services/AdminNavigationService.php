@@ -31,6 +31,10 @@ class AdminNavigationService
                 'label' => 'Площадки',
                 'href' => '/admin/venues-moderation',
             ];
+            $moderationItems[] = [
+                'label' => 'Контракты',
+                'href' => '/admin/contracts-moderation',
+            ];
         }
 
         if ($this->permissionChecker->can($user, PermissionCode::LogsView)) {

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -60,6 +61,34 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             return redirect()->guest(route('login'));
+        });
+
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            $userId = $request->user()?->id;
+            $headers = $request->headers;
+            $cookies = $request->cookies;
+
+            logger()->warning('CSRF token mismatch.', [
+                'method' => $request->method(),
+                'url' => $request->fullUrl(),
+                'path' => $request->path(),
+                'ip' => $request->ip(),
+                'user_id' => $userId,
+                'referer' => $headers->get('referer'),
+                'origin' => $headers->get('origin'),
+                'user_agent' => $headers->get('user-agent'),
+                'session_id' => $request->session()?->getId(),
+                'has_x_csrf_token' => $headers->has('x-csrf-token'),
+                'has_x_xsrf_token' => $headers->has('x-xsrf-token'),
+                'has_x_requested_with' => $headers->has('x-requested-with'),
+                'has_xsrf_cookie' => $cookies->has('XSRF-TOKEN'),
+                'has_session_cookie' => $cookies->has(config('session.cookie')),
+                'xsrf_cookie_length' => $cookies->has('XSRF-TOKEN')
+                    ? strlen((string) $cookies->get('XSRF-TOKEN'))
+                    : 0,
+            ]);
+
+            return null;
         });
 
         $exceptions->render(function (Throwable $e, Request $request) use ($renderErrorPage) {

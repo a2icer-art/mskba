@@ -109,14 +109,6 @@ watch(
 );
 watch(
     () => activeConversationState.value?.id,
-    () => {
-        selectedContact.value = null;
-        directMessageBody.value = '';
-        directMessageError.value = '';
-    }
-);
-watch(
-    () => activeConversationState.value?.id,
     (value) => {
         if (!value) {
             return;
@@ -386,16 +378,17 @@ const formatDate = (value) => {
 
 const contactOptions = computed(() => {
     const contacts = (activeConversationState.value?.contacts || []).filter((item) => item.id !== props.user?.id);
-    if (!contacts.length) {
-        return [];
-    }
     const primary = messagesState.value?.[messagesState.value.length - 1]?.contact_user;
+    if (!contacts.length) {
+        return primary?.id && primary.id !== props.user?.id ? [primary] : [];
+    }
     if (!primary?.id) {
         return contacts;
     }
     const ordered = [
         ...contacts.filter((item) => item.id === primary.id),
         ...contacts.filter((item) => item.id !== primary.id),
+        ...(primary.id !== props.user?.id && !contacts.some((item) => item.id === primary.id) ? [primary] : []),
     ];
     const unique = [];
     const seen = new Set();
@@ -451,36 +444,13 @@ const handleMessagesScroll = () => {
     }
 };
 
-const selectedContact = ref(null);
-const directMessageBody = ref('');
-const directMessageError = ref('');
-const isSendingDirect = ref(false);
-
-const selectContact = (contact) => {
-    selectedContact.value = contact;
-    directMessageBody.value = '';
-    directMessageError.value = '';
-};
-
-const sendDirectMessage = async () => {
-    const contact = selectedContact.value;
+const openDirectConversation = async (contact) => {
     if (!contact?.id) {
         return;
     }
-    if (!directMessageBody.value) {
-        return;
-    }
-    if (isSendingDirect.value) {
-        return;
-    }
-
-    directMessageError.value = '';
-    isSendingDirect.value = true;
-    const draft = directMessageBody.value;
-    directMessageBody.value = '';
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     try {
-        const response = await fetch('/account/messages/direct', {
+        const response = await fetch('/account/messages/conversations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -488,41 +458,37 @@ const sendDirectMessage = async () => {
                 'X-Requested-With': 'XMLHttpRequest',
                 ...(token ? { 'X-CSRF-TOKEN': token } : {}),
             },
-            body: JSON.stringify({ user_id: contact.id, body: draft }),
+            body: JSON.stringify({ user_id: contact.id }),
         });
         if (!response.ok) {
-            const data = await response.json();
-            directMessageError.value = data?.errors?.body?.[0]
-                || data?.errors?.recipient_id?.[0]
-                || data?.errors?.user_id?.[0]
-                || data?.message
-                || 'Не удалось отправить сообщение.';
             return;
         }
         const data = await response.json();
         const newId = data?.conversation_id;
-        selectedContact.value = null;
-        await poll({ include_conversations: 1 });
         if (newId) {
-            pollParams.conversation_id = newId;
-            await poll({ conversation_id: newId, include_conversations: 1 });
-            const target = conversationsState.value.find((item) => item.id === newId);
-            if (target) {
-                activeConversationState.value = target;
+            let target = conversationsState.value.find((item) => item.id === newId);
+            if (!target) {
+                target = {
+                    id: newId,
+                    type: 'direct',
+                    title: contact.login,
+                    other_user: {
+                        id: contact.id,
+                        login: contact.login,
+                    },
+                    last_message: null,
+                    unread_count: 0,
+                    updated_at: new Date().toISOString(),
+                };
+                conversationsState.value = [target, ...conversationsState.value];
             }
+            selectedConversationId.value = newId;
+            activeConversationState.value = target;
+            openConversation(target);
+            poll({ include_conversations: 1 });
         }
     } catch (error) {
-        directMessageError.value = 'Не удалось отправить сообщение.';
-        directMessageBody.value = draft;
-    } finally {
-        isSendingDirect.value = false;
-    }
-};
-
-const handleDirectKeydown = (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        event.preventDefault();
-        sendDirectMessage();
+        // Ошибку проглатываем, чтобы не ломать системный диалог.
     }
 };
 
@@ -751,7 +717,7 @@ const deleteMessage = async (messageId) => {
                                             :key="contact.id"
                                             type="button"
                                             class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900"
-                                            @click="selectContact(contact)"
+                                            @click="openDirectConversation(contact)"
                                         >
                                             <span class="block text-sm">{{ contact.login }}</span>
                                             <span v-if="contact.role" class="mt-1 block text-[10px] uppercase tracking-[0.12em] text-slate-500">
@@ -762,30 +728,6 @@ const deleteMessage = async (messageId) => {
                                     <p v-if="!contactOptions.length" class="text-xs text-slate-500">
                                         Нет доступных контактов для ответа.
                                     </p>
-                                    <div v-if="selectedContact" class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                                        <p class="text-xs font-semibold text-slate-500">
-                                            Сообщение для {{ selectedContact.login }}
-                                        </p>
-                                        <textarea
-                                            v-model="directMessageBody"
-                                            class="mt-2 min-h-[96px] w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                                            placeholder="Введите сообщение (Ctrl+Enter)"
-                                            @keydown="handleDirectKeydown"
-                                        ></textarea>
-                                        <div v-if="directMessageError" class="mt-2 text-xs text-rose-700">
-                                            {{ directMessageError }}
-                                        </div>
-                                        <div class="mt-3 flex justify-end">
-                                        <button
-                                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                                            type="button"
-                                            :disabled="!directMessageBody || isSendingDirect"
-                                            @click="sendDirectMessage"
-                                        >
-                                            Отправить
-                                        </button>
-                                        </div>
-                                    </div>
                                 </div>
                                 <form v-else class="mt-auto space-y-2" @submit.prevent="sendMessage">
                                     <textarea

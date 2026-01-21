@@ -15,6 +15,7 @@ class ModerationRulesFactory
         return match ($entityType) {
             ModerationEntityType::User => app(UserModerationRules::class),
             ModerationEntityType::Venue => app(VenueModerationRules::class),
+            ModerationEntityType::VenueContract => app(EmptyModerationRules::class),
             default => app(EmptyModerationRules::class),
         };
     }

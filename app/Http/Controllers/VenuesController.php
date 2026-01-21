@@ -6,7 +6,11 @@ use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Enums\ContractType;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Contracts\Services\ContractManager;
+use App\Domain\Contracts\Services\ContractNotificationService;
+use App\Domain\Contracts\UseCases\SubmitVenueContractModerationRequest;
 use App\Domain\Moderation\Enums\ModerationEntityType;
+use App\Domain\Moderation\Enums\ModerationStatus;
+use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Moderation\UseCases\SubmitModerationRequest;
 use App\Domain\Permissions\Enums\PermissionScope;
 use App\Domain\Permissions\Enums\PermissionCode;
@@ -35,6 +39,8 @@ use App\Domain\Venues\Services\VenueCatalogService;
 use App\Domain\Venues\Services\VenueAboutDataBuilder;
 use App\Domain\Venues\UseCases\CreateVenue;
 use App\Domain\Venues\UseCases\UpdateVenue;
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
+use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Users\Enums\UserStatus;
 use App\Http\Requests\Venues\StoreVenueRequest;
 use App\Presentation\Breadcrumbs\VenueBreadcrumbsPresenter;
@@ -42,6 +48,7 @@ use App\Presentation\Navigation\VenueNavigationPresenter;
 use App\Presentation\Venues\MetroOptionsPresenter;
 use App\Presentation\Venues\VenueShowPresenter;
 use App\Presentation\Venues\VenueSidebarPresenter;
+use App\Support\DateFormatter;
 use App\Support\TimeValueNormalizer;
 use App\Presentation\Venues\VenueTypeOptionsPresenter;
 use Illuminate\Http\Request;
@@ -181,13 +188,18 @@ class VenuesController extends Controller
             ->firstOrFail();
         $venue->loadMissing(['venueType:id,name,plural_name,alias']);
 
-        if (!$this->canViewContracts($user, $venue)) {
+        $contractModeration = $this->resolveContractModerationState($user, $venue);
+        $canViewContracts = $this->canViewContracts($user, $venue);
+        $hasVenueAdminRole = $this->hasVenueAdminRole($user, $venue);
+        $canViewContractRequests = $hasVenueAdminRole || $this->canViewContractRequests($contractModeration);
+
+        if (!$canViewContracts && !$canViewContractRequests) {
             abort(403);
         }
 
         $checker = app(PermissionChecker::class);
-        $canAssignContracts = $manager->canAssign($user, $venue);
-        $assignableTypes = $manager->getAssignableTypes($user, $venue);
+        $canAssignContracts = $canViewContracts && $manager->canAssign($user, $venue);
+        $assignableTypes = $canViewContracts ? $manager->getAssignableTypes($user, $venue) : [];
         $assignableTypeValues = array_map(static fn (ContractType $contractType) => $contractType->value, $assignableTypes);
 
         $navigation = app(VenueSidebarPresenter::class)->present([
@@ -205,108 +217,112 @@ class VenuesController extends Controller
         $this->ensureContractPermissions();
 
         $isAdmin = $user->roles()->where('alias', 'admin')->exists();
-        $availablePermissions = Permission::query()
-            ->where('scope', PermissionScope::Resource)
-            ->where('target_model', Venue::class)
-            ->orderBy('label')
-            ->get(['code', 'label'])
-            ->map(function (Permission $permission) use ($checker, $isAdmin, $user, $venue, $manager, $assignableTypes, $assignableTypeValues) {
-                $code = $permission->code;
+        $availablePermissions = $canViewContracts
+            ? Permission::query()
+                ->where('scope', PermissionScope::Resource)
+                ->where('target_model', Venue::class)
+                ->orderBy('label')
+                ->get(['code', 'label'])
+                ->map(function (Permission $permission) use ($checker, $isAdmin, $user, $venue, $manager, $assignableTypes, $assignableTypeValues) {
+                    $code = $permission->code;
 
-                if (!$isAdmin && !$checker->can($user, $code, $venue)) {
-                    return null;
-                }
+                    if (!$isAdmin && !$checker->can($user, $code, $venue)) {
+                        return null;
+                    }
 
-                $allowedTypes = $assignableTypes;
+                    $allowedTypes = $assignableTypes;
 
-                if ($code === PermissionCode::ContractAssign->value) {
-                    $allowedTypes = array_filter(
-                        $assignableTypes,
-                        fn (ContractType $contractType) => $manager->canGrantContractAssign($user, $venue, $contractType)
-                    );
-                }
+                    if ($code === PermissionCode::ContractAssign->value) {
+                        $allowedTypes = array_filter(
+                            $assignableTypes,
+                            fn (ContractType $contractType) => $manager->canGrantContractAssign($user, $venue, $contractType)
+                        );
+                    }
 
-                if ($code === PermissionCode::ContractRevoke->value) {
-                    $allowedTypes = array_filter(
-                        $assignableTypes,
-                        fn (ContractType $contractType) => $manager->canGrantContractRevoke($user, $venue, $contractType)
-                    );
-                }
+                    if ($code === PermissionCode::ContractRevoke->value) {
+                        $allowedTypes = array_filter(
+                            $assignableTypes,
+                            fn (ContractType $contractType) => $manager->canGrantContractRevoke($user, $venue, $contractType)
+                        );
+                    }
 
-                if ($allowedTypes === []) {
-                    return null;
-                }
+                    if ($allowedTypes === []) {
+                        return null;
+                    }
 
-                return [
-                    'code' => $code,
-                    'label' => $permission->label ?: $permission->code,
-                    'allowed_types' => $allowedTypes === $assignableTypes
-                        ? $assignableTypeValues
-                        : array_map(static fn (ContractType $contractType) => $contractType->value, $allowedTypes),
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+                    return [
+                        'code' => $code,
+                        'label' => $permission->label ?: $permission->code,
+                        'allowed_types' => $allowedTypes === $assignableTypes
+                            ? $assignableTypeValues
+                            : array_map(static fn (ContractType $contractType) => $contractType->value, $allowedTypes),
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all()
+            : [];
 
         $currentUserId = $user?->id;
-        $contracts = Contract::query()
-            ->where('entity_type', $venue->getMorphClass())
-            ->where('entity_id', $venue->getKey())
-            ->with(['user:id,login', 'permissions:id,code,label'])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId): array {
-                $contractUserId = $contract->user?->id;
+        $contracts = $canViewContracts
+            ? Contract::query()
+                ->where('entity_type', $venue->getMorphClass())
+                ->where('entity_id', $venue->getKey())
+                ->with(['user:id,login', 'permissions:id,code,label'])
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId): array {
+                    $contractUserId = $contract->user?->id;
 
-                return [
-                    'id' => $contract->id,
-                    'user_id' => $contractUserId,
-                    'name' => $contract->name,
-                    'contract_type' => $contract->contract_type?->value,
-                    'status' => $contract->status?->value,
-                    'starts_at' => $contract->starts_at?->toDateTimeString(),
-                    'ends_at' => $contract->ends_at?->toDateTimeString(),
-                    'comment' => $contract->comment,
-                    'created_by' => $contract->created_by,
-                    'created_at' => $contract->created_at?->timestamp,
-                    'is_current_user' => $currentUserId !== null && $contractUserId === $currentUserId,
-                    'can_revoke' => $manager->canRevoke($user, $contract, $venue),
-                    'can_update_permissions' => $manager->canUpdatePermissions($user, $contract, $venue),
-                    'user' => $contract->user
-                        ? [
-                            'id' => $contract->user->id,
-                            'login' => $contract->user->login,
-                        ]
-                        : null,
-                    'permissions' => $contract->permissions
-                        ->filter(static fn ($permission) => (bool) $permission->pivot?->is_active)
-                        ->map(static fn ($permission) => [
-                            'code' => $permission->code,
-                            'label' => $permission->label ?: $permission->code,
-                        ])
-                        ->all(),
-                ];
-            })
-            ->sortBy(function (array $contract) use ($currentUserId): array {
-                $type = $contract['contract_type'] ?? null;
+                    return [
+                        'id' => $contract->id,
+                        'user_id' => $contractUserId,
+                        'name' => $contract->name,
+                        'contract_type' => $contract->contract_type?->value,
+                        'status' => $contract->status?->value,
+                        'starts_at' => $contract->starts_at?->toDateTimeString(),
+                        'ends_at' => $contract->ends_at?->toDateTimeString(),
+                        'comment' => $contract->comment,
+                        'created_by' => $contract->created_by,
+                        'created_at' => $contract->created_at?->timestamp,
+                        'is_current_user' => $currentUserId !== null && $contractUserId === $currentUserId,
+                        'can_revoke' => $manager->canRevoke($user, $contract, $venue),
+                        'can_update_permissions' => $manager->canUpdatePermissions($user, $contract, $venue),
+                        'user' => $contract->user
+                            ? [
+                                'id' => $contract->user->id,
+                                'login' => $contract->user->login,
+                            ]
+                            : null,
+                        'permissions' => $contract->permissions
+                            ->filter(static fn ($permission) => (bool) $permission->pivot?->is_active)
+                            ->map(static fn ($permission) => [
+                                'code' => $permission->code,
+                                'label' => $permission->label ?: $permission->code,
+                            ])
+                            ->all(),
+                    ];
+                })
+                ->sortBy(function (array $contract) use ($currentUserId): array {
+                    $type = $contract['contract_type'] ?? null;
 
-                if ($type === ContractType::Creator->value) {
-                    $group = 0;
-                } elseif ($type === ContractType::Owner->value) {
-                    $group = 1;
-                } elseif ($currentUserId && ($contract['user_id'] ?? null) === $currentUserId) {
-                    $group = 2;
-                } else {
-                    $group = 3;
-                }
+                    if ($type === ContractType::Creator->value) {
+                        $group = 0;
+                    } elseif ($type === ContractType::Owner->value) {
+                        $group = 1;
+                    } elseif ($currentUserId && ($contract['user_id'] ?? null) === $currentUserId) {
+                        $group = 2;
+                    } else {
+                        $group = 3;
+                    }
 
-                $createdAt = $contract['created_at'] ?? 0;
+                    $createdAt = $contract['created_at'] ?? 0;
 
-                return [$group, -$createdAt];
-            })
-            ->values()
-            ->all();
+                    return [$group, -$createdAt];
+                })
+                ->values()
+                ->all()
+            : [];
 
         return Inertia::render('VenueContracts', [
             'appName' => config('app.name'),
@@ -323,7 +339,9 @@ class VenuesController extends Controller
                     'label' => $contractType->label(),
                 ])
                 ->all(),
+            'contractModeration' => $contractModeration,
             'canAssignContracts' => $canAssignContracts,
+            'canViewContracts' => $canViewContracts,
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/contracts",
             'activeTypeSlug' => $type,
@@ -626,6 +644,53 @@ class VenuesController extends Controller
             'canCancel' => $canCancel,
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/bookings",
+            'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function supervisor(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+        $venue->loadMissing(['venueType:id,name,plural_name,alias']);
+
+        $checker = app(PermissionChecker::class);
+        $canView = $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
+            || $checker->can($user, PermissionCode::VenueSupervisorManage, $venue);
+        if (!$canView) {
+            abort(403);
+        }
+
+        $navigation = app(VenueSidebarPresenter::class)->present([
+            'title' => 'Площадки',
+            'typeSlug' => $type,
+            'venue' => $venue,
+            'user' => $user,
+        ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Супервайзер',
+        ])['data'];
+
+        return Inertia::render('VenueSupervisor', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'canManage' => $checker->can($user, PermissionCode::VenueSupervisorManage, $venue),
+            'navigation' => $navigation,
+            'activeHref' => "/venues/{$type}/{$venue->alias}/supervisor",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
@@ -1496,6 +1561,8 @@ class VenuesController extends Controller
             return back()->withErrors(['contract' => $result->error ?? 'Не удалось обновить права контракта.']);
         }
 
+        app(ContractNotificationService::class)->notifyContractPermissionsUpdated($contract, $user);
+
         return back();
     }
 
@@ -1566,6 +1633,10 @@ class VenuesController extends Controller
             return back()->withErrors(['contract' => 'Пользователь не найден.']);
         }
 
+        if ($result->contract) {
+            app(ContractNotificationService::class)->notifyContractAssigned($result->contract, $user);
+        }
+
         return back()->with('notice', 'Контракт назначен.');
     }
 
@@ -1594,7 +1665,45 @@ class VenuesController extends Controller
             return back()->withErrors(['contract' => 'Пользователь не найден.']);
         }
 
+        app(ContractNotificationService::class)->notifyContractRevoked($contract, $user);
+
         return back()->with('notice', 'Контракт аннулирован.');
+    }
+
+    public function submitContractModeration(
+        Request $request,
+        string $type,
+        Venue $venue,
+        SubmitVenueContractModerationRequest $useCase
+    ) {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'contract_type' => ['required', 'string', Rule::in([
+                ContractType::Owner->value,
+                ContractType::Supervisor->value,
+            ])],
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $contractType = ContractType::from($data['contract_type']);
+        $result = $useCase->execute($user, $venue, $contractType, $data['comment'] ?? null);
+
+        if (!$result->success) {
+            return back()->withErrors([
+                'contract' => implode("\n", $result->missingRequirements ?? ['Не удалось отправить заявку.']),
+            ]);
+        }
+
+        return back()->with('notice', 'Заявка отправлена на модерацию.');
     }
 
     private function canViewContracts(?\App\Models\User $user, Venue $venue): bool
@@ -1617,6 +1726,154 @@ class VenuesController extends Controller
             ->where('user_id', $user->id)
             ->where('entity_type', $venue->getMorphClass())
             ->where('entity_id', $venue->getKey())
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
+    }
+
+    private function canViewContractRequests(array $contractModeration): bool
+    {
+        foreach (['owner', 'supervisor'] as $type) {
+            $state = $contractModeration[$type] ?? [];
+            if (!empty($state['request'])) {
+                return true;
+            }
+            if (!empty($state['can_request'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolveContractModerationState(\App\Models\User $user, Venue $venue): array
+    {
+        return [
+            'owner' => $this->buildContractRequestState($user, $venue, ContractType::Owner),
+            'supervisor' => $this->buildContractRequestState($user, $venue, ContractType::Supervisor),
+        ];
+    }
+
+    private function buildContractRequestState(\App\Models\User $user, Venue $venue, ContractType $type): array
+    {
+        $request = $this->getContractModerationRequest($user, $venue, $type);
+        $hasActive = $this->hasActiveContractType($venue, $type);
+
+        $canRequest = true;
+        $reason = '';
+
+        if ($venue->status?->value !== VenueStatus::Confirmed->value) {
+            $canRequest = false;
+            $reason = 'Площадка должна быть подтверждена.';
+        }
+
+        if ($hasActive) {
+            $canRequest = false;
+            $reason = 'Для площадки уже есть активный контракт этого типа.';
+        }
+
+        if ($type === ContractType::Owner && !$this->hasVenueAdminRole($user, $venue)) {
+            $canRequest = false;
+            $reason = 'Нужна роль администратора площадки.';
+        }
+
+        if ($type === ContractType::Supervisor && $this->hasActiveUserContract($user, $venue)) {
+            $canRequest = false;
+            $reason = 'Нельзя стать супервайзером при наличии активного контракта.';
+        }
+
+        if ($request && $request->status === ModerationStatus::Pending) {
+            $canRequest = false;
+            $reason = 'Заявка уже находится на модерации.';
+        }
+
+        return [
+            'can_request' => $canRequest,
+            'reason' => $reason,
+            'has_active' => $hasActive,
+            'request' => $request ? $this->formatContractModerationRequest($request) : null,
+        ];
+    }
+
+    private function getContractModerationRequest(\App\Models\User $user, Venue $venue, ContractType $type): ?ModerationRequest
+    {
+        return ModerationRequest::query()
+            ->where('entity_type', ModerationEntityType::VenueContract->value)
+            ->where('entity_id', $venue->getKey())
+            ->where('submitted_by', $user->id)
+            ->where('meta->contract_type', $type->value)
+            ->orderByDesc('submitted_at')
+            ->first();
+    }
+
+    private function formatContractModerationRequest(ModerationRequest $request): array
+    {
+        $meta = $request->meta ?? [];
+
+        return [
+            'id' => $request->id,
+            'status' => $request->status?->value,
+            'submitted_at' => DateFormatter::dateTime($request->submitted_at),
+            'reviewed_at' => DateFormatter::dateTime($request->reviewed_at),
+            'reject_reason' => $request->reject_reason,
+            'comment' => $meta['comment'] ?? null,
+            'review_comment' => $meta['review_comment'] ?? null,
+            'contract_type' => $meta['contract_type'] ?? null,
+        ];
+    }
+
+    private function hasVenueAdminRole(\App\Models\User $user, Venue $venue): bool
+    {
+        return ParticipantRoleAssignment::query()
+            ->where('user_id', $user->id)
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+            ->whereHas('role', fn ($query) => $query->where('alias', 'venue-admin'))
+            ->where(function ($query) use ($venue) {
+                $query->whereNull('context_type')
+                    ->whereNull('context_id')
+                    ->orWhere(function ($subQuery) use ($venue) {
+                        $subQuery->where('context_type', $venue->getMorphClass())
+                            ->where('context_id', $venue->getKey());
+                    });
+            })
+            ->exists();
+    }
+
+    private function hasActiveUserContract(\App\Models\User $user, Venue $venue): bool
+    {
+        $now = now();
+
+        return Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
+    }
+
+    private function hasActiveContractType(Venue $venue, ContractType $type): bool
+    {
+        $now = now();
+
+        return Contract::query()
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', $type->value)
             ->where('status', ContractStatus::Active->value)
             ->where(function ($query) use ($now) {
                 $query->whereNull('starts_at')

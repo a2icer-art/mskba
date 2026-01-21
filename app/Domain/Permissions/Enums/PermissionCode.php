@@ -23,6 +23,8 @@ enum PermissionCode: string
     case VenueDeactivate = 'venue.deactivate';
     case VenueBlock = 'venue.block';
     case VenueMediaManage = 'venue.media.manage';
+    case VenueSupervisorView = 'venue.supervisor.view';
+    case VenueSupervisorManage = 'venue.supervisor.manage';
 
     case ArticleCreate = 'article.create';
     case ArticleUpdate = 'article.update';

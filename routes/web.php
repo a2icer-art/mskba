@@ -8,6 +8,7 @@ use App\Http\Controllers\AccountMessagesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
+use App\Http\Controllers\AdminContractsModerationController;
 use App\Http\Controllers\AdminLogsController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUsersModerationController;
@@ -123,6 +124,9 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/contracts', [VenuesController::class, 'assignContract'])
         ->middleware('auth')
         ->name('venues.contracts.assign');
+    Route::post('/{type}/{venue}/contracts/moderation', [VenuesController::class, 'submitContractModeration'])
+        ->middleware('auth')
+        ->name('venues.contracts.moderation');
     Route::patch('/{type}/{venue}/contracts/{contract}/permissions', [VenuesController::class, 'updateContractPermissions'])
         ->middleware('auth')
         ->name('venues.contracts.permissions.update');
@@ -144,6 +148,9 @@ Route::prefix('venues')->group(function () {
     Route::post('/{type}/{venue}/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
         ->middleware('auth')
         ->name('venues.bookings.cancel');
+    Route::get('/{type}/{venue}/supervisor', [VenuesController::class, 'supervisor'])
+        ->middleware('auth')
+        ->name('venues.supervisor');
     Route::get('/{type}/{venue}/settings', [VenuesController::class, 'settings'])
         ->middleware('auth')
         ->name('venues.settings');
@@ -204,6 +211,12 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
         ->name('admin.venues.moderation.block');
     Route::post('/venues-moderation/{moderationRequest}/unblock', [AdminVenuesModerationController::class, 'unblock'])
         ->name('admin.venues.moderation.unblock');
+    Route::get('/contracts-moderation', [AdminContractsModerationController::class, 'index'])
+        ->name('admin.contracts.moderation');
+    Route::post('/contracts-moderation/{moderationRequest}/approve', [AdminContractsModerationController::class, 'approve'])
+        ->name('admin.contracts.moderation.approve');
+    Route::post('/contracts-moderation/{moderationRequest}/reject', [AdminContractsModerationController::class, 'reject'])
+        ->name('admin.contracts.moderation.reject');
     Route::get('/logs', [AdminLogsController::class, 'index'])
         ->middleware('can:logs.view')
         ->name('admin.logs');
