@@ -4,6 +4,7 @@
 # Документация
 - `docs/project/processes.md` дополнен правилами автоотмены pending и предупреждений.
 - `docs/project/conventions.md` дополнен правилом обработки временных значений (`*_is_minutes`).
+- `docs/project/conventions.md` дополнен правилами системных уведомлений (`SystemNoticeStack`).
 
 # UI-сценарии проверки
 1. В настройках площадки задать:
