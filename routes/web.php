@@ -217,6 +217,8 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
         ->name('admin.contracts.moderation.approve');
     Route::post('/contracts-moderation/{moderationRequest}/reject', [AdminContractsModerationController::class, 'reject'])
         ->name('admin.contracts.moderation.reject');
+    Route::post('/contracts-moderation/{moderationRequest}/clarify', [AdminContractsModerationController::class, 'clarify'])
+        ->name('admin.contracts.moderation.clarify');
     Route::get('/logs', [AdminLogsController::class, 'index'])
         ->middleware('can:logs.view')
         ->name('admin.logs');

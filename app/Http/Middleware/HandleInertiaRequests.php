@@ -82,6 +82,11 @@ class HandleInertiaRequests extends Middleware
                 ->where('status', ParticipantRoleStatus::Confirmed)
                 ->orderBy('sort')
                 ->get(['id', 'name', 'alias']),
+            'flash' => [
+                'notice' => session('notice'),
+                'error' => session('error'),
+                'info' => session('info'),
+            ],
         ];
     }
 }

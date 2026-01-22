@@ -43,6 +43,7 @@ class AdminContractsModerationController extends Controller
         $allowedStatuses = [
             ModerationStatus::Pending->value,
             ModerationStatus::Approved->value,
+            ModerationStatus::Clarification->value,
             ModerationStatus::Rejected->value,
         ];
         $allowedSorts = ['submitted_at_desc', 'submitted_at_asc'];
@@ -136,6 +137,7 @@ class AdminContractsModerationController extends Controller
                 ['value' => '', 'label' => 'Все'],
                 ['value' => ModerationStatus::Pending->value, 'label' => 'На модерации'],
                 ['value' => ModerationStatus::Approved->value, 'label' => 'Подтверждено'],
+                ['value' => ModerationStatus::Clarification->value, 'label' => 'Требуются уточнения'],
                 ['value' => ModerationStatus::Rejected->value, 'label' => 'Отклонено'],
             ],
             'sortOptions' => [
@@ -161,7 +163,7 @@ class AdminContractsModerationController extends Controller
             abort(404);
         }
 
-        if ($moderationRequest->status !== ModerationStatus::Pending) {
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
             return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
         }
 
@@ -265,7 +267,7 @@ class AdminContractsModerationController extends Controller
             abort(404);
         }
 
-        if ($moderationRequest->status !== ModerationStatus::Pending) {
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
             return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
         }
 
@@ -283,6 +285,43 @@ class AdminContractsModerationController extends Controller
         app(ContractNotificationService::class)->notifyModerationStatus(
             $moderationRequest,
             ModerationStatus::Rejected,
+            $request->user()
+        );
+
+        return back();
+    }
+
+    public function clarify(Request $request, ModerationRequest $moderationRequest)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::VenueContract) {
+            abort(404);
+        }
+
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
+            return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
+        }
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $moderationRequest->update([
+            'status' => ModerationStatus::Clarification,
+            'reviewed_by' => $request->user()?->id,
+            'reviewed_at' => now(),
+            'reject_reason' => $data['reason'] ?? null,
+        ]);
+
+        app(ContractNotificationService::class)->notifyModerationStatus(
+            $moderationRequest,
+            ModerationStatus::Clarification,
             $request->user()
         );
 

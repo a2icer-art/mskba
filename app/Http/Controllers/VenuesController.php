@@ -1789,7 +1789,7 @@ class VenuesController extends Controller
             $reason = 'Нельзя стать супервайзером при наличии активного контракта.';
         }
 
-        if ($request && $request->status === ModerationStatus::Pending) {
+        if ($request && in_array($request->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
             $canRequest = false;
             $reason = 'Заявка уже находится на модерации.';
         }

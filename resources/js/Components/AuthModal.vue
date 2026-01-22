@@ -48,6 +48,7 @@ const registerForm = useForm({
 const loginError = computed(() => {
     return loginForm.errors.login || loginForm.errors.password || page.props.errors?.login;
 });
+const infoNotice = computed(() => page.props.flash?.info || '');
 
 const registerError = computed(() => {
     return (
@@ -130,6 +131,9 @@ const submitRegister = () => {
                     :class="{ loading: loginForm.processing }"
                     @submit.prevent="submitLogin"
                 >
+                    <div v-if="infoNotice" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        {{ infoNotice }}
+                    </div>
                     <div>
                         <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Логин</label>
                         <input
@@ -237,5 +241,4 @@ const submitRegister = () => {
         </div>
     </div>
 </template>
-
 

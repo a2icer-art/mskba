@@ -43,11 +43,15 @@ class ContractNotificationService
         $statusLabel = match ($status) {
             ModerationStatus::Pending => 'На модерации',
             ModerationStatus::Approved => 'Подтверждено',
+            ModerationStatus::Clarification => 'Требуются уточнения',
             ModerationStatus::Rejected => 'Отклонено',
         };
         $body = 'Статус: ' . $statusLabel;
-        if ($status === ModerationStatus::Rejected && $request->reject_reason) {
-            $body .= "\nПричина: " . $request->reject_reason;
+        if (
+            in_array($status, [ModerationStatus::Rejected, ModerationStatus::Clarification], true)
+            && $request->reject_reason
+        ) {
+            $body .= "\nКомментарий: " . $request->reject_reason;
         }
 
         $linkUrl = $this->resolveVenueContractsUrl($venue);

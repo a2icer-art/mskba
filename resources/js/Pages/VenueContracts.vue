@@ -139,6 +139,7 @@ const contractTypeLabels = {
 const requestStatusLabels = {
     pending: 'На рассмотрении',
     approved: 'Подтверждено',
+    clarification: 'Требуются уточнения',
     rejected: 'Отклонено',
 };
 const contractModeration = computed(() => props.contractModeration ?? {});
@@ -398,6 +399,7 @@ const formatDate = (value) => {
                                         :class="{
                                             'border-amber-200 bg-amber-50 text-amber-800': ownerRequest.status === 'pending',
                                             'border-emerald-200 bg-emerald-50 text-emerald-700': ownerRequest.status === 'approved',
+                                            'border-sky-200 bg-sky-50 text-sky-700': ownerRequest.status === 'clarification',
                                             'border-rose-200 bg-rose-50 text-rose-700': ownerRequest.status === 'rejected',
                                         }"
                                     >
@@ -408,8 +410,12 @@ const formatDate = (value) => {
                                     <div v-if="ownerRequest?.comment" class="mb-2">
                                         Комментарий: {{ ownerRequest.comment }}
                                     </div>
-                                    <div v-if="ownerRequest?.reject_reason" class="text-rose-700">
-                                        Отклонено: {{ ownerRequest.reject_reason }}
+                                    <div
+                                        v-if="ownerRequest?.reject_reason"
+                                        :class="ownerRequest.status === 'clarification' ? 'text-sky-700' : 'text-rose-700'"
+                                    >
+                                        {{ ownerRequest.status === 'clarification' ? 'Требуются уточнения' : 'Отклонено' }}:
+                                        {{ ownerRequest.reject_reason }}
                                     </div>
                                     <div v-else-if="!ownerRequest && !ownerRequestState.can_request" class="text-slate-500">
                                         {{ ownerRequestState.reason }}
@@ -443,6 +449,7 @@ const formatDate = (value) => {
                                         :class="{
                                             'border-amber-200 bg-amber-50 text-amber-800': supervisorRequest.status === 'pending',
                                             'border-emerald-200 bg-emerald-50 text-emerald-700': supervisorRequest.status === 'approved',
+                                            'border-sky-200 bg-sky-50 text-sky-700': supervisorRequest.status === 'clarification',
                                             'border-rose-200 bg-rose-50 text-rose-700': supervisorRequest.status === 'rejected',
                                         }"
                                     >
@@ -453,8 +460,12 @@ const formatDate = (value) => {
                                     <div v-if="supervisorRequest?.comment" class="mb-2">
                                         Комментарий: {{ supervisorRequest.comment }}
                                     </div>
-                                    <div v-if="supervisorRequest?.reject_reason" class="text-rose-700">
-                                        Отклонено: {{ supervisorRequest.reject_reason }}
+                                    <div
+                                        v-if="supervisorRequest?.reject_reason"
+                                        :class="supervisorRequest.status === 'clarification' ? 'text-sky-700' : 'text-rose-700'"
+                                    >
+                                        {{ supervisorRequest.status === 'clarification' ? 'Требуются уточнения' : 'Отклонено' }}:
+                                        {{ supervisorRequest.reject_reason }}
                                     </div>
                                     <div v-else-if="!supervisorRequest && !supervisorRequestState.can_request" class="text-slate-500">
                                         {{ supervisorRequestState.reason }}

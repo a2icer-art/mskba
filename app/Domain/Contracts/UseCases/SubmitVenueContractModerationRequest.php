@@ -51,7 +51,10 @@ class SubmitVenueContractModerationRequest
         $hasPending = ModerationRequest::query()
             ->where('entity_type', ModerationEntityType::VenueContract->value)
             ->where('entity_id', $venue->getKey())
-            ->where('status', ModerationStatus::Pending->value)
+            ->whereIn('status', [
+                ModerationStatus::Pending->value,
+                ModerationStatus::Clarification->value,
+            ])
             ->where('meta->contract_type', $type->value)
             ->exists();
 

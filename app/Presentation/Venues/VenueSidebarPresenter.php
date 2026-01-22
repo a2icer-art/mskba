@@ -8,6 +8,7 @@ use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 use App\Presentation\BasePresenter;
@@ -53,7 +54,8 @@ class VenueSidebarPresenter extends BasePresenter
 
         $canViewContracts = $this->canViewContracts($user, $venue);
         $canRequestContracts = $this->canRequestContracts($user, $venue);
-        $showContracts = $canViewContracts || $canRequestContracts;
+        $isConfirmedUser = $user?->status?->value === UserStatus::Confirmed->value;
+        $showContracts = $canViewContracts || $canRequestContracts || $isConfirmedUser;
         $canManageBookings = $this->canManageBookings($user, $venue);
         $canManageSettings = $this->canManageSettings($user, $venue);
         $canViewSupervisor = $this->canViewSupervisor($user, $venue);

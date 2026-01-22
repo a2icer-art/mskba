@@ -42,6 +42,41 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) use ($renderErrorPage) {
             $status = $e->getStatusCode();
+            if ($status === 419) {
+                $userId = $request->user()?->id;
+                $headers = $request->headers;
+                $cookies = $request->cookies;
+
+                logger()->warning('CSRF token mismatch.', [
+                    'method' => $request->method(),
+                    'url' => $request->fullUrl(),
+                    'path' => $request->path(),
+                    'ip' => $request->ip(),
+                    'user_id' => $userId,
+                    'referer' => $headers->get('referer'),
+                    'origin' => $headers->get('origin'),
+                    'user_agent' => $headers->get('user-agent'),
+                    'session_id' => $request->session()?->getId(),
+                    'has_x_csrf_token' => $headers->has('x-csrf-token'),
+                    'has_x_xsrf_token' => $headers->has('x-xsrf-token'),
+                    'has_x_requested_with' => $headers->has('x-requested-with'),
+                    'has_xsrf_cookie' => $cookies->has('XSRF-TOKEN'),
+                    'has_session_cookie' => $cookies->has(config('session.cookie')),
+                    'xsrf_cookie_length' => $cookies->has('XSRF-TOKEN')
+                        ? strlen((string) $cookies->get('XSRF-TOKEN'))
+                        : 0,
+                ]);
+
+                $target = $headers->get('referer') ?: url()->previous() ?: '/';
+                $message = 'Сессия обновилась, страница перезагружена.';
+                session()->flash('info', $message);
+
+                if ($request->header('X-Inertia')) {
+                    return Inertia::location($target);
+                }
+
+                return redirect()->to($target);
+            }
             if (!in_array($status, [403, 404, 500], true)) {
                 return null;
             }
