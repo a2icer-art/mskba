@@ -1,40 +1,103 @@
-name: Deploy
+name: Build and Deploy
 
 on:
   push:
-    branches: [ "dev", "main" ]
+    branches: [ dev, main ]
 
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: mskba-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy-dev:
-    if: github.ref_name == 'dev'
+  build:
+    name: Build frontend
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy DEV via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.VDS_HOST }}
-          username: ${{ secrets.VDS_USER }}
-          port: ${{ secrets.VDS_PORT }}
-          key: ${{ secrets.VDS_SSH_KEY }}
-          script: |
-            /usr/local/bin/deploy-mskba-dev
+          node-version: '20'
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build
+
+      - name: Pack public/build
+        run: |
+          if [ -d public/build ]; then
+            tar -czf public-build.tgz -C public build
+          else
+            echo "public/build not found" && exit 2
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-build
+          path: public-build.tgz
+
+  deploy-dev:
+    name: Deploy to dev
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/dev'
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: public-build
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.VDS_SSH_KEY }}
+
+      - name: Copy artifact to server
+        run: scp -o StrictHostKeyChecking=no public-build.tgz ${{ secrets.VDS_USER }}@${{ secrets.VDS_HOST }}:/tmp/public-build.tgz
+
+      - name: Run remote deploy and apply frontend
+        env:
+          DEPLOY_USER: ${{ secrets.VDS_USER }}
+          DEPLOY_HOST: ${{ secrets.VDS_HOST }}
+          DEPLOY_PATH: /var/www/mskba-dev
+        run: |
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n /usr/local/bin/deploy-mskba-dev || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n tar -xzf /tmp/public-build.tgz -C ${DEPLOY_PATH}/public || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n chown -R www-data:www-data ${DEPLOY_PATH}/public/build || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "rm -f /tmp/public-build.tgz || true"
 
   deploy-prod:
-    if: github.ref_name == 'main'
+    name: Deploy to prod
     runs-on: ubuntu-latest
-    environment:
-      name: production
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
-      - name: Deploy PROD via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          host: ${{ secrets.VDS_HOST }}
-          username: ${{ secrets.VDS_USER }}
-          port: ${{ secrets.VDS_PORT }}
-          key: ${{ secrets.VDS_SSH_KEY }}
-          script: |
-            /usr/local/bin/deploy-mskba-prod
+          name: public-build
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.VDS_SSH_KEY }}
+
+      - name: Copy artifact to server
+        run: scp -o StrictHostKeyChecking=no public-build.tgz ${{ secrets.VDS_USER }}@${{ secrets.VDS_HOST }}:/tmp/public-build.tgz
+
+      - name: Run remote deploy and apply frontend
+        env:
+          DEPLOY_USER: ${{ secrets.VDS_USER }}
+          DEPLOY_HOST: ${{ secrets.VDS_HOST }}
+          DEPLOY_PATH: /var/www/mskba-prod
+        run: |
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n /usr/local/bin/deploy-mskba-prod || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n tar -xzf /tmp/public-build.tgz -C ${DEPLOY_PATH}/public || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "sudo -n chown -R www-data:www-data ${DEPLOY_PATH}/public/build || true"
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "rm -f /tmp/public-build.tgz || true"

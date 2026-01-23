@@ -136,6 +136,16 @@ const formatMetroLabel = (metro) => {
     return metro.line_name ? `${metro.name} — ${metro.line_name}` : metro.name;
 };
 
+const normalizeMetroColor = (metro) => {
+    const raw = metro?.line_color ?? metro?.color ?? '';
+    const color = raw?.toString?.() ?? '';
+    if (!color) return null;
+    const trimmed = color.trim();
+    if (trimmed.startsWith('#')) return trimmed;
+    if (/^[0-9a-fA-F]{6}$/.test(trimmed)) return `#${trimmed}`;
+    return trimmed; // could be color name like 'red' or rgba()
+};
+
 const normalized = (value) => (value ?? '').toString().toLowerCase();
 
 const filtered = computed(() => {
@@ -519,9 +529,13 @@ const applyAddressSuggestion = (suggestion) => {
                                         <p v-if="hall.address" class="mt-2 text-sm text-slate-600">
                                             {{ hall.address }}
                                         </p>
-                                        <p v-if="hall.metro?.name" class="mt-1 text-xs text-slate-500">
-                                            Метро: {{ formatMetroLabel(hall.metro) }}
-                                        </p>
+                                        <div v-if="hall.metro" class="flex items-center gap-2 text-sm text-slate-700">
+                                            <span
+                                                class="h-2.5 w-2.5 rounded-full"
+                                                :style="{ backgroundColor: normalizeMetroColor(hall.metro) || '#94a3b8' }"
+                                            ></span>
+                                            <span>{{ formatMetroLabel(hall.metro) }}</span>
+                                        </div>
                                     </div>
                                     <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
                                         <span
