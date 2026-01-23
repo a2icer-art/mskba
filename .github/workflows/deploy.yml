@@ -19,7 +19,7 @@ jobs:
 
       - name: Install & build (Vite)
         run: |
-          npm ci
+          npm ci || npm install
           npm run build
 
       - name: Pack build artifact
@@ -63,15 +63,16 @@ jobs:
           port: ${{ secrets.VDS_PORT }}
           script: |
             set -e
+
             sudo -n /usr/local/bin/deploy-mskba-dev
 
-            sudo rm -rf /var/www/mskba-dev/public/build
-            sudo mkdir -p /var/www/mskba-dev/public
-            sudo tar -xzf /tmp/public-build.tgz -C /var/www/mskba-dev/public
+            sudo -n rm -rf /var/www/mskba-dev/public/build
+            sudo -n mkdir -p /var/www/mskba-dev/public
+            sudo -n tar -xzf /tmp/public-build.tgz -C /var/www/mskba-dev/public
 
-            sudo chown -R www-data:www-data /var/www/mskba-dev/public/build || true
-            sudo find /var/www/mskba-dev/public/build -type d -exec chmod 755 {} \; || true
-            sudo find /var/www/mskba-dev/public/build -type f -exec chmod 644 {} \; || true
+            sudo -n chown -R www-data:www-data /var/www/mskba-dev/public/build || true
+            sudo -n find /var/www/mskba-dev/public/build -type d -exec chmod 755 {} \; || true
+            sudo -n find /var/www/mskba-dev/public/build -type f -exec chmod 644 {} \; || true
 
             rm -f /tmp/public-build.tgz
 
@@ -105,14 +106,15 @@ jobs:
           port: ${{ secrets.VDS_PORT }}
           script: |
             set -e
+
             sudo -n /usr/local/bin/deploy-mskba-prod
 
-            sudo rm -rf /var/www/mskba-prod/public/build
-            sudo mkdir -p /var/www/mskba-prod/public
-            sudo tar -xzf /tmp/public-build.tgz -C /var/www/mskba-prod/public
+            sudo -n rm -rf /var/www/mskba-prod/public/build
+            sudo -n mkdir -p /var/www/mskba-prod/public
+            sudo -n tar -xzf /tmp/public-build.tgz -C /var/www/mskba-prod/public
 
-            sudo chown -R www-data:www-data /var/www/mskba-prod/public/build || true
-            sudo find /var/www/mskba-prod/public/build -type d -exec chmod 755 {} \; || true
-            sudo find /var/www/mskba-prod/public/build -type f -exec chmod 644 {} \; || true
+            sudo -n chown -R www-data:www-data /var/www/mskba-prod/public/build || true
+            sudo -n find /var/www/mskba-prod/public/build -type d -exec chmod 755 {} \; || true
+            sudo -n find /var/www/mskba-prod/public/build -type f -exec chmod 644 {} \; || true
 
             rm -f /tmp/public-build.tgz
