@@ -539,24 +539,36 @@ const applyAddressSuggestion = (suggestion) => {
                                     </div>
                                     <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
                                         <span
-                                            class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5"
-                                            :class="{
-                                                'border-emerald-200 bg-emerald-50 text-emerald-700': hall.status === 'confirmed',
-                                                'border-amber-200 bg-amber-50 text-amber-800': hall.status === 'moderation',
-                                                'border-rose-200 bg-rose-50 text-rose-700': hall.status === 'unconfirmed',
-                                                'border-rose-300 bg-rose-50 text-rose-700': hall.status === 'blocked',
-                                            }"
+                                            v-if="hall.status === 'confirmed'"
+                                            class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                                            title="Подтверждено"
                                         >
-                                        {{
-                                            hall.status === 'confirmed'
-                                                ? 'Подтвержден'
-                                                : hall.status === 'moderation'
-                                                    ? 'На модерации'
-                                                    : hall.status === 'blocked'
-                                                        ? 'Заблокирован'
-                                                        : 'Не подтвержден'
-                                        }}
-                                    </span>
+                                            <span class="text-sm leading-none">✓</span>
+                                        </span>
+
+                                        <span
+                                            v-else-if="hall.status === 'blocked'"
+                                            class="flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700"
+                                            title="Заблокирован"
+                                        >
+                                            <span class="text-sm leading-none">✕</span>
+                                        </span>
+
+                                        <span
+                                            v-else-if="hall.status === 'moderation'"
+                                            class="flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800"
+                                            title="На модерации"
+                                        >
+                                            <span class="text-sm leading-none">•</span>
+                                        </span>
+
+                                        <span
+                                            v-else
+                                            class="flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700"
+                                            title="Не подтвержден"
+                                        >
+                                            <span class="text-sm leading-none">?</span>
+                                        </span>
                                     </div>
                                 </div>
                             </article>
