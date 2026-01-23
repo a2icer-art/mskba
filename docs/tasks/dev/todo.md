@@ -99,4 +99,4 @@
 050. [x] Централизованные проверки confirmed + role_level
 053. [x] Проектирование домена Events (Event, EventType, Tournament) и флоу бронирований
 084. [ ] Контракты площадки: новые типы (создатель/владелец/супервайзер/сотрудник) и модерация
-000. [...] Test protected prod deploy - another try
+000. [...] Test protected prod deploy - another try - and another
