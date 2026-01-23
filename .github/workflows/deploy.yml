@@ -9,10 +9,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  deploy-dev:
+    if: github.ref_name == 'dev'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Deploy DEV via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VDS_HOST }}
@@ -20,8 +21,20 @@ jobs:
           port: ${{ secrets.VDS_PORT }}
           key: ${{ secrets.VDS_SSH_KEY }}
           script: |
-            if [ "${{ github.ref_name }}" = "dev" ]; then
-              /usr/local/bin/deploy-mskba-dev
-            else
-              /usr/local/bin/deploy-mskba-prod
-            fi
+            /usr/local/bin/deploy-mskba-dev
+
+  deploy-prod:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Deploy PROD via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          port: ${{ secrets.VDS_PORT }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            /usr/local/bin/deploy-mskba-prod
