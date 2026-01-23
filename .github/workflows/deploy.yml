@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          port: ${{ secrets.VDS_PORT }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            if [ "${{ github.ref_name }}" = "dev" ]; then
+              /usr/local/bin/deploy-mskba-dev
+            else
+              /usr/local/bin/deploy-mskba-prod
+            fi
