@@ -2,39 +2,117 @@ name: Deploy
 
 on:
   push:
-    branches: [ "dev", "main" ]
-
-concurrency:
-  group: deploy-${{ github.ref_name }}
-  cancel-in-progress: true
+    branches: [ dev, main ]
 
 jobs:
-  deploy-dev:
-    if: github.ref_name == 'dev'
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy DEV via SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install & build (Vite)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Pack build artifact
+        run: |
+          test -d public/build
+          tar -czf public-build.tgz -C public build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-build
+          path: public-build.tgz
+          if-no-files-found: error
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/dev'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: public-build
+
+      - name: Upload build to server (dev)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          port: ${{ secrets.VDS_PORT }}
+          source: "public-build.tgz"
+          target: "/tmp"
+
+      - name: Deploy backend + apply frontend (dev)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
-          port: ${{ secrets.VDS_PORT }}
           key: ${{ secrets.VDS_SSH_KEY }}
+          port: ${{ secrets.VDS_PORT }}
           script: |
-            /usr/local/bin/deploy-mskba-dev
+            set -e
+            sudo -n /usr/local/bin/deploy-mskba-dev
+
+            sudo rm -rf /var/www/mskba-dev/public/build
+            sudo mkdir -p /var/www/mskba-dev/public
+            sudo tar -xzf /tmp/public-build.tgz -C /var/www/mskba-dev/public
+
+            sudo chown -R www-data:www-data /var/www/mskba-dev/public/build || true
+            sudo find /var/www/mskba-dev/public/build -type d -exec chmod 755 {} \; || true
+            sudo find /var/www/mskba-dev/public/build -type f -exec chmod 644 {} \; || true
+
+            rm -f /tmp/public-build.tgz
 
   deploy-prod:
-    if: github.ref_name == 'main'
+    if: github.ref == 'refs/heads/main'
+    needs: [build]
     runs-on: ubuntu-latest
-    environment:
-      name: production
+    environment: production
     steps:
-      - name: Deploy PROD via SSH
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: public-build
+
+      - name: Upload build to server (prod)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          port: ${{ secrets.VDS_PORT }}
+          source: "public-build.tgz"
+          target: "/tmp"
+
+      - name: Deploy backend + apply frontend (prod)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
-          port: ${{ secrets.VDS_PORT }}
           key: ${{ secrets.VDS_SSH_KEY }}
+          port: ${{ secrets.VDS_PORT }}
           script: |
-            /usr/local/bin/deploy-mskba-prod
+            set -e
+            sudo -n /usr/local/bin/deploy-mskba-prod
+
+            sudo rm -rf /var/www/mskba-prod/public/build
+            sudo mkdir -p /var/www/mskba-prod/public
+            sudo tar -xzf /tmp/public-build.tgz -C /var/www/mskba-prod/public
+
+            sudo chown -R www-data:www-data /var/www/mskba-prod/public/build || true
+            sudo find /var/www/mskba-prod/public/build -type d -exec chmod 755 {} \; || true
+            sudo find /var/www/mskba-prod/public/build -type f -exec chmod 644 {} \; || true
+
+            rm -f /tmp/public-build.tgz
