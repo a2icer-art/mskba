@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-dev:
+    if: github.ref_name == 'dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy DEV via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          port: ${{ secrets.VDS_PORT }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            /usr/local/bin/deploy-mskba-dev
+
+  deploy-prod:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Deploy PROD via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          port: ${{ secrets.VDS_PORT }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            /usr/local/bin/deploy-mskba-prod
