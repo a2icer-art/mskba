@@ -71,6 +71,8 @@ const clarifyForm = useForm({
 const approveForm = useForm({
     permissions: [],
     comment: '',
+    starts_at: '',
+    ends_at: '',
 });
 const viewPermissionsForm = useForm({
     permissions: [],
@@ -141,6 +143,8 @@ const openApprove = (requestItem) => {
     approveTarget.value = requestItem;
     approveForm.permissions = requestItem?.approved_permissions ? [...requestItem.approved_permissions] : [];
     approveForm.comment = '';
+    approveForm.starts_at = new Date().toISOString().slice(0, 10);
+    approveForm.ends_at = '';
     approveForm.clearErrors();
     approveOpen.value = true;
 };
@@ -148,7 +152,7 @@ const openApprove = (requestItem) => {
 const closeApprove = () => {
     approveOpen.value = false;
     approveTarget.value = null;
-    approveForm.reset('permissions', 'comment');
+    approveForm.reset('permissions', 'comment', 'starts_at', 'ends_at');
     approveForm.clearErrors();
 };
 
@@ -730,6 +734,28 @@ const submitRestore = () => {
                             </div>
                             <div v-if="approveForm.errors.permissions" class="text-xs text-rose-700">
                                 {{ approveForm.errors.permissions }}
+                            </div>
+
+                            <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Действует с
+                                    <input
+                                        v-model="approveForm.starts_at"
+                                        type="date"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    />
+                                </label>
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Действует до
+                                    <input
+                                        v-model="approveForm.ends_at"
+                                        type="date"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    />
+                                </label>
+                            </div>
+                            <div v-if="approveForm.errors.starts_at || approveForm.errors.ends_at" class="text-xs text-rose-700">
+                                {{ approveForm.errors.starts_at || approveForm.errors.ends_at }}
                             </div>
 
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">

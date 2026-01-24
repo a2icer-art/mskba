@@ -200,6 +200,8 @@ class AdminContractsModerationController extends Controller
             'permissions' => ['array'],
             'permissions.*' => ['string', 'exists:permissions,code'],
             'comment' => ['nullable', 'string', 'max:2000'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
         ]);
 
         $permissionCodes = $this->filterApprovalPermissionCodes(
@@ -223,8 +225,8 @@ class AdminContractsModerationController extends Controller
             'contract_type' => $contractType,
             'entity_type' => $venue->getMorphClass(),
             'entity_id' => $venue->getKey(),
-            'starts_at' => now(),
-            'ends_at' => null,
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'] ?? null,
             'status' => ContractStatus::Active,
             'comment' => $data['comment'] ?? null,
         ]);
