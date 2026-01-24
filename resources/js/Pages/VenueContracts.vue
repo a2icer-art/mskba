@@ -374,7 +374,7 @@ const formatDate = (value) => {
                         </button>
                     </div>
 
-                    <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-5">
+                    <div v-if="ownerRequestState.can_request || supervisorRequestState.can_request" class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-5">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <h2 class="text-lg font-semibold text-slate-900">Запросы на контракты</h2>
                             <p class="text-sm text-slate-500">
@@ -382,7 +382,7 @@ const formatDate = (value) => {
                             </p>
                         </div>
                         <div class="mt-4 grid gap-4 md:grid-cols-2">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div v-if="!ownerRequestState.has_active" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
                                         <h3 class="text-sm font-semibold text-slate-900">Владелец</h3>
@@ -433,7 +433,7 @@ const formatDate = (value) => {
                                 </button>
                             </div>
 
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div v-if="!supervisorRequestState.has_active" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
                                         <h3 class="text-sm font-semibold text-slate-900">Супервайзер</h3>
