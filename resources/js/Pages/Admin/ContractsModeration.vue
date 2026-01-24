@@ -309,29 +309,33 @@ const allowedPermissions = computed(() => {
 
                     <div v-if="hasRequests" class="mt-6 w-full overflow-x-auto rounded-2xl border border-slate-200">
                         <div class="min-w-max">
-                            <div class="grid grid-cols-[200px_140px_140px_140px_220px_220px_160px_160px_160px] gap-4 bg-slate-50 px-4 py-3 text-xs uppercase tracking-[0.15em] text-slate-500 whitespace-nowrap">
-                                <span>Площадка</span>
-                                <span>Тип</span>
-                                <span>Заявитель</span>
-                                <span>Статус</span>
-                                <span>Действия</span>
-                                <span>Комментарий</span>
-                                <span>Отправлено</span>
-                                <span>Решение</span>
-                                <span>Кто решил</span>
-                            </div>
+                    <div class="grid grid-cols-[140px_200px_140px_140px_140px_220px_220px_160px_160px_160px] gap-4 bg-slate-50 px-4 py-3 text-xs uppercase tracking-[0.15em] text-slate-500 whitespace-nowrap">
+                        <span>Сущность</span>
+                        <span>Название</span>
+                        <span>Тип</span>
+                        <span>Заявитель</span>
+                        <span>Статус</span>
+                        <span>Действия</span>
+                        <span>Комментарий</span>
+                        <span>Отправлено</span>
+                        <span>Решение</span>
+                        <span>Кто решил</span>
+                    </div>
 
-                            <div
-                                v-for="requestItem in requests.data"
-                                :key="requestItem.id"
-                                class="grid grid-cols-[200px_140px_140px_140px_220px_220px_160px_160px_160px] gap-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700 whitespace-nowrap"
+                    <div
+                        v-for="requestItem in requests.data"
+                        :key="requestItem.id"
+                        class="grid grid-cols-[140px_200px_140px_140px_140px_220px_220px_160px_160px_160px] gap-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700 whitespace-nowrap"
+                    >
+                        <div>
+                            {{ requestItem.entity_label || '—' }}
+                        </div>
+                        <div>
+                            <button
+                                class="text-left text-sm font-medium text-slate-800 transition hover:text-slate-700"
+                                type="button"
+                                @click="openView(requestItem)"
                             >
-                                <div>
-                                    <button
-                                        class="text-left text-sm font-medium text-slate-800 transition hover:text-slate-700"
-                                        type="button"
-                                        @click="openView(requestItem)"
-                                    >
                                         {{ requestItem.venue?.name || '—' }}
                                     </button>
                                 </div>

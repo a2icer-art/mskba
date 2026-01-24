@@ -78,6 +78,7 @@ class AdminContractsModerationController extends Controller
 
                 return [
                     'id' => $request->id,
+                    'entity_label' => 'Площадка',
                     'status' => $request->status?->value,
                     'submitted_at' => DateFormatter::dateTime($request->submitted_at),
                     'reviewed_at' => DateFormatter::dateTime($request->reviewed_at),
