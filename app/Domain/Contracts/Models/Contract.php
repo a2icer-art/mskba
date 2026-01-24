@@ -4,6 +4,7 @@ namespace App\Domain\Contracts\Models;
 
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Enums\ContractType;
+use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Permissions\Models\Permission;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Contract extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'user_id',
         'created_by',

@@ -38,6 +38,12 @@ class AdminLogsService
                 'href' => '/admin/logs/venues',
             ],
             [
+                'key' => 'contracts',
+                'label' => 'Контракты',
+                'model' => \App\Domain\Contracts\Models\Contract::class,
+                'href' => '/admin/logs/contracts',
+            ],
+            [
                 'key' => 'addresses',
                 'label' => 'Адреса',
                 'model' => \App\Domain\Addresses\Models\Address::class,

@@ -21,6 +21,7 @@ return [
         App\Domain\Participants\Models\ParticipantRoleAssignment::class,
         App\Domain\Events\Models\Event::class,
         App\Domain\Events\Models\EventBooking::class,
+        App\Domain\Contracts\Models\Contract::class,
         App\Domain\Balances\Models\Balance::class,
         App\Domain\Balances\Models\BalanceTransaction::class,
     ],
