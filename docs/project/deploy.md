@@ -115,6 +115,7 @@
 ## 5) Важные места и “точки правды”
 
 ### На GitHub
+- Actions: https://github.com/a2icer-art/mskba/actions
 - Workflow: .github/workflows/deploy.yml
 - Secrets (в Settings → Secrets and variables → Actions):
   - VDS_HOST
