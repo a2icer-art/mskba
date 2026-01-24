@@ -75,6 +75,7 @@ class AdminContractsModerationController extends Controller
                 $reviewer = $request->reviewer;
                 $submitter = $request->submitter;
                 $meta = $request->meta ?? [];
+                $contract = $this->resolveContractSnapshot($request, $meta['contract_type'] ?? null);
 
                 return [
                     'id' => $request->id,
@@ -87,6 +88,7 @@ class AdminContractsModerationController extends Controller
                     'comment' => $meta['comment'] ?? null,
                     'review_comment' => $meta['review_comment'] ?? null,
                     'approved_permissions' => $meta['approved_permissions'] ?? [],
+                    'contract' => $contract,
                     'reviewer' => $reviewer
                         ? [
                             'id' => $reviewer->id,
@@ -336,6 +338,147 @@ class AdminContractsModerationController extends Controller
         return back();
     }
 
+    public function revoke(Request $request, ModerationRequest $moderationRequest, Contract $contract)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::VenueContract) {
+            abort(404);
+        }
+
+        $venue = $moderationRequest->entityVenue;
+        $submitter = $moderationRequest->submitter;
+        if (!$venue || !$submitter) {
+            return back()->withErrors(['moderation' => 'Недостаточно данных для аннулирования.']);
+        }
+
+        if (
+            $contract->user_id !== $submitter->id
+            || $contract->entity_type !== $venue->getMorphClass()
+            || $contract->entity_id !== $venue->getKey()
+        ) {
+            return back()->withErrors(['moderation' => 'Контракт не найден.']);
+        }
+
+        if ($contract->status?->value !== ContractStatus::Active->value) {
+            return back()->withErrors(['moderation' => 'Контракт уже аннулирован.']);
+        }
+
+        $type = $contract->contract_type;
+        if (!$type || !in_array($type, [ContractType::Owner, ContractType::Supervisor], true)) {
+            return back()->withErrors(['moderation' => 'Недоступный тип контракта для аннулирования.']);
+        }
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reason = $data['reason'] ?? null;
+        if ($reason) {
+            $note = 'Причина аннулирования: ' . $reason;
+            $contract->comment = $contract->comment
+                ? $contract->comment . "\n" . $note
+                : $note;
+        }
+
+        $contract->update([
+            'status' => ContractStatus::Inactive,
+            'ends_at' => $contract->ends_at ?: now(),
+            'comment' => $contract->comment,
+        ]);
+
+        $meta = $moderationRequest->meta ?? [];
+        $moderationRequest->update([
+            'meta' => array_merge($meta, [
+                'revoked_reason' => $reason,
+                'revoked_at' => now(),
+                'revoked_by' => $request->user()?->id,
+            ]),
+        ]);
+
+        app(ContractNotificationService::class)->notifyContractRevoked($contract, $request->user());
+
+        return back();
+    }
+
+    public function restore(Request $request, ModerationRequest $moderationRequest, Contract $contract)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::VenueContract) {
+            abort(404);
+        }
+
+        $venue = $moderationRequest->entityVenue;
+        $submitter = $moderationRequest->submitter;
+        if (!$venue || !$submitter) {
+            return back()->withErrors(['moderation' => 'Недостаточно данных для восстановления.']);
+        }
+
+        if (
+            $contract->user_id !== $submitter->id
+            || $contract->entity_type !== $venue->getMorphClass()
+            || $contract->entity_id !== $venue->getKey()
+        ) {
+            return back()->withErrors(['moderation' => 'Контракт не найден.']);
+        }
+
+        if ($contract->status?->value !== ContractStatus::Inactive->value) {
+            return back()->withErrors(['moderation' => 'Контракт уже активен.']);
+        }
+
+        $type = $contract->contract_type;
+        if (!$type || !in_array($type, [ContractType::Owner, ContractType::Supervisor], true)) {
+            return back()->withErrors(['moderation' => 'Недоступный тип контракта для восстановления.']);
+        }
+
+        if ($this->hasActiveContractType($venue, $type)) {
+            return back()->withErrors(['moderation' => 'У площадки уже есть активный контракт данного типа.']);
+        }
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reason = $data['reason'] ?? null;
+        if ($reason) {
+            $note = 'Причина восстановления: ' . $reason;
+            $contract->comment = $contract->comment
+                ? $contract->comment . "\n" . $note
+                : $note;
+        }
+
+        $contract->update([
+            'status' => ContractStatus::Active,
+            'ends_at' => null,
+            'starts_at' => $contract->starts_at ?: now(),
+            'comment' => $contract->comment,
+        ]);
+
+        $meta = $moderationRequest->meta ?? [];
+        $moderationRequest->update([
+            'meta' => array_merge($meta, [
+                'restored_reason' => $reason,
+                'restored_at' => now(),
+                'restored_by' => $request->user()?->id,
+            ]),
+        ]);
+
+        app(ContractNotificationService::class)->notifyContractAssigned($contract, $request->user());
+
+        return back();
+    }
+
     public function clarify(Request $request, ModerationRequest $moderationRequest)
     {
         $roleLevel = $this->getRoleLevel($request);
@@ -418,6 +561,48 @@ class AdminContractsModerationController extends Controller
         }
 
         return $permissionCodes;
+    }
+
+    private function resolveContractSnapshot(ModerationRequest $request, ?string $contractTypeValue): ?array
+    {
+        if ($request->status?->value !== ModerationStatus::Approved->value) {
+            return null;
+        }
+
+        $venue = $request->entityVenue;
+        $submitter = $request->submitter;
+        if (!$venue || !$submitter || !$contractTypeValue) {
+            return null;
+        }
+
+        $contractType = ContractType::tryFrom($contractTypeValue);
+        if (!$contractType || !in_array($contractType, [ContractType::Owner, ContractType::Supervisor], true)) {
+            return null;
+        }
+
+        $contract = Contract::query()
+            ->where('user_id', $submitter->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', $contractType->value)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$contract) {
+            return null;
+        }
+
+        $isActive = $contract->status?->value === ContractStatus::Active->value;
+        $canRestore = !$isActive && !$this->hasActiveContractType($venue, $contractType);
+
+        return [
+            'id' => $contract->id,
+            'type' => $contractType->value,
+            'label' => $contractType->label(),
+            'status' => $contract->status?->value,
+            'can_revoke' => $isActive,
+            'can_restore' => $canRestore,
+        ];
     }
 
     private function hasActiveContractType(Venue $venue, ContractType $type): bool

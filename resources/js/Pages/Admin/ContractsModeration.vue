@@ -75,10 +75,20 @@ const approveForm = useForm({
 const viewPermissionsForm = useForm({
     permissions: [],
 });
+const revokeForm = useForm({
+    reason: '',
+});
+const restoreForm = useForm({
+    reason: '',
+});
 const approveOpen = ref(false);
 const approveTarget = ref(null);
 const viewOpen = ref(false);
 const viewTarget = ref(null);
+const revokeOpen = ref(false);
+const revokeTarget = ref(null);
+const restoreOpen = ref(false);
+const restoreTarget = ref(null);
 const page = usePage();
 
 const statusLabelMap = {
@@ -254,6 +264,38 @@ const closeView = () => {
     viewPermissionsForm.clearErrors();
 };
 
+const openRevoke = (requestItem) => {
+    actionNotice.value = '';
+    actionError.value = '';
+    revokeTarget.value = requestItem;
+    revokeForm.reason = '';
+    revokeForm.clearErrors();
+    revokeOpen.value = true;
+};
+
+const closeRevoke = () => {
+    revokeOpen.value = false;
+    revokeTarget.value = null;
+    revokeForm.reset('reason');
+    revokeForm.clearErrors();
+};
+
+const openRestore = (requestItem) => {
+    actionNotice.value = '';
+    actionError.value = '';
+    restoreTarget.value = requestItem;
+    restoreForm.reason = '';
+    restoreForm.clearErrors();
+    restoreOpen.value = true;
+};
+
+const closeRestore = () => {
+    restoreOpen.value = false;
+    restoreTarget.value = null;
+    restoreForm.reset('reason');
+    restoreForm.clearErrors();
+};
+
 const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 const supervisorPermissionSet = computed(() => new Set(props.supervisorPermissionCodes || []));
 const resolveAllowedPermissions = (contractType) => {
@@ -293,6 +335,71 @@ const submitViewPermissions = () => {
             }
         },
     });
+};
+
+const submitRevoke = () => {
+    if (!revokeTarget.value?.contract?.id) {
+        return;
+    }
+
+    actionNotice.value = '';
+    actionError.value = '';
+
+    revokeForm.post(
+        `/admin/contracts-moderation/${revokeTarget.value.id}/contracts/${revokeTarget.value.contract.id}/revoke`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                actionNotice.value = 'Контракт аннулирован.';
+                if (revokeTarget.value) {
+                    revokeTarget.value.contract = null;
+                }
+                closeRevoke();
+            },
+            onError: (errors) => {
+                actionError.value = errors.moderation || revokeForm.errors.reason || 'Не удалось аннулировать контракт.';
+            },
+            onFinish: () => {
+                if (page.props?.errors?.moderation) {
+                    actionError.value = page.props.errors.moderation;
+                }
+            },
+        }
+    );
+};
+
+const submitRestore = () => {
+    if (!restoreTarget.value?.contract?.id) {
+        return;
+    }
+
+    actionNotice.value = '';
+    actionError.value = '';
+
+    restoreForm.post(
+        `/admin/contracts-moderation/${restoreTarget.value.id}/contracts/${restoreTarget.value.contract.id}/restore`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                actionNotice.value = 'Контракт восстановлен.';
+                if (restoreTarget.value?.contract) {
+                    restoreTarget.value.contract.can_restore = false;
+                    restoreTarget.value.contract.can_revoke = true;
+                    restoreTarget.value.contract.status = 'active';
+                }
+                closeRestore();
+            },
+            onError: (errors) => {
+                actionError.value =
+                    errors.moderation || restoreForm.errors.reason || 'Не удалось восстановить контракт.';
+            },
+            onFinish: () => {
+                if (page.props?.errors?.moderation) {
+                    actionError.value = page.props.errors.moderation;
+                }
+            },
+        }
+    );
 };
 </script>
 
@@ -410,16 +517,34 @@ const submitViewPermissions = () => {
                                     >
                                         Требуются уточнения
                                     </button>
-                                    <button
-                                        v-if="requestItem.status === 'pending' || requestItem.status === 'clarification'"
-                                        class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
-                                        type="button"
-                                        :disabled="rejectForm.processing"
-                                        @click="openReject(requestItem)"
-                                    >
-                                        Отклонить
-                                    </button>
-                                </div>
+                                <button
+                                    v-if="requestItem.status === 'pending' || requestItem.status === 'clarification'"
+                                    class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                    type="button"
+                                    :disabled="rejectForm.processing"
+                                    @click="openReject(requestItem)"
+                                >
+                                    Отклонить
+                                </button>
+                                <button
+                                    v-if="requestItem.contract?.can_revoke"
+                                    class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
+                                    type="button"
+                                    :disabled="revokeForm.processing"
+                                    @click="openRevoke(requestItem)"
+                                >
+                                    Аннулировать
+                                </button>
+                                <button
+                                    v-if="requestItem.contract?.can_restore"
+                                    class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
+                                    type="button"
+                                    :disabled="restoreForm.processing"
+                                    @click="openRestore(requestItem)"
+                                >
+                                    Восстановить
+                                </button>
+                            </div>
                                 <div class="truncate" :title="requestItem.comment || ''">
                                     {{ requestItem.comment || '—' }}
                                 </div>
@@ -631,6 +756,102 @@ const submitViewPermissions = () => {
                             :disabled="approveForm.processing"
                         >
                             Подтвердить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-if="revokeOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <form :class="{ loading: revokeForm.processing }" @submit.prevent="submitRevoke">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Аннулировать контракт</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeRevoke"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                        <p class="text-sm text-slate-600">
+                            Укажите причину аннулирования (необязательно). Она будет сохранена в комментарии контракта.
+                        </p>
+                        <textarea
+                            v-model="revokeForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина аннулирования (необязательно)"
+                        ></textarea>
+                        <div v-if="revokeForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ revokeForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="revokeForm.processing"
+                            @click="closeRevoke"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="revokeForm.processing"
+                        >
+                            Аннулировать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-if="restoreOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <form :class="{ loading: restoreForm.processing }" @submit.prevent="submitRestore">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">Восстановить контракт</h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closeRestore"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                        <p class="text-sm text-slate-600">
+                            Укажите причину восстановления (необязательно). Она будет сохранена в комментарии контракта.
+                        </p>
+                        <textarea
+                            v-model="restoreForm.reason"
+                            class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                            placeholder="Причина восстановления (необязательно)"
+                        ></textarea>
+                        <div v-if="restoreForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                            {{ restoreForm.errors.reason }}
+                        </div>
+                    </div>
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="restoreForm.processing"
+                            @click="closeRestore"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="restoreForm.processing"
+                        >
+                            Восстановить
                         </button>
                     </div>
                 </form>

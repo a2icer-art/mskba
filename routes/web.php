@@ -219,6 +219,10 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
         ->name('admin.contracts.moderation.reject');
     Route::post('/contracts-moderation/{moderationRequest}/clarify', [AdminContractsModerationController::class, 'clarify'])
         ->name('admin.contracts.moderation.clarify');
+    Route::post('/contracts-moderation/{moderationRequest}/contracts/{contract}/revoke', [AdminContractsModerationController::class, 'revoke'])
+        ->name('admin.contracts.moderation.revoke');
+    Route::post('/contracts-moderation/{moderationRequest}/contracts/{contract}/restore', [AdminContractsModerationController::class, 'restore'])
+        ->name('admin.contracts.moderation.restore');
     Route::post('/contracts-moderation/{moderationRequest}/permissions', [AdminContractsModerationController::class, 'updatePermissions'])
         ->name('admin.contracts.moderation.permissions');
     Route::get('/logs', [AdminLogsController::class, 'index'])
