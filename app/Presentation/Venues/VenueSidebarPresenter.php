@@ -59,13 +59,20 @@ class VenueSidebarPresenter extends BasePresenter
         $canManageBookings = $this->canManageBookings($user, $venue);
         $canManageSettings = $this->canManageSettings($user, $venue);
         $canViewSupervisor = $this->canViewSupervisor($user, $venue);
+        $canManageSchedule = $this->canManageSchedule($user, $venue);
 
-        if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor) {
+        if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor || $canManageSchedule) {
             $adminItems = [];
             if ($showContracts) {
                 $adminItems[] = [
                     'label' => 'Контракты',
                     'href' => "/venues/{$typeSlug}/{$venue->alias}/contracts",
+                ];
+            }
+            if ($canManageSchedule) {
+                $adminItems[] = [
+                    'label' => 'Расписание',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/schedule",
                 ];
             }
             if ($canManageBookings) {
@@ -190,5 +197,16 @@ class VenueSidebarPresenter extends BasePresenter
 
         return $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
             || $checker->can($user, PermissionCode::VenueSupervisorManage, $venue);
+    }
+
+    private function canManageSchedule(?User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
     }
 }

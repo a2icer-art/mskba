@@ -358,6 +358,46 @@ class VenuesController extends Controller
             ->firstOrFail();
         $venue->loadMissing(['venueType:id,name,plural_name,alias']);
 
+        return $this->renderSchedulePage(
+            $user,
+            $venue,
+            $type,
+            false,
+            "/venues/{$type}/{$venue->alias}/schedule"
+        );
+    }
+
+    public function adminSchedule(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+        $venue->loadMissing(['venueType:id,name,plural_name,alias']);
+
+        $this->ensureCanManageSchedule($user, $venue);
+
+        return $this->renderSchedulePage(
+            $user,
+            $venue,
+            $type,
+            true,
+            "/venues/{$type}/{$venue->alias}/admin/schedule"
+        );
+    }
+
+    private function renderSchedulePage(
+        ?\App\Models\User $user,
+        Venue $venue,
+        string $type,
+        bool $canManage,
+        string $activeHref
+    ) {
         $schedule = VenueSchedule::query()
             ->where('venue_id', $venue->id)
             ->with(['intervals', 'exceptions.intervals'])
@@ -435,16 +475,13 @@ class VenuesController extends Controller
             ->values()
             ->all();
 
-        $checker = app(PermissionChecker::class);
-        $canManage = $user
-            && $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
-
         return Inertia::render('VenueSchedule', [
             'appName' => config('app.name'),
             'venue' => [
                 'id' => $venue->id,
                 'name' => $venue->name,
                 'alias' => $venue->alias,
+                'status' => $venue->status?->value,
             ],
             'schedule' => $schedule
                 ? [
@@ -458,7 +495,7 @@ class VenuesController extends Controller
             'canManage' => $canManage,
             'daysOfWeek' => $this->weekDays(),
             'navigation' => $navigation,
-            'activeHref' => "/venues/{$type}/{$venue->alias}/schedule",
+            'activeHref' => $activeHref,
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);

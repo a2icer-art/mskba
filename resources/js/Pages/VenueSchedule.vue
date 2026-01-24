@@ -1,7 +1,8 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
+import EventCreateModal from '../Components/EventCreateModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -63,6 +64,7 @@ const navigationData = computed(() => props.navigation?.data ?? props.navigation
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.schedule ?? '');
+const isVenueUnavailableForBooking = computed(() => props.venue?.status && props.venue?.status !== 'confirmed');
 
 const intervalOpen = ref(false);
 const exceptionOpen = ref(false);
@@ -348,6 +350,15 @@ const submitException = () => {
 const intervalDeleteForm = useForm({});
 const exceptionDeleteForm = useForm({});
 
+const selectedDay = ref(null);
+const showDayBookingForm = ref(false);
+const dayLoading = ref(false);
+const dayError = ref('');
+const createPrefill = ref({});
+const embeddedCreateRef = ref(null);
+const bookingFormRef = ref(null);
+const popupBodyRef = ref(null);
+
 const removeInterval = (intervalId) => {
     intervalDeleteForm.delete(
         `/venues/${props.activeTypeSlug}/${props.venue?.alias}/schedule/intervals/${intervalId}`,
@@ -361,6 +372,127 @@ const removeException = (exceptionId) => {
         { preserveScroll: true }
     );
 };
+
+const openDayDetails = (day) => {
+    if (!day?.date) {
+        return;
+    }
+    selectedDay.value = {
+        date: day.date,
+        is_today: day.isToday,
+        is_closed: false,
+        is_closed_by_exception: false,
+        intervals: [],
+        bookings: [],
+        comment: null,
+    };
+    dayLoading.value = true;
+    dayError.value = '';
+    showDayBookingForm.value = false;
+    fetchDayDetails(day.date);
+};
+
+const closeDayDetails = () => {
+    selectedDay.value = null;
+    showDayBookingForm.value = false;
+    createPrefill.value = {};
+    dayLoading.value = false;
+    dayError.value = '';
+};
+
+const closeDayBookingForm = () => {
+    showDayBookingForm.value = false;
+};
+
+const scrollPopupToBookingForm = () => {
+    const container = popupBodyRef.value;
+    const target = bookingFormRef.value;
+    if (!container || !target) {
+        return;
+    }
+    const offset = Math.max(target.offsetTop - container.offsetTop - 8, 0);
+    container.scrollTo({ top: offset, behavior: 'smooth' });
+};
+
+const refreshDayBookings = async () => {
+    if (!selectedDay.value?.date || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    try {
+        const params = new URLSearchParams({ date: selectedDay.value.date });
+        const response = await fetch(
+            `/venues/${props.activeTypeSlug}/${props.venue.alias}/schedule-day-bookings?${params.toString()}`
+        );
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        selectedDay.value.bookings = data?.bookings ?? [];
+    } catch (error) {
+        return;
+    }
+};
+
+const fetchDayDetails = async (date) => {
+    if (!date || !props.venue?.alias || !props.activeTypeSlug) {
+        dayLoading.value = false;
+        return;
+    }
+    try {
+        const params = new URLSearchParams({ date });
+        const response = await fetch(
+            `/venues/${props.activeTypeSlug}/${props.venue.alias}/schedule-day?${params.toString()}`
+        );
+        if (!response.ok) {
+            throw new Error('day_failed');
+        }
+        const data = await response.json();
+        selectedDay.value = {
+            date,
+            is_today: data?.is_today ?? false,
+            is_closed: data?.is_closed ?? false,
+            is_closed_by_exception: data?.is_closed_by_exception ?? false,
+            intervals: data?.intervals ?? [],
+            bookings: data?.bookings ?? [],
+            comment: data?.comment ?? null,
+        };
+    } catch (error) {
+        dayError.value = 'Не удалось загрузить данные дня.';
+    } finally {
+        dayLoading.value = false;
+    }
+};
+
+const openBookingFromDay = () => {
+    if (!selectedDay.value) {
+        return;
+    }
+    createPrefill.value = {
+        venue: props.venue?.alias || '',
+        date: selectedDay.value.date || '',
+    };
+    showDayBookingForm.value = true;
+    nextTick(() => {
+        scrollPopupToBookingForm();
+    });
+};
+
+const handleBookingFormLoaded = () => {
+    nextTick(() => {
+        embeddedCreateRef.value?.focusType?.();
+    });
+};
+
+const submitEmbeddedBooking = () => {
+    if (!embeddedCreateRef.value || embeddedCreateRef.value.isDisabled) {
+        return;
+    }
+    embeddedCreateRef.value.submit();
+};
+
+const isEmbeddedSubmitDisabled = computed(() => embeddedCreateRef.value?.isDisabled ?? true);
+const formatDayLabel = (date) =>
+    new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(date));
 
 </script>
 
@@ -505,7 +637,7 @@ const removeException = (exceptionId) => {
                                     ]"
                                     type="button"
                                     :disabled="!day.date || (!day.exception && day.isClosedByWeek && !canManage)"
-                                    @click="openExceptionForDate(day.date)"
+                                    @click="canManage ? openExceptionForDate(day.date) : openDayDetails(day)"
                                 >
                                     {{ day.label }}
                                     <span
@@ -529,7 +661,7 @@ const removeException = (exceptionId) => {
                                 {{
                                     canManage
                                         ? 'Кликните по дате, чтобы добавить или отредактировать исключение.'
-                                        : 'Кликните по дате, чтобы посмотреть подробнее.'
+                                        : 'Кликните по дате, чтобы посмотреть детали и забронировать.'
                                 }}
                             </p>
                             <div class="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
@@ -552,63 +684,190 @@ const removeException = (exceptionId) => {
                             </div>
                         </div>
 
-                        <div v-if="!visibleExceptions.length" class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                            Исключений пока нет.
-                        </div>
-                        <div v-else class="mt-4 grid gap-3">
-                            <div
-                                v-for="exception in visibleExceptions"
-                                :key="exception.id"
-                                class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                            >
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div>
-                                        <p class="text-sm font-semibold text-slate-900">{{ exception.date }}</p>
-                                        <p class="mt-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                            {{ exception.is_closed ? 'Закрыто' : 'Открыто' }}
-                                        </p>
-                                        <div v-if="exception.comment" class="mt-2 text-sm text-slate-600">
-                                            {{ exception.comment }}
+                        <template v-if="canManage && visibleExceptions.length">
+                            <div class="mt-4 grid gap-3">
+                                <div
+                                    v-for="exception in visibleExceptions"
+                                    :key="exception.id"
+                                    class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                                >
+                                    <div class="flex flex-wrap items-start justify-between gap-4">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">{{ exception.date }}</p>
+                                            <p class="mt-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                {{ exception.is_closed ? 'Закрыто' : 'Открыто' }}
+                                            </p>
+                                            <div v-if="exception.comment" class="mt-2 text-sm text-slate-600">
+                                                {{ exception.comment }}
+                                            </div>
+                                            <div v-if="!exception.is_closed" class="mt-2 flex flex-wrap gap-2">
+                                                <span
+                                                    v-for="interval in exception.intervals"
+                                                    :key="interval.id"
+                                                    class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700"
+                                                >
+                                                    {{ interval.starts_at }} – {{ interval.ends_at }}
+                                                </span>
+                                                <span v-if="!exception.intervals.length" class="text-xs text-slate-500">
+                                                    Интервалы не заданы
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div v-if="!exception.is_closed" class="mt-2 flex flex-wrap gap-2">
-                                            <span
-                                                v-for="interval in exception.intervals"
-                                                :key="interval.id"
-                                                class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700"
+                                        <div class="flex flex-wrap gap-2">
+                                            <button
+                                                class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5"
+                                                type="button"
+                                                @click="openExceptionModal(exception)"
                                             >
-                                                {{ interval.starts_at }} – {{ interval.ends_at }}
-                                            </span>
-                                            <span v-if="!exception.intervals.length" class="text-xs text-slate-500">
-                                                Интервалы не заданы
-                                            </span>
+                                                Редактировать
+                                            </button>
+                                            <button
+                                                class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5"
+                                                type="button"
+                                                :disabled="exceptionDeleteForm.processing"
+                                                @click="removeException(exception.id)"
+                                            >
+                                                Удалить
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div v-if="canManage" class="flex flex-wrap gap-2">
-                                        <button
-                                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5"
-                                            type="button"
-                                            @click="openExceptionModal(exception)"
-                                        >
-                                            Редактировать
-                                        </button>
-                                        <button
-                                            class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:-translate-y-0.5"
-                                            type="button"
-                                            :disabled="exceptionDeleteForm.processing"
-                                            @click="removeException(exception.id)"
-                                        >
-                                            Удалить
-                                        </button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </template>
                     </section>
 
                 </div>
             </main>
 
             <MainFooter :app-name="appName" />
+        </div>
+    </div>
+
+    <div v-if="selectedDay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeDayDetails">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Расписание на день</h2>
+                    <p class="mt-1 text-sm text-slate-500">
+                        {{ selectedDay?.date ? formatDayLabel(selectedDay.date) : '—' }}
+                    </p>
+                </div>
+                <button
+                    class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closeDayDetails"
+                >
+                    x
+                </button>
+            </div>
+            <div ref="popupBodyRef" class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4" :class="{ loading: dayLoading }">
+                <div v-if="dayError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {{ dayError }}
+                </div>
+                <div v-else-if="dayLoading" class="flex min-h-[180px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+                    <div class="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"></div>
+                </div>
+                <template v-else>
+                    <div v-if="selectedDay.is_closed" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        Площадка закрыта.
+                    </div>
+                    <div
+                        v-else-if="isVenueUnavailableForBooking"
+                        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                    >
+                        Бронирование недоступно для неподтвержденной площадки.
+                    </div>
+                    <div v-else class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-normal text-slate-600">
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">График работы</p>
+                        <div v-if="selectedDay.intervals?.length" class="mt-2 space-y-1">
+                            <div v-for="(interval, index) in selectedDay.intervals" :key="index">
+                                {{ interval.starts_at }}–{{ interval.ends_at }}
+                            </div>
+                        </div>
+                        <p v-else class="mt-2 text-slate-500">Интервалы не заданы.</p>
+                    </div>
+
+                    <div v-if="selectedDay.is_closed">
+                        <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                            <p v-if="!selectedDay.is_closed_by_exception" class="text-sm text-slate-600">Интервалы не заданы.</p>
+                            <p v-if="selectedDay.comment" class="mt-2 text-sm text-slate-700">{{ selectedDay.comment }}</p>
+                        </div>
+                    </div>
+                    <div v-else-if="!isVenueUnavailableForBooking" class="mt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Занятые интервалы</p>
+                        <div v-if="selectedDay.bookings?.length" class="mt-2 flex flex-wrap gap-2">
+                            <span
+                                v-for="(booking, index) in selectedDay.bookings"
+                                :key="index"
+                                class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700"
+                            >
+                                {{ booking.starts_at }}–{{ booking.ends_at }}
+                            </span>
+                        </div>
+                        <p v-else class="mt-2 text-sm text-slate-500">Бронирований нет.</p>
+                    </div>
+
+                    <div v-if="showDayBookingForm" ref="bookingFormRef" class="mt-6">
+                        <hr class="my-4 border-slate-200/80" />
+                        <p class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Забронировать</p>
+                        <div class="mt-2"></div>
+                        <EventCreateModal
+                            ref="embeddedCreateRef"
+                            embedded
+                            :prefill="createPrefill"
+                            :can-book-fallback="false"
+                            :hide-submit="true"
+                            @close="closeDayDetails"
+                            @loaded="handleBookingFormLoaded"
+                            @booking-conflict="refreshDayBookings"
+                        />
+                    </div>
+                </template>
+            </div>
+            <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <button
+                    v-if="dayLoading"
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    type="button"
+                    @click="closeDayDetails"
+                >
+                    Закрыть
+                </button>
+                <button
+                    v-if="selectedDay.is_closed"
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    type="button"
+                    @click="closeDayDetails"
+                >
+                    Закрыть
+                </button>
+                <button
+                    v-if="!dayLoading && !selectedDay.is_closed && isVenueUnavailableForBooking"
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    type="button"
+                    @click="closeDayDetails"
+                >
+                    Закрыть
+                </button>
+                <button
+                    v-if="showDayBookingForm && !selectedDay.is_closed"
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    type="button"
+                    @click="closeDayBookingForm"
+                >
+                    Отмена
+                </button>
+                <button
+                    v-if="!selectedDay.is_closed && !dayLoading && !isVenueUnavailableForBooking"
+                    class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                    type="button"
+                    :disabled="showDayBookingForm ? isEmbeddedSubmitDisabled : false"
+                    @click="showDayBookingForm ? submitEmbeddedBooking() : openBookingFromDay()"
+                >
+                    {{ showDayBookingForm ? 'Подтвердить' : 'Забронировать' }}
+                </button>
+            </div>
         </div>
     </div>
 

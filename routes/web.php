@@ -94,8 +94,10 @@ Route::prefix('venues')->group(function () {
         ->middleware('auth')
         ->name('venues.moderation.request');
     Route::get('/{type}/{venue}/schedule', [VenuesController::class, 'schedule'])
-        ->middleware('auth')
         ->name('venues.schedule');
+    Route::get('/{type}/{venue}/admin/schedule', [VenuesController::class, 'adminSchedule'])
+        ->middleware('auth')
+        ->name('venues.schedule.admin');
     Route::get('/{type}/{venue}/schedule-day', [VenuesController::class, 'scheduleDay'])
         ->name('venues.schedule.day');
     Route::post('/{type}/{venue}/schedule/intervals', [VenuesController::class, 'storeScheduleInterval'])
