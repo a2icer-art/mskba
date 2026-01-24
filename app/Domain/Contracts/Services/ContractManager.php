@@ -204,10 +204,6 @@ class ContractManager
             return false;
         }
 
-        if ($contract->created_by !== $actor->id) {
-            return false;
-        }
-
         $actorType = $this->resolveActorContractType($actor, $entity);
         $targetType = $contract->contract_type;
 
@@ -216,6 +212,14 @@ class ContractManager
         }
 
         if (!in_array($actorType, [ContractType::Creator, ContractType::Owner, ContractType::Supervisor], true)) {
+            return false;
+        }
+
+        if ($actorType === ContractType::Owner) {
+            return $targetType !== ContractType::Supervisor;
+        }
+
+        if ($contract->created_by !== $actor->id) {
             return false;
         }
 
