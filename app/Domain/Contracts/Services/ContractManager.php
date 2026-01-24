@@ -168,6 +168,10 @@ class ContractManager
             return true;
         }
 
+        if ($contract->user_id === $actor->id) {
+            return false;
+        }
+
         if ($contract->created_by !== $actor->id) {
             return false;
         }
@@ -194,6 +198,10 @@ class ContractManager
 
         if ($this->isAdmin($actor)) {
             return true;
+        }
+
+        if ($contract->user_id === $actor->id) {
+            return false;
         }
 
         if ($contract->created_by !== $actor->id) {
