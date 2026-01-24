@@ -237,6 +237,8 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
         ->name('admin.settings');
     Route::patch('/settings', [AdminSettingsController::class, 'update'])
         ->name('admin.settings.update');
+    Route::post('/settings/test-email', [AdminSettingsController::class, 'testEmail'])
+        ->name('admin.settings.test-email');
     Route::get('/balances', [AdminBalancesController::class, 'index'])
         ->name('admin.balances');
     Route::post('/balances/{user}/top-up', [AdminBalancesController::class, 'topUp'])

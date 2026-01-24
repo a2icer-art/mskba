@@ -41,7 +41,12 @@ class ContactVerificationService
         $expiresAt = now()->addMinutes(self::CODE_TTL_MINUTES);
 
         $delivery = app(ContactDeliveryResolver::class)->resolve($contact->type);
-        $delivery->send($contact, $code);
+        $sent = $delivery->send($contact, $code);
+        if (!$sent) {
+            throw ValidationException::withMessages([
+                'contact' => 'Отправка кода временно недоступна. Попробуйте позже.',
+            ]);
+        }
 
         return DB::transaction(function () use ($user, $contact, $code, $expiresAt, $now) {
             ContactVerification::query()
