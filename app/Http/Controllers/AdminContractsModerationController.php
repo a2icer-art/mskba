@@ -86,6 +86,7 @@ class AdminContractsModerationController extends Controller
                     'contract_type' => $meta['contract_type'] ?? null,
                     'comment' => $meta['comment'] ?? null,
                     'review_comment' => $meta['review_comment'] ?? null,
+                    'approved_permissions' => $meta['approved_permissions'] ?? [],
                     'reviewer' => $reviewer
                         ? [
                             'id' => $reviewer->id,
@@ -288,6 +289,49 @@ class AdminContractsModerationController extends Controller
             ModerationStatus::Rejected,
             $request->user()
         );
+
+        return back();
+    }
+
+    public function updatePermissions(Request $request, ModerationRequest $moderationRequest)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 10);
+
+        if ($roleLevel <= 20) {
+            abort(403);
+        }
+
+        if ($moderationRequest->entity_type !== ModerationEntityType::VenueContract) {
+            abort(404);
+        }
+
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
+            return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
+        }
+
+        $meta = $moderationRequest->meta ?? [];
+        $contractTypeValue = $meta['contract_type'] ?? null;
+        $contractType = $contractTypeValue ? ContractType::tryFrom($contractTypeValue) : null;
+        if (!$contractType || !in_array($contractType, [ContractType::Owner, ContractType::Supervisor], true)) {
+            return back()->withErrors(['moderation' => 'Недоступный тип контракта.']);
+        }
+
+        $data = $request->validate([
+            'permissions' => ['array'],
+            'permissions.*' => ['string', 'exists:permissions,code'],
+        ]);
+
+        $permissionCodes = $this->filterApprovalPermissionCodes(
+            $contractType,
+            $data['permissions'] ?? []
+        );
+
+        $moderationRequest->update([
+            'meta' => array_merge($meta, [
+                'approved_permissions' => $permissionCodes,
+            ]),
+        ]);
 
         return back();
     }

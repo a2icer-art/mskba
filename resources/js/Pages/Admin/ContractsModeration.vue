@@ -72,6 +72,9 @@ const approveForm = useForm({
     permissions: [],
     comment: '',
 });
+const viewPermissionsForm = useForm({
+    permissions: [],
+});
 const approveOpen = ref(false);
 const approveTarget = ref(null);
 const viewOpen = ref(false);
@@ -126,7 +129,7 @@ const openApprove = (requestItem) => {
     actionNotice.value = '';
     actionError.value = '';
     approveTarget.value = requestItem;
-    approveForm.permissions = [];
+    approveForm.permissions = requestItem?.approved_permissions ? [...requestItem.approved_permissions] : [];
     approveForm.comment = '';
     approveForm.clearErrors();
     approveOpen.value = true;
@@ -239,25 +242,58 @@ const submitReject = () => {
 
 const openView = (requestItem) => {
     viewTarget.value = requestItem;
+    viewPermissionsForm.permissions = requestItem?.approved_permissions ? [...requestItem.approved_permissions] : [];
+    viewPermissionsForm.clearErrors();
     viewOpen.value = true;
 };
 
 const closeView = () => {
     viewOpen.value = false;
     viewTarget.value = null;
+    viewPermissionsForm.reset('permissions');
+    viewPermissionsForm.clearErrors();
 };
 
 const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
 const supervisorPermissionSet = computed(() => new Set(props.supervisorPermissionCodes || []));
-const allowedPermissions = computed(() => {
-    if (!approveTarget.value) {
+const resolveAllowedPermissions = (contractType) => {
+    if (!contractType) {
         return [];
     }
-    if (approveTarget.value.contract_type === 'supervisor') {
+    if (contractType === 'supervisor') {
         return props.permissions.filter((permission) => supervisorPermissionSet.value.has(permission.code));
     }
     return props.permissions;
-});
+};
+const allowedPermissions = computed(() => resolveAllowedPermissions(approveTarget.value?.contract_type));
+const viewAllowedPermissions = computed(() => resolveAllowedPermissions(viewTarget.value?.contract_type));
+
+const submitViewPermissions = () => {
+    if (!viewTarget.value) {
+        return;
+    }
+
+    actionNotice.value = '';
+    actionError.value = '';
+
+    viewPermissionsForm.post(`/admin/contracts-moderation/${viewTarget.value.id}/permissions`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            actionNotice.value = 'Права заявки обновлены.';
+            if (viewTarget.value) {
+                viewTarget.value.approved_permissions = [...viewPermissionsForm.permissions];
+            }
+        },
+        onError: (errors) => {
+            actionError.value = errors.moderation || viewPermissionsForm.errors.permissions || 'Не удалось обновить права.';
+        },
+        onFinish: () => {
+            if (page.props?.errors?.moderation) {
+                actionError.value = page.props.errors.moderation;
+            }
+        },
+    });
+};
 </script>
 
 <template>
@@ -614,7 +650,7 @@ const allowedPermissions = computed(() => {
                         x
                     </button>
                 </div>
-                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                <div class="popup-body max-h-[520px] overflow-y-auto px-6 pt-4">
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
@@ -639,8 +675,40 @@ const allowedPermissions = computed(() => {
                             </div>
                         </div>
                     </div>
+                    <div class="mt-4">
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Права заявки</p>
+                        <div class="mt-3 max-h-[240px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3">
+                            <div v-if="viewAllowedPermissions.length" class="grid gap-2 text-sm text-slate-700">
+                                <label
+                                    v-for="permission in viewAllowedPermissions"
+                                    :key="permission.code"
+                                    class="flex items-center gap-2"
+                                >
+                                    <input
+                                        v-model="viewPermissionsForm.permissions"
+                                        :value="permission.code"
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                    />
+                                    <span>{{ permission.label }}</span>
+                                </label>
+                            </div>
+                            <p v-else class="text-sm text-slate-500">Нет доступных прав для заявки.</p>
+                        </div>
+                        <div v-if="viewPermissionsForm.errors.permissions" class="mt-2 text-xs text-rose-700">
+                            {{ viewPermissionsForm.errors.permissions }}
+                        </div>
+                    </div>
                 </div>
                 <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="button"
+                        :disabled="viewPermissionsForm.processing"
+                        @click="submitViewPermissions"
+                    >
+                        Сохранить
+                    </button>
                     <button
                         class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
                         type="button"
