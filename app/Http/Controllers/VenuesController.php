@@ -1798,7 +1798,7 @@ class VenuesController extends Controller
             'can_request' => $canRequest,
             'reason' => $reason,
             'has_active' => $hasActive,
-            'request' => $request ? $this->formatContractModerationRequest($request) : null,
+            'request' => $request ? $this->formatContractModerationRequest($request, $hasActive) : null,
         ];
     }
 
@@ -1813,19 +1813,28 @@ class VenuesController extends Controller
             ->first();
     }
 
-    private function formatContractModerationRequest(ModerationRequest $request): array
+    private function formatContractModerationRequest(ModerationRequest $request, bool $hasActive): array
     {
         $meta = $request->meta ?? [];
+        $status = $request->status?->value;
+        $revokedAt = $meta['revoked_at'] ?? null;
+        $revokedReason = $meta['revoked_reason'] ?? null;
+
+        if ($status === ModerationStatus::Approved->value && !$hasActive && $revokedAt) {
+            $status = 'revoked';
+        }
 
         return [
             'id' => $request->id,
-            'status' => $request->status?->value,
+            'status' => $status,
             'submitted_at' => DateFormatter::dateTime($request->submitted_at),
             'reviewed_at' => DateFormatter::dateTime($request->reviewed_at),
-            'reject_reason' => $request->reject_reason,
+            'reject_reason' => $status === 'revoked' ? $revokedReason : $request->reject_reason,
             'comment' => $meta['comment'] ?? null,
             'review_comment' => $meta['review_comment'] ?? null,
             'contract_type' => $meta['contract_type'] ?? null,
+            'revoked_at' => $revokedAt,
+            'revoked_reason' => $revokedReason,
         ];
     }
 

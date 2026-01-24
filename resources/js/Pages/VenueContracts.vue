@@ -141,6 +141,7 @@ const requestStatusLabels = {
     approved: 'Подтверждено',
     clarification: 'Требуются уточнения',
     rejected: 'Отклонено',
+    revoked: 'Аннулировано',
 };
 const contractModeration = computed(() => props.contractModeration ?? {});
 const ownerRequestState = computed(() => contractModeration.value.owner ?? {});
@@ -401,6 +402,7 @@ const formatDate = (value) => {
                                             'border-emerald-200 bg-emerald-50 text-emerald-700': ownerRequest.status === 'approved',
                                             'border-sky-200 bg-sky-50 text-sky-700': ownerRequest.status === 'clarification',
                                             'border-rose-200 bg-rose-50 text-rose-700': ownerRequest.status === 'rejected',
+                                            'border-amber-200 bg-amber-50 text-amber-800': ownerRequest.status === 'revoked',
                                         }"
                                     >
                                         {{ requestStatusLabels[ownerRequest.status] || '—' }}
@@ -414,7 +416,7 @@ const formatDate = (value) => {
                                         v-if="ownerRequest?.reject_reason"
                                         :class="ownerRequest.status === 'clarification' ? 'text-sky-700' : 'text-rose-700'"
                                     >
-                                        {{ ownerRequest.status === 'clarification' ? 'Требуются уточнения' : 'Отклонено' }}:
+                                        {{ ownerRequest.status === 'clarification' ? 'Требуются уточнения' : ownerRequest.status === 'revoked' ? 'Аннулировано' : 'Отклонено' }}:
                                         {{ ownerRequest.reject_reason }}
                                     </div>
                                     <div v-else-if="!ownerRequest && !ownerRequestState.can_request" class="text-slate-500">
@@ -451,6 +453,7 @@ const formatDate = (value) => {
                                             'border-emerald-200 bg-emerald-50 text-emerald-700': supervisorRequest.status === 'approved',
                                             'border-sky-200 bg-sky-50 text-sky-700': supervisorRequest.status === 'clarification',
                                             'border-rose-200 bg-rose-50 text-rose-700': supervisorRequest.status === 'rejected',
+                                            'border-amber-200 bg-amber-50 text-amber-800': supervisorRequest.status === 'revoked',
                                         }"
                                     >
                                         {{ requestStatusLabels[supervisorRequest.status] || '—' }}
@@ -464,7 +467,7 @@ const formatDate = (value) => {
                                         v-if="supervisorRequest?.reject_reason"
                                         :class="supervisorRequest.status === 'clarification' ? 'text-sky-700' : 'text-rose-700'"
                                     >
-                                        {{ supervisorRequest.status === 'clarification' ? 'Требуются уточнения' : 'Отклонено' }}:
+                                        {{ supervisorRequest.status === 'clarification' ? 'Требуются уточнения' : supervisorRequest.status === 'revoked' ? 'Аннулировано' : 'Отклонено' }}:
                                         {{ supervisorRequest.reject_reason }}
                                     </div>
                                     <div v-else-if="!supervisorRequest && !supervisorRequestState.can_request" class="text-slate-500">
