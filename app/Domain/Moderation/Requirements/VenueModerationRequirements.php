@@ -27,7 +27,10 @@ class VenueModerationRequirements
     public static function editableFields(bool $confirmed): array
     {
         if ($confirmed) {
-            return self::OPTIONAL_VENUE_FIELDS;
+            return array_values(array_unique(array_merge(
+                self::OPTIONAL_VENUE_FIELDS,
+                ['name']
+            )));
         }
 
         return array_values(array_unique(array_merge(

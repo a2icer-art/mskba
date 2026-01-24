@@ -5,6 +5,8 @@ namespace App\Domain\Venues\UseCases;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Domain\Moderation\Requirements\VenueModerationRequirements;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Permissions\Services\PermissionChecker;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
@@ -77,11 +79,14 @@ class UpdateVenue
         ];
 
         if ($this->isRestrictedStatus($venue)) {
+            $allowed = $this->getAllowedFields($venue);
             foreach (array_merge(
                 VenueModerationRequirements::requiredVenueFields(),
                 VenueModerationRequirements::requiredAddressFields()
             ) as $field) {
-                $rules[$field] = ['prohibited'];
+                if (!in_array($field, $allowed, true)) {
+                    $rules[$field] = ['prohibited'];
+                }
             }
         }
 
@@ -95,11 +100,18 @@ class UpdateVenue
 
     private function ensureOwner(User $actor, Venue $venue): void
     {
-        if ($venue->created_by !== $actor->id) {
-            throw ValidationException::withMessages([
-                'venue' => 'Редактировать площадку может только создатель.',
-            ]);
+        if ($venue->created_by === $actor->id) {
+            return;
         }
+
+        $checker = app(PermissionChecker::class);
+        if ($checker->can($actor, PermissionCode::VenueUpdate, $venue)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'venue' => 'Редактировать площадку может только создатель.',
+        ]);
     }
 
     private function ensureFieldsAllowed(Venue $venue, array $data): void
