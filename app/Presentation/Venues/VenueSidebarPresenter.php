@@ -66,7 +66,7 @@ class VenueSidebarPresenter extends BasePresenter
             if ($showContracts) {
                 $adminItems[] = [
                     'label' => 'Контракты',
-                    'href' => "/venues/{$typeSlug}/{$venue->alias}/contracts",
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/contracts",
                 ];
             }
             if ($canManageSchedule) {
@@ -78,19 +78,19 @@ class VenueSidebarPresenter extends BasePresenter
             if ($canManageBookings) {
                 $adminItems[] = [
                     'label' => 'Бронирование',
-                    'href' => "/venues/{$typeSlug}/{$venue->alias}/bookings",
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/bookings",
                 ];
             }
             if ($canViewSupervisor) {
                 $adminItems[] = [
                     'label' => 'Супервайзер',
-                    'href' => "/venues/{$typeSlug}/{$venue->alias}/supervisor",
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/supervisor",
                 ];
             }
             if ($canManageSettings) {
                 $adminItems[] = [
                     'label' => 'Настройки',
-                    'href' => "/venues/{$typeSlug}/{$venue->alias}/settings",
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/settings",
                 ];
             }
 

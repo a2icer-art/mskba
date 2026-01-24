@@ -82,7 +82,7 @@ watch(statusFilter, (value) => {
         return;
     }
     router.get(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings`,
         { status: value || undefined },
         { preserveScroll: true, preserveState: true, replace: true }
     );
@@ -334,7 +334,7 @@ const submitConfirm = () => {
         return;
     }
     confirmForm.post(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/confirm`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/confirm`,
         { preserveScroll: true, onSuccess: closeConfirm }
     );
 };
@@ -344,7 +344,7 @@ const submitCancel = () => {
         return;
     }
     cancelForm.post(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/cancel`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/cancel`,
         { preserveScroll: true, onSuccess: closeCancel }
     );
 };
@@ -361,7 +361,7 @@ const submitAwaitPayment = () => {
     }
     awaitPaymentForm.payment_wait_is_minutes = isPostpayment.value ? null : isPaymentWaitMinutes.value;
     awaitPaymentForm.post(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/await-payment`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/await-payment`,
         { preserveScroll: true, onSuccess: closeAwaitPayment }
     );
 };
@@ -371,7 +371,7 @@ const submitPaid = () => {
         return;
     }
     paidForm.post(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/bookings/${activeBooking.value.id}/mark-paid`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/mark-paid`,
         { preserveScroll: true, onSuccess: closePaid }
     );
 };

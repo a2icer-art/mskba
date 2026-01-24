@@ -343,7 +343,7 @@ class VenuesController extends Controller
             'canAssignContracts' => $canAssignContracts,
             'canViewContracts' => $canViewContracts,
             'navigation' => $navigation,
-            'activeHref' => "/venues/{$type}/{$venue->alias}/contracts",
+            'activeHref' => "/venues/{$type}/{$venue->alias}/admin/contracts",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
@@ -680,7 +680,7 @@ class VenuesController extends Controller
             'canConfirm' => $canConfirm,
             'canCancel' => $canCancel,
             'navigation' => $navigation,
-            'activeHref' => "/venues/{$type}/{$venue->alias}/bookings",
+            'activeHref' => "/venues/{$type}/{$venue->alias}/admin/bookings",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
@@ -727,7 +727,7 @@ class VenuesController extends Controller
             ],
             'canManage' => $checker->can($user, PermissionCode::VenueSupervisorManage, $venue),
             'navigation' => $navigation,
-            'activeHref' => "/venues/{$type}/{$venue->alias}/supervisor",
+            'activeHref' => "/venues/{$type}/{$venue->alias}/admin/supervisor",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
@@ -813,7 +813,7 @@ class VenuesController extends Controller
             ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
-            'activeHref' => "/venues/{$type}/{$venue->alias}/settings",
+            'activeHref' => "/venues/{$type}/{$venue->alias}/admin/settings",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);

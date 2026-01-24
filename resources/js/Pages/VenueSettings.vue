@@ -266,7 +266,7 @@ const submit = () => {
     const warningValue = Number(pendingWarningValue.value);
     form.pending_warning_minutes = Number.isFinite(warningValue) ? warningValue : null;
     form.pending_warning_is_minutes = isPendingWarningMinutes.value;
-    form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/settings`, {
+    form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/settings`, {
         preserveScroll: true,
         onSuccess: () => {
             localNotice.value = actionNotice.value || 'Настройки сохранены.';
@@ -581,4 +581,3 @@ const submit = () => {
         </div>
     </div>
 </template>
-

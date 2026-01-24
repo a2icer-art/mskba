@@ -159,6 +159,6 @@ class ContractNotificationService
             return null;
         }
 
-        return "/venues/{$venue->venueType->alias}/{$venue->alias}/contracts";
+        return "/venues/{$venue->venueType->alias}/{$venue->alias}/admin/contracts";
     }
 }

@@ -120,43 +120,43 @@ Route::prefix('venues')->group(function () {
     Route::delete('/{type}/{venue}/schedule/exceptions/{exception}', [VenuesController::class, 'destroyScheduleException'])
         ->middleware('auth')
         ->name('venues.schedule.exceptions.destroy');
-    Route::get('/{type}/{venue}/contracts', [VenuesController::class, 'contracts'])
+    Route::get('/{type}/{venue}/admin/contracts', [VenuesController::class, 'contracts'])
         ->middleware('auth')
         ->name('venues.contracts');
-    Route::post('/{type}/{venue}/contracts', [VenuesController::class, 'assignContract'])
+    Route::post('/{type}/{venue}/admin/contracts', [VenuesController::class, 'assignContract'])
         ->middleware('auth')
         ->name('venues.contracts.assign');
-    Route::post('/{type}/{venue}/contracts/moderation', [VenuesController::class, 'submitContractModeration'])
+    Route::post('/{type}/{venue}/admin/contracts/moderation', [VenuesController::class, 'submitContractModeration'])
         ->middleware('auth')
         ->name('venues.contracts.moderation');
-    Route::patch('/{type}/{venue}/contracts/{contract}/permissions', [VenuesController::class, 'updateContractPermissions'])
+    Route::patch('/{type}/{venue}/admin/contracts/{contract}/permissions', [VenuesController::class, 'updateContractPermissions'])
         ->middleware('auth')
         ->name('venues.contracts.permissions.update');
-    Route::post('/{type}/{venue}/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
+    Route::post('/{type}/{venue}/admin/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
         ->middleware('auth')
         ->name('venues.contracts.revoke');
-    Route::get('/{type}/{venue}/bookings', [VenuesController::class, 'bookings'])
+    Route::get('/{type}/{venue}/admin/bookings', [VenuesController::class, 'bookings'])
         ->middleware('auth')
         ->name('venues.bookings');
-    Route::post('/{type}/{venue}/bookings/{booking}/confirm', [VenuesController::class, 'confirmBooking'])
+    Route::post('/{type}/{venue}/admin/bookings/{booking}/confirm', [VenuesController::class, 'confirmBooking'])
         ->middleware('auth')
         ->name('venues.bookings.confirm');
-    Route::post('/{type}/{venue}/bookings/{booking}/await-payment', [VenuesController::class, 'awaitPaymentBooking'])
+    Route::post('/{type}/{venue}/admin/bookings/{booking}/await-payment', [VenuesController::class, 'awaitPaymentBooking'])
         ->middleware('auth')
         ->name('venues.bookings.await-payment');
-    Route::post('/{type}/{venue}/bookings/{booking}/mark-paid', [VenuesController::class, 'markPaidBooking'])
+    Route::post('/{type}/{venue}/admin/bookings/{booking}/mark-paid', [VenuesController::class, 'markPaidBooking'])
         ->middleware('auth')
         ->name('venues.bookings.mark-paid');
-    Route::post('/{type}/{venue}/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
+    Route::post('/{type}/{venue}/admin/bookings/{booking}/cancel', [VenuesController::class, 'cancelBooking'])
         ->middleware('auth')
         ->name('venues.bookings.cancel');
-    Route::get('/{type}/{venue}/supervisor', [VenuesController::class, 'supervisor'])
+    Route::get('/{type}/{venue}/admin/supervisor', [VenuesController::class, 'supervisor'])
         ->middleware('auth')
         ->name('venues.supervisor');
-    Route::get('/{type}/{venue}/settings', [VenuesController::class, 'settings'])
+    Route::get('/{type}/{venue}/admin/settings', [VenuesController::class, 'settings'])
         ->middleware('auth')
         ->name('venues.settings');
-    Route::patch('/{type}/{venue}/settings', [VenuesController::class, 'updateSettings'])
+    Route::patch('/{type}/{venue}/admin/settings', [VenuesController::class, 'updateSettings'])
         ->middleware('auth')
         ->name('venues.settings.update');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');

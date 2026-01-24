@@ -125,7 +125,7 @@ class BookingNotificationService
         $linkUrl = $booking->event?->id
             ? "/events/{$booking->event->id}{$query}"
             : ($booking->venue && $booking->venue->venueType
-                ? "/venues/{$booking->venue->venueType->alias}/{$booking->venue->alias}/bookings{$query}"
+                ? "/venues/{$booking->venue->venueType->alias}/{$booking->venue->alias}/admin/bookings{$query}"
                 : null);
 
         app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor);

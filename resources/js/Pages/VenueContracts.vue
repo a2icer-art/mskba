@@ -208,7 +208,7 @@ const closeEdit = () => {
 };
 
 const submitAssign = () => {
-    assignForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/contracts`, {
+    assignForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/contracts`, {
         preserveScroll: true,
         onSuccess: () => {
             assignForm.reset('login', 'user_id', 'name', 'contract_type', 'starts_at', 'ends_at', 'comment', 'permissions');
@@ -225,7 +225,7 @@ const submitEditPermissions = () => {
     }
 
     editForm.patch(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/contracts/${editTarget.value.id}/permissions`,
+        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/contracts/${editTarget.value.id}/permissions`,
         {
             preserveScroll: true,
             onSuccess: () => {
@@ -292,7 +292,7 @@ const revokeContract = (contract) => {
         return;
     }
 
-    revokeForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/contracts/${contract.id}/revoke`, {
+    revokeForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/contracts/${contract.id}/revoke`, {
         preserveScroll: true,
     });
 };
@@ -317,7 +317,7 @@ const submitRequest = () => {
         return;
     }
 
-    requestForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/contracts/moderation`, {
+    requestForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/contracts/moderation`, {
         preserveScroll: true,
         onSuccess: () => {
             closeRequest();
