@@ -135,14 +135,23 @@ class AdminSettingsController extends Controller
         }
 
         $encryption = (string) ($smtp['encryption'] ?? 'tls');
-        $encryption = $encryption === 'none' ? null : $encryption;
+        $scheme = null;
+        $autoTls = true;
+        if ($encryption === 'none') {
+            $autoTls = false;
+        } elseif ($encryption === 'ssl') {
+            $scheme = 'smtps';
+            $autoTls = false;
+        }
 
         config([
             'mail.mailers.smtp.host' => $host,
             'mail.mailers.smtp.port' => $port,
             'mail.mailers.smtp.username' => (string) ($smtp['username'] ?? ''),
             'mail.mailers.smtp.password' => (string) ($smtp['password'] ?? ''),
-            'mail.mailers.smtp.encryption' => $encryption,
+            'mail.mailers.smtp.encryption' => $encryption === 'none' ? null : $encryption,
+            'mail.mailers.smtp.scheme' => $scheme,
+            'mail.mailers.smtp.auto_tls' => $autoTls,
             'mail.from.address' => $fromAddress,
             'mail.from.name' => (string) ($smtp['from_name'] ?? config('app.name')),
         ]);
