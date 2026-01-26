@@ -8,6 +8,9 @@ use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
 use App\Domain\Messages\Services\ConversationService;
 use App\Domain\Messages\Services\MessageService;
+use App\Domain\Notifications\Enums\NotificationCode;
+use App\Domain\Notifications\Services\NotificationDeliveryService;
+use App\Domain\Notifications\Services\NotificationSettingsService;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Models\User;
 
@@ -15,6 +18,8 @@ class BookingNotificationService
 {
     public function notifyStatus(EventBooking $booking, EventBookingStatus $status, ?User $actor = null): int
     {
+        $notificationCode = NotificationCode::BookingStatus->value;
+
         $booking->loadMissing([
             'event:id',
             'venue:id,alias,venue_type_id',
@@ -26,11 +31,13 @@ class BookingNotificationService
 
         $title = $this->titleForStatus($status);
         $body = $booking->moderation_comment ?: null;
-        return $this->sendSystemMessage($booking, $title, $body, $actor);
+        return $this->sendSystemMessage($booking, $title, $body, $actor, $notificationCode);
     }
 
     public function notifyPendingWarning(EventBooking $booking, int $minutes): int
     {
+        $notificationCode = NotificationCode::BookingPendingWarning->value;
+
         $booking->loadMissing([
             'event:id',
             'venue:id,alias,venue_type_id',
@@ -43,7 +50,7 @@ class BookingNotificationService
         $title = 'Заявка на бронирование скоро будет отменена';
         $body = 'Заявка будет автоматически отменена через ' . $minutes . ' мин., если не будет подтверждена.';
 
-        return $this->sendSystemMessage($booking, $title, $body, null);
+        return $this->sendSystemMessage($booking, $title, $body, null, $notificationCode);
     }
 
     private function resolveBookingCode(EventBooking $booking): ?string
@@ -92,7 +99,13 @@ class BookingNotificationService
         };
     }
 
-    private function sendSystemMessage(EventBooking $booking, string $title, ?string $body, ?User $actor = null): int
+    private function sendSystemMessage(
+        EventBooking $booking,
+        string $title,
+        ?string $body,
+        ?User $actor = null,
+        ?string $notificationCode = null
+    ): int
     {
         $bookingCode = $this->resolveBookingCode($booking);
         $query = $bookingCode ? ('?booking=' . $bookingCode) : '';
@@ -100,11 +113,17 @@ class BookingNotificationService
         $creator = $booking->creator;
         $venueRecipients = $this->resolveVenueRecipients($booking);
 
-        $recipientIds = collect([$creator?->id, ...array_map(static fn (User $user) => $user->id, $venueRecipients)])
+        $recipientUsers = collect([$creator, ...$venueRecipients])
             ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            ->unique('id')
+            ->values();
+        if ($notificationCode) {
+            $settingsService = app(NotificationSettingsService::class);
+            $recipientUsers = $recipientUsers
+                ->filter(fn (User $user) => $settingsService->isEnabledForUser($user, $notificationCode))
+                ->values();
+        }
+        $recipientIds = $recipientUsers->pluck('id')->all();
 
         if ($recipientIds === []) {
             return 0;
@@ -128,7 +147,16 @@ class BookingNotificationService
                 ? "/venues/{$booking->venue->venueType->alias}/{$booking->venue->alias}/admin/bookings{$query}"
                 : null);
 
-        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor);
+        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor, $recipientIds);
+        if ($notificationCode) {
+            app(NotificationDeliveryService::class)->sendExternal(
+                $notificationCode,
+                $recipientUsers->all(),
+                $title,
+                $body,
+                $linkUrl
+            );
+        }
 
         return count($recipientIds);
     }

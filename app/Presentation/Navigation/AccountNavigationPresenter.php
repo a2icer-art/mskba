@@ -34,6 +34,7 @@ class AccountNavigationPresenter extends NavigationPresenter
         $settingsItems = [
             ['key' => 'access', 'label' => 'Доступы', 'href' => '/account/access'],
             ['key' => 'messages-settings', 'label' => 'Сообщения', 'href' => '/account/settings/messages'],
+            ['key' => 'notifications-settings', 'label' => 'Уведомления', 'href' => '/account/settings/notifications'],
         ];
 
         return [

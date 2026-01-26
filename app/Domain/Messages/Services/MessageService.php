@@ -52,11 +52,13 @@ class MessageService
         string $title,
         ?string $body,
         ?string $linkUrl = null,
-        ?User $contactUser = null
+        ?User $contactUser = null,
+        ?array $recipientIds = null
     ): Message
     {
         $participants = $conversation->participants()->pluck('user_id')->all();
-        if ($participants === []) {
+        $recipients = $recipientIds ?? $participants;
+        if ($recipients === []) {
             throw ValidationException::withMessages([
                 'message' => 'Нельзя отправлять сообщения без участников.',
             ]);
@@ -71,7 +73,7 @@ class MessageService
         ]);
 
         $now = Carbon::now();
-        foreach ($participants as $userId) {
+        foreach ($recipients as $userId) {
             MessageReceipt::query()->create([
                 'message_id' => $message->id,
                 'user_id' => $userId,

@@ -8,6 +8,9 @@ use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Messages\Services\ConversationService;
 use App\Domain\Messages\Services\MessageService;
+use App\Domain\Notifications\Enums\NotificationCode;
+use App\Domain\Notifications\Services\NotificationDeliveryService;
+use App\Domain\Notifications\Services\NotificationSettingsService;
 use App\Domain\Venues\Models\Venue;
 use App\Models\User;
 
@@ -18,15 +21,21 @@ class ContractNotificationService
         ModerationStatus $status,
         ?User $actor = null
     ): void {
+        $notificationCode = NotificationCode::ContractModerationStatus->value;
+
         $request->loadMissing(['submitter:id,login', 'reviewer:id,login', 'entityVenue:id,name,alias,venue_type_id', 'entityVenue.venueType:id,alias']);
         $venue = $request->entityVenue;
         $submitter = $request->submitter;
 
-        $recipientIds = collect([$submitter?->id, $actor?->id])
+        $recipientUsers = collect([$submitter, $actor])
             ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            ->unique('id')
+            ->values();
+        $settingsService = app(NotificationSettingsService::class);
+        $recipientUsers = $recipientUsers
+            ->filter(fn (User $user) => $settingsService->isEnabledForUser($user, $notificationCode))
+            ->values();
+        $recipientIds = $recipientUsers->pluck('id')->all();
 
         if ($recipientIds === []) {
             return;
@@ -56,7 +65,21 @@ class ContractNotificationService
 
         $linkUrl = $this->resolveVenueContractsUrl($venue);
 
-        app(MessageService::class)->sendSystem($conversation, 'Изменение статуса модерации', $body, $linkUrl, $actor);
+        app(MessageService::class)->sendSystem(
+            $conversation,
+            'Изменение статуса модерации',
+            $body,
+            $linkUrl,
+            $actor,
+            $recipientIds
+        );
+        app(NotificationDeliveryService::class)->sendExternal(
+            $notificationCode,
+            $recipientUsers->all(),
+            'Изменение статуса модерации',
+            $body,
+            $linkUrl
+        );
     }
 
     public function notifyContractAssigned(Contract $contract, ?User $actor = null): void
@@ -65,7 +88,8 @@ class ContractNotificationService
             $contract,
             'Назначение контракта',
             $this->buildContractBody($contract),
-            $actor
+            $actor,
+            NotificationCode::ContractAssigned->value
         );
     }
 
@@ -75,7 +99,8 @@ class ContractNotificationService
             $contract,
             'Аннулирование контракта',
             $this->buildContractBody($contract),
-            $actor
+            $actor,
+            NotificationCode::ContractRevoked->value
         );
     }
 
@@ -85,19 +110,30 @@ class ContractNotificationService
             $contract,
             'Изменение прав контракта',
             $this->buildContractBody($contract),
-            $actor
+            $actor,
+            NotificationCode::ContractPermissionsUpdated->value
         );
     }
 
-    private function notifyContractEvent(Contract $contract, string $title, ?string $body, ?User $actor): void
+    private function notifyContractEvent(
+        Contract $contract,
+        string $title,
+        ?string $body,
+        ?User $actor,
+        string $notificationCode
+    ): void
     {
         $contract->loadMissing(['user:id,login', 'permissions:id,code,label', 'entity']);
 
-        $recipientIds = collect([$contract->user?->id, $actor?->id])
+        $recipientUsers = collect([$contract->user, $actor])
             ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            ->unique('id')
+            ->values();
+        $settingsService = app(NotificationSettingsService::class);
+        $recipientUsers = $recipientUsers
+            ->filter(fn (User $user) => $settingsService->isEnabledForUser($user, $notificationCode))
+            ->values();
+        $recipientIds = $recipientUsers->pluck('id')->all();
 
         if ($recipientIds === []) {
             return;
@@ -115,7 +151,14 @@ class ContractNotificationService
 
         $linkUrl = $this->resolveVenueContractsUrl($venue);
 
-        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor);
+        app(MessageService::class)->sendSystem($conversation, $title, $body, $linkUrl, $actor, $recipientIds);
+        app(NotificationDeliveryService::class)->sendExternal(
+            $notificationCode,
+            $recipientUsers->all(),
+            $title,
+            $body,
+            $linkUrl
+        );
     }
 
     private function buildContractBody(Contract $contract): string

@@ -5,6 +5,7 @@ use App\Http\Controllers\AccountProfileController;
 use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AccountMessagesController;
+use App\Http\Controllers\AccountNotificationsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
@@ -40,6 +41,10 @@ Route::middleware('auth')->prefix('account')->group(function () {
     Route::get('/messages', [AccountMessagesController::class, 'index'])->name('account.messages');
     Route::get('/settings/messages', [AccountMessagesController::class, 'settings'])
         ->name('account.settings.messages');
+    Route::get('/settings/notifications', [AccountNotificationsController::class, 'settings'])
+        ->name('account.settings.notifications');
+    Route::patch('/settings/notifications', [AccountNotificationsController::class, 'update'])
+        ->name('account.settings.notifications.update');
     Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
