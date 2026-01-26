@@ -151,6 +151,8 @@ const paymentWaitMax = computed(() => (isPaymentWaitMinutes.value ? 10080 : 168)
 const highlightPartialSwap = ref(false);
 const highlightTimer = ref(null);
 const originalTotalAmount = ref(0);
+const bookingTotalAmount = ref(0);
+const venueDefaultAmount = ref(0);
 
 const formatAmount = (value) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -173,6 +175,19 @@ const resolvePaymentAmount = (booking) => {
         return booking.payment_total_amount_minor;
     }
     return null;
+};
+
+const resolveBookingTotalAmount = (booking) => {
+    if (!booking) {
+        return 0;
+    }
+    if (booking.payment_total_amount_minor) {
+        return booking.payment_total_amount_minor;
+    }
+    if (booking.payment_amount_minor) {
+        return booking.payment_amount_minor;
+    }
+    return 0;
 };
 
 const calcDurationMinutes = (booking) => {
@@ -203,6 +218,19 @@ const resolveTotalAmount = () => {
     const fallback = calcTotalAmount(activeBooking.value);
     return originalTotalAmount.value > 0 ? originalTotalAmount.value : fallback;
 };
+
+const isDefaultAmountMismatch = computed(() => {
+    if (bookingTotalAmount.value <= 0 || venueDefaultAmount.value <= 0) {
+        return false;
+    }
+    return bookingTotalAmount.value !== venueDefaultAmount.value;
+});
+const priceLabel = computed(() => (isDefaultAmountMismatch.value ? 'Стоимость (!)' : 'Стоимость'));
+const priceLabelTitle = computed(() => (
+    isDefaultAmountMismatch.value
+        ? `стоимость аренды площадки ${formatAmount(venueDefaultAmount.value)}`
+        : ''
+));
 
 const isPartialAmountOverTotal = computed(() => {
     if (!isPartialPrepayment.value) {
@@ -294,7 +322,9 @@ const openAwaitPayment = (booking) => {
     awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
     awaitPaymentForm.payment_order_id = defaultPaymentOrderId;
     initPaymentWaitValue(paymentDefaults.value.payment_wait_minutes ?? null);
-    originalTotalAmount.value = booking?.payment_total_amount_minor ?? calcTotalAmount(booking);
+    bookingTotalAmount.value = resolveBookingTotalAmount(booking);
+    venueDefaultAmount.value = calcTotalAmount(booking);
+    originalTotalAmount.value = bookingTotalAmount.value > 0 ? bookingTotalAmount.value : venueDefaultAmount.value;
     if (selectedPaymentOrder.value?.code === 'partial_prepayment') {
         const totalAmount = resolveTotalAmount();
         awaitPaymentForm.partial_amount_minor = booking?.payment_partial_amount_minor
@@ -312,6 +342,8 @@ const closeAwaitPayment = () => {
     awaitPaymentForm.reset('comment', 'payment_wait_minutes', 'partial_amount_minor');
     isPaymentWaitMinutes.value = false;
     originalTotalAmount.value = 0;
+    bookingTotalAmount.value = 0;
+    venueDefaultAmount.value = 0;
     awaitPaymentForm.clearErrors();
 };
 
@@ -694,8 +726,11 @@ watch(
                         <div v-if="awaitPaymentForm.errors.payment_wait_minutes" class="text-xs text-rose-700">
                             {{ awaitPaymentForm.errors.payment_wait_minutes }}
                         </div>
-                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Стоимость
+                        <label
+                            class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500"
+                            :title="priceLabelTitle || null"
+                        >
+                            {{ priceLabel }}
                             <input
                                 v-model.number="awaitPaymentForm.partial_amount_minor"
                                 type="number"
