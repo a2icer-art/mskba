@@ -26,6 +26,11 @@ jobs:
 
       - name: Build assets
         run: npm run build
+        env:
+          VITE_REVERB_APP_KEY: ${{ vars.VITE_REVERB_APP_KEY }}
+          VITE_REVERB_HOST: ${{ vars.VITE_REVERB_HOST }}
+          VITE_REVERB_PORT: ${{ vars.VITE_REVERB_PORT }}
+          VITE_REVERB_SCHEME: ${{ vars.VITE_REVERB_SCHEME }}
 
       - name: Pack public/build
         run: |
