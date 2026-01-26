@@ -80,6 +80,14 @@ class NotificationDeliveryService
         $username = (string) ($smtp['username'] ?? '');
         $password = (string) ($smtp['password'] ?? '');
         $encryption = (string) ($smtp['encryption'] ?? 'tls');
+        $scheme = null;
+        $autoTls = true;
+        if ($encryption === 'none') {
+            $autoTls = false;
+        } elseif ($encryption === 'ssl') {
+            $scheme = 'smtps';
+            $autoTls = false;
+        }
         $fromAddress = trim((string) ($smtp['from_address'] ?? ''));
         $fromName = (string) ($smtp['from_name'] ?? config('app.name'));
 
@@ -87,14 +95,14 @@ class NotificationDeliveryService
             return;
         }
 
-        $encryption = $encryption === 'none' ? null : $encryption;
-
         config([
             'mail.mailers.smtp.host' => $host,
             'mail.mailers.smtp.port' => $port,
             'mail.mailers.smtp.username' => $username,
             'mail.mailers.smtp.password' => $password,
-            'mail.mailers.smtp.encryption' => $encryption,
+            'mail.mailers.smtp.encryption' => $encryption === 'none' ? null : $encryption,
+            'mail.mailers.smtp.scheme' => $scheme,
+            'mail.mailers.smtp.auto_tls' => $autoTls,
             'mail.from.address' => $fromAddress,
             'mail.from.name' => $fromName,
         ]);
