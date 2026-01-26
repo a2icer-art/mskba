@@ -43,28 +43,20 @@ class ContactVerificationService
         $delivery = app(ContactDeliveryResolver::class)->resolve($contact->type);
         $sent = $delivery->send($contact, $code);
         if (!$sent) {
+            if (app()->environment('local')) {
+                $this->createVerification($user, $contact, $code, $expiresAt, $now);
+                throw ValidationException::withMessages([
+                    'contact' => 'Не удалось отправить код. Обратитесь в техподдержку.',
+                    'fallback' => '1',
+                ]);
+            }
+
             throw ValidationException::withMessages([
-                'contact' => 'Отправка кода временно недоступна. Попробуйте позже.',
+                'contact' => 'Не удалось отправить код. Обратитесь в техподдержку.',
             ]);
         }
 
-        return DB::transaction(function () use ($user, $contact, $code, $expiresAt, $now) {
-            ContactVerification::query()
-                ->where('contact_id', $contact->id)
-                ->forceDelete();
-
-            return ContactVerification::query()->create([
-                'user_id' => $user->id,
-                'contact_id' => $contact->id,
-                'code' => $code,
-                'expires_at' => $expiresAt,
-                'sent_at' => $now,
-                'attempts' => 0,
-                'verified_at' => null,
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]);
-        });
+        return $this->createVerification($user, $contact, $code, $expiresAt, $now);
     }
 
     public function verifyCode(User $user, UserContact $contact, string $code): void
@@ -132,5 +124,31 @@ class ContactVerificationService
         $max = (10 ** self::CODE_LENGTH) - 1;
 
         return (string) random_int($min, $max);
+    }
+
+    private function createVerification(
+        User $user,
+        UserContact $contact,
+        string $code,
+        $expiresAt,
+        $now
+    ): ContactVerification {
+        return DB::transaction(function () use ($user, $contact, $code, $expiresAt, $now) {
+            ContactVerification::query()
+                ->where('contact_id', $contact->id)
+                ->forceDelete();
+
+            return ContactVerification::query()->create([
+                'user_id' => $user->id,
+                'contact_id' => $contact->id,
+                'code' => $code,
+                'expires_at' => $expiresAt,
+                'sent_at' => $now,
+                'attempts' => 0,
+                'verified_at' => null,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        });
     }
 }

@@ -572,6 +572,28 @@ const requestVerificationCode = (contact, errorMap) => {
                     [contact.id]: message,
                 };
             }
+            if (errors.fallback) {
+                verificationOpen.value = {
+                    ...verificationOpen.value,
+                    [contact.id]: true,
+                };
+                verificationCodes.value = {
+                    ...verificationCodes.value,
+                    [contact.id]: '',
+                };
+                if (message) {
+                    verificationMessages.value = {
+                        ...verificationMessages.value,
+                        [contact.id]: message,
+                    };
+                    verificationError.value = {
+                        ...verificationError.value,
+                        [contact.id]: true,
+                    };
+                }
+                setVerificationCountdown(contact.id, 0);
+                clearVerificationOverride(contact.id);
+            }
             const waitSeconds = Number(errors.wait_seconds ?? 0);
             if (waitSeconds > 0) {
                 setVerificationCountdown(contact.id, waitSeconds);
