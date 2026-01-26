@@ -10,4 +10,5 @@ enum NotificationCode: string
     case ContractAssigned = 'contract.assigned';
     case ContractRevoked = 'contract.revoked';
     case ContractPermissionsUpdated = 'contract.permissions_updated';
+    case MessageCreated = 'message.created';
 }

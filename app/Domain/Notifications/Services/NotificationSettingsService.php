@@ -21,6 +21,10 @@ class NotificationSettingsService
                 'label' => 'Предупреждение о скорой отмене бронирования',
             ],
             [
+                'code' => NotificationCode::MessageCreated->value,
+                'label' => 'Новое личное сообщение',
+            ],
+            [
                 'code' => NotificationCode::ContractModerationStatus->value,
                 'label' => 'Смена статуса модерации контракта',
             ],
