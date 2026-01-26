@@ -1084,13 +1084,21 @@ class VenuesController extends Controller
             ? null
             : ($waitMinutes > 0 ? now()->addMinutes($waitMinutes) : null);
 
+        $existingPayment = $booking->payment;
+        $existingMeta = $existingPayment?->meta ?? [];
+
         $durationMinutes = $booking->starts_at && $booking->ends_at
             ? max(1, $booking->starts_at->diffInMinutes($booking->ends_at))
             : 0;
-        $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
-        $units = $durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0;
-        $unitPrice = (int) $settings->rental_price_rub;
-        $amount = (int) round($units * $unitPrice);
+        $unitMinutes = max(1, (int) ($existingMeta['unit_minutes'] ?? $settings->rental_duration_minutes));
+        $units = $existingMeta['units'] ?? ($durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0);
+        $unitPrice = (int) ($existingMeta['unit_price_rub'] ?? $settings->rental_price_rub);
+
+        $existingTotalAmount = $existingMeta['total_amount_minor'] ?? null;
+        $existingAmount = $existingPayment?->amount_minor;
+        $amount = $existingTotalAmount !== null
+            ? (int) $existingTotalAmount
+            : ($existingAmount !== null ? (int) $existingAmount : (int) round($units * $unitPrice));
         $partialAmount = null;
         if ($paymentOrderCode === VenuePaymentOrder::PartialPrepayment->value) {
             $partialAmount = (int) ($data['partial_amount_minor'] ?? (int) ceil($amount * 0.5));
