@@ -170,7 +170,7 @@ const submitTest = () => {
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-6">
                         <h2 class="text-lg font-semibold text-slate-900">Отправка сообщений</h2>
                         <p class="mt-2 text-sm text-slate-600">
-                            Настройки SMTP используются для отправки кода подтверждения по email.
+                            Настройки SMTP используются для отправки писем сайта (например: коды подтверждения и уведомления).
                         </p>
 
                         <form class="mt-6 space-y-6" @submit.prevent="submit">
