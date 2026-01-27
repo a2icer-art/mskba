@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
+import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -38,6 +39,10 @@ const props = defineProps({
 });
 
 const page = usePage();
+const isAuthenticated = computed(() => !!page.props.auth?.user);
+const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const showAuthModal = ref(false);
+const authMode = ref('login');
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
@@ -123,6 +128,11 @@ const venueSuggestLoading = ref(false);
 const venueSuggestError = ref('');
 let venueSuggestTimer = null;
 let venueSuggestRequestId = 0;
+
+const openAuthModal = () => {
+    authMode.value = 'login';
+    showAuthModal.value = true;
+};
 
 const openBooking = () => {
     bookingForm.clearErrors();
@@ -337,8 +347,9 @@ const bookingClientError = computed(() => {
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
                 :app-name="appName"
-                :is-authenticated="Boolean($page.props.auth?.user)"
-                :login-label="$page.props.auth?.user?.login"
+                :is-authenticated="isAuthenticated"
+                :login-label="loginLabel"
+                @open-login="openAuthModal"
             />
 
             <main class="grid gap-6">
@@ -453,6 +464,14 @@ const bookingClientError = computed(() => {
 
             <MainFooter :app-name="appName" />
         </div>
+
+        <AuthModal
+            :app-name="appName"
+            :is-open="showAuthModal"
+            :participant-roles="page.props.participantRoles || []"
+            :initial-mode="authMode"
+            @close="showAuthModal = false"
+        />
     </div>
 
     <div v-if="bookingOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">

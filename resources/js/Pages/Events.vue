@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, onMounted, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import EventCreateModal from '../Components/EventCreateModal.vue';
 import MainFooter from '../Components/MainFooter.vue';
@@ -31,6 +32,11 @@ const props = defineProps({
 });
 
 const page = usePage();
+const isAuthenticated = computed(() => !!page.props.auth?.user);
+const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
+const showAuthModal = ref(false);
+const authMode = ref('login');
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.event ?? '');
 const hasEvents = computed(() => props.events.length > 0);
@@ -44,6 +50,11 @@ const openCreate = (prefill = {}) => {
 
 const closeCreate = () => {
     createOpen.value = false;
+};
+
+const openAuthModal = () => {
+    authMode.value = 'login';
+    showAuthModal.value = true;
 };
 
 onMounted(() => {
@@ -94,8 +105,9 @@ const formatDateRange = (startsAt, endsAt) => {
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader
                 :app-name="appName"
-                :is-authenticated="Boolean($page.props.auth?.user)"
-                :login-label="$page.props.auth?.user?.login"
+                :is-authenticated="isAuthenticated"
+                :login-label="loginLabel"
+                @open-login="openAuthModal"
             />
 
             <main class="grid gap-6">
@@ -104,8 +116,23 @@ const formatDateRange = (startsAt, endsAt) => {
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 class="text-3xl font-semibold text-slate-900">События</h1>
-                            <p class="mt-2 text-sm text-slate-600">
-                                Игры, тренировки и игровые тренировки.
+                            <p v-if="!isAuthenticated" class="mt-2 text-sm text-slate-600">
+                                Для просмотра событий необходимо
+                                <button
+                                    class="font-semibold text-slate-900 transition hover:text-slate-700"
+                                    type="button"
+                                    @click="openAuthModal"
+                                >
+                                    авторизоваться
+                                </button>
+                                .
+                            </p>
+                            <p v-else-if="!isUserConfirmed" class="mt-2 text-sm text-slate-600">
+                                Для просмотра событий необходимо
+                                <Link class="font-semibold text-slate-900 transition hover:text-slate-700" href="/account">
+                                    подтвердить свой аккаунт
+                                </Link>
+                                .
                             </p>
                         </div>
                         <button
@@ -132,9 +159,14 @@ const formatDateRange = (startsAt, endsAt) => {
                             <div class="flex flex-wrap items-center justify-between gap-4">
                                 <div>
                                     <h2 class="text-lg font-semibold text-slate-900">
-                                        <Link class="transition hover:text-slate-700" :href="`/events/${event.id}`">
+                                        <Link
+                                            v-if="isAuthenticated"
+                                            class="transition hover:text-slate-700"
+                                            :href="`/events/${event.id}`"
+                                        >
                                             {{ event.title }}
                                         </Link>
+                                        <span v-else>{{ event.title }}</span>
                                     </h2>
                                     <div class="mt-1 text-sm text-slate-600">
                                         {{ event.type?.label || 'Тип не задан' }}
@@ -176,8 +208,25 @@ const formatDateRange = (startsAt, endsAt) => {
                                             <span class="text-sm leading-none">✕</span>
                                         </span>
                                     </div>
+                                    <div
+                                        v-if="event.has_approved_booking && event.approved_venue?.alias && event.approved_venue?.type_slug"
+                                        class="mt-2 text-sm text-slate-700"
+                                    >
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
+                                        <div class="mt-1">
+                                            <a
+                                                class="font-semibold text-slate-900 transition hover:text-slate-700"
+                                                :href="`/venues/${event.approved_venue.type_slug}/${event.approved_venue.alias}`"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                {{ event.approved_venue.name || 'Площадка' }}
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <Link
+                                    v-if="isAuthenticated"
                                     class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5"
                                     :href="`/events/${event.id}`"
                                 >
@@ -185,7 +234,7 @@ const formatDateRange = (startsAt, endsAt) => {
                                 </Link>
                             </div>
                             <div class="mt-3 text-sm text-slate-700">
-                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Время</span>
+                                <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата</span>
                                 <div class="mt-1">{{ formatDateRange(event.starts_at, event.ends_at) }}</div>
                             </div>
                         </article>
@@ -202,5 +251,13 @@ const formatDateRange = (startsAt, endsAt) => {
         :prefill="createPrefill"
         :can-book-fallback="props.canBook"
         @close="closeCreate"
+    />
+
+    <AuthModal
+        :app-name="appName"
+        :is-open="showAuthModal"
+        :participant-roles="page.props.participantRoles || []"
+        :initial-mode="authMode"
+        @close="showAuthModal = false"
     />
 </template>

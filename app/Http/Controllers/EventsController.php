@@ -10,12 +10,14 @@ use App\Domain\Events\Services\EventBookingService;
 use App\Domain\Admin\Services\EventDefaultsService;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Presentation\Breadcrumbs\EventBreadcrumbsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -27,7 +29,7 @@ class EventsController extends Controller
         $checker = app(PermissionChecker::class);
 
         $events = Event::query()
-            ->with(['type', 'organizer', 'bookings'])
+            ->with(['type', 'organizer', 'bookings.venue.venueType'])
             ->orderByDesc('created_at')
             ->get()
             ->map(static function (Event $event): array {
@@ -36,6 +38,9 @@ class EventsController extends Controller
                 $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Pending);
                 $hasAwaitingPaymentBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::AwaitingPayment);
                 $hasPaidBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Paid);
+                $approvedVenue = $event->bookings
+                    ->first(static fn ($booking) => $booking->status === EventBookingStatus::Approved && $booking->venue)
+                    ?->venue;
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
@@ -47,6 +52,16 @@ class EventsController extends Controller
                     'has_pending_booking' => $hasPendingBooking,
                     'has_awaiting_payment_booking' => $hasAwaitingPaymentBooking,
                     'has_paid_booking' => $hasPaidBooking,
+                    'approved_venue' => $approvedVenue
+                        ? [
+                            'id' => $approvedVenue->id,
+                            'name' => $approvedVenue->name,
+                            'alias' => $approvedVenue->alias,
+                            'type_slug' => $approvedVenue->venueType?->alias
+                                ? Str::plural($approvedVenue->venueType->alias)
+                                : null,
+                        ]
+                        : null,
                     'type' => $event->type
                         ? [
                             'code' => $event->type->code,
@@ -246,6 +261,49 @@ class EventsController extends Controller
                 ->withErrors(['event' => 'Недостаточно прав для просмотра заявки.']);
         }
 
+        $timezone = config('app.timezone');
+        $now = Carbon::now($timezone);
+        $bookingDeadlinePassed = $event->starts_at
+            ? $event->starts_at->copy()->subMinutes(VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES)->lte($now)
+            : false;
+        $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
+        $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
+        $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
+        $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
+            'event' => $event,
+        ])['data'];
+
+        $eventPayload = [
+            'id' => $event->id,
+            'title' => $event->title ?: 'Событие',
+            'status' => $event->status,
+            'starts_at' => $event->starts_at?->toDateTimeString(),
+            'ends_at' => $event->ends_at?->toDateTimeString(),
+            'type' => $event->type
+                ? [
+                    'code' => $event->type->code,
+                    'label' => $event->type->label,
+                ]
+                : null,
+            'organizer' => $event->organizer
+                ? [
+                    'id' => $event->organizer->id,
+                    'login' => $event->organizer->login,
+                ]
+                : null,
+        ];
+
+        $isAdmin = $user?->roles()->where('alias', 'admin')->exists() ?? false;
+        $isOrganizer = $user && $event->organizer_id === $user->id;
+
+        if (!$isAdmin && !$isOrganizer) {
+            return Inertia::render('EventShowPublic', [
+                'appName' => config('app.name'),
+                'event' => $eventPayload,
+                'breadcrumbs' => $breadcrumbs,
+            ]);
+        }
+
         $bookings = $event->bookings
             ->map(static function ($booking): array {
                 $snapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
@@ -273,39 +331,9 @@ class EventsController extends Controller
             })
             ->all();
 
-        $timezone = config('app.timezone');
-        $now = Carbon::now($timezone);
-        $bookingDeadlinePassed = $event->starts_at
-            ? $event->starts_at->copy()->subMinutes(VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES)->lte($now)
-            : false;
-        $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
-        $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
-        $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
-        $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
-            'event' => $event,
-        ])['data'];
-
         return Inertia::render('EventShow', [
             'appName' => config('app.name'),
-            'event' => [
-                'id' => $event->id,
-                'title' => $event->title ?: 'Событие',
-                'status' => $event->status,
-                'starts_at' => $event->starts_at?->toDateTimeString(),
-                'ends_at' => $event->ends_at?->toDateTimeString(),
-                'type' => $event->type
-                    ? [
-                        'code' => $event->type->code,
-                        'label' => $event->type->label,
-                    ]
-                    : null,
-                'organizer' => $event->organizer
-                    ? [
-                        'id' => $event->organizer->id,
-                        'login' => $event->organizer->login,
-                    ]
-                    : null,
-            ],
+            'event' => $eventPayload,
             'bookings' => $bookings,
             'canBook' => $canBook,
             'bookingDeadlinePassed' => $bookingDeadlinePassed,
@@ -398,6 +426,10 @@ class EventsController extends Controller
         }
 
         if ($event->organizer_id === $user->id) {
+            return true;
+        }
+
+        if ($user->status === UserStatus::Confirmed) {
             return true;
         }
 
