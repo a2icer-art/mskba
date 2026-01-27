@@ -27,8 +27,9 @@ class VenueShowPresenter extends BasePresenter
         $canSubmitModeration = $user
             && $user->status?->value === UserStatus::Confirmed->value
             && $checker->can($user, PermissionCode::VenueSubmitForModeration, $venue);
+        $canEditByPermission = $user ? $checker->can($user, PermissionCode::VenueUpdate, $venue) : false;
         $editPolicy = app(VenueEditPolicy::class);
-        $editableFields = $isOwner ? $editPolicy->getEditableFields($venue) : [];
+        $editableFields = ($isOwner || $canEditByPermission) ? $editPolicy->getEditableFields($venue) : [];
 
         $latestRequest = ModerationRequest::query()
             ->where('entity_type', ModerationEntityType::Venue->value)
@@ -85,7 +86,7 @@ class VenueShowPresenter extends BasePresenter
             'activeTypeSlug' => $typeSlug,
             'types' => app(VenueTypeOptionsPresenter::class)->present()['data'],
             'editableFields' => $editableFields,
-            'canEdit' => (bool) $isOwner,
+            'canEdit' => (bool) ($isOwner || $canEditByPermission),
             'canSubmitModeration' => $canSubmitModeration,
         ];
     }
