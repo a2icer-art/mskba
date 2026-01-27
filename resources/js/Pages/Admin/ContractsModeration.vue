@@ -309,7 +309,10 @@ const resolveAllowedPermissions = (contractType) => {
     if (contractType === 'supervisor') {
         return props.permissions.filter((permission) => supervisorPermissionSet.value.has(permission.code));
     }
-    return props.permissions;
+    return props.permissions.filter((permission) => ![
+        'venue.supervisor.view',
+        'venue.supervisor.manage',
+    ].includes(permission.code));
 };
 const allowedPermissions = computed(() => resolveAllowedPermissions(approveTarget.value?.contract_type));
 const viewAllowedPermissions = computed(() => resolveAllowedPermissions(viewTarget.value?.contract_type));

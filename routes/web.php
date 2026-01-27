@@ -160,6 +160,9 @@ Route::prefix('venues')->group(function () {
     Route::get('/{type}/{venue}/admin/supervisor', [VenuesController::class, 'supervisor'])
         ->middleware('auth')
         ->name('venues.supervisor');
+    Route::patch('/{type}/{venue}/admin/supervisor', [VenuesController::class, 'updateSupervisor'])
+        ->middleware('auth')
+        ->name('venues.supervisor.update');
     Route::get('/{type}/{venue}/admin/settings', [VenuesController::class, 'settings'])
         ->middleware('auth')
         ->name('venues.settings');

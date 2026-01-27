@@ -7,6 +7,9 @@ use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Services\BookingNotificationService;
+use App\Domain\Contracts\Enums\ContractStatus;
+use App\Domain\Contracts\Enums\ContractType;
+use App\Domain\Contracts\Models\Contract;
 use App\Models\User;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
@@ -176,6 +179,9 @@ class EventBookingService
             'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
             'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
             'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
+            'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+            'supervisor_fee_amount_rub' => VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+            'supervisor_fee_is_fixed' => VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
         ]);
     }
 
@@ -188,7 +194,12 @@ class EventBookingService
         $unitMinutes = max(1, (int) $settings->rental_duration_minutes);
         $units = $durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0;
         $unitPrice = (int) $settings->rental_price_rub;
-        $amount = (int) round($units * $unitPrice);
+        $baseAmount = (int) round($units * $unitPrice);
+        $commission = $this->resolveSupervisorCommission($venue, $settings, $baseAmount);
+        $commissionAmount = $commission['amount'];
+        $commissionPercent = $commission['percent'];
+        $commissionFixed = $commission['is_fixed'];
+        $amount = $baseAmount + $commissionAmount;
 
         Payment::query()->create([
             'user_id' => $createdBy,
@@ -202,7 +213,51 @@ class EventBookingService
                 'unit_minutes' => $unitMinutes,
                 'unit_price_rub' => $unitPrice,
                 'units' => $units,
+                'base_amount_minor' => $baseAmount,
+                'supervisor_fee_percent' => $commissionPercent,
+                'supervisor_fee_amount_minor' => $commissionAmount,
+                'supervisor_fee_is_fixed' => $commissionFixed,
+                'total_amount_minor' => $amount,
             ],
         ]);
+    }
+
+    private function resolveSupervisorCommission(Venue $venue, VenueSettings $settings, int $baseAmount): array
+    {
+        $percent = (int) ($settings->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT);
+        $fixedAmount = (int) ($settings->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB);
+        $isFixed = (bool) ($settings->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED);
+
+        $now = now();
+        $hasActiveSupervisor = Contract::query()
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', ContractType::Supervisor->value)
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
+
+        if (!$hasActiveSupervisor) {
+            return ['amount' => 0, 'percent' => 0, 'is_fixed' => $isFixed];
+        }
+
+        if ($isFixed) {
+            $amount = max(0, $fixedAmount);
+            return ['amount' => $amount, 'percent' => 0, 'is_fixed' => true];
+        }
+
+        if ($percent <= 0) {
+            return ['amount' => 0, 'percent' => 0, 'is_fixed' => false];
+        }
+
+        $amount = (int) round($baseAmount * $percent / 100);
+        return ['amount' => $amount, 'percent' => $percent, 'is_fixed' => false];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Presentation\Venues;
 
 use App\Domain\Contracts\Enums\ContractStatus;
+use App\Domain\Contracts\Enums\ContractType;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
@@ -193,10 +194,17 @@ class VenueSidebarPresenter extends BasePresenter
             return false;
         }
 
-        $checker = app(PermissionChecker::class);
+        if ($this->isAdmin($user)) {
+            return true;
+        }
 
-        return $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
-            || $checker->can($user, PermissionCode::VenueSupervisorManage, $venue);
+        $checker = app(PermissionChecker::class);
+        if (!$checker->can($user, PermissionCode::VenueSupervisorView, $venue)
+            && !$checker->can($user, PermissionCode::VenueSupervisorManage, $venue)) {
+            return false;
+        }
+
+        return $this->hasActiveSupervisorContract($user, $venue);
     }
 
     private function canManageSchedule(?User $user, Venue $venue): bool
@@ -208,5 +216,33 @@ class VenueSidebarPresenter extends BasePresenter
         $checker = app(PermissionChecker::class);
 
         return $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
+    }
+
+    private function isAdmin(User $user): bool
+    {
+        return $user->roles()
+            ->where('alias', 'admin')
+            ->exists();
+    }
+
+    private function hasActiveSupervisorContract(User $user, Venue $venue): bool
+    {
+        $now = now();
+
+        return Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', ContractType::Supervisor->value)
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
     }
 }

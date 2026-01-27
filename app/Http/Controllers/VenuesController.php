@@ -530,6 +530,9 @@ class VenuesController extends Controller
                 'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
                 'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
                 'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
+                'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+                'supervisor_fee_amount_rub' => VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+                'supervisor_fee_is_fixed' => VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
             ]
         );
         $paymentOrders = PaymentOrder::query()
@@ -594,6 +597,10 @@ class VenuesController extends Controller
                       'payment_amount_minor' => $booking->payment?->amount_minor,
                       'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
                       'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
+                      'payment_base_amount_minor' => $paymentMeta['base_amount_minor'] ?? null,
+                      'payment_supervisor_fee_percent' => $paymentMeta['supervisor_fee_percent'] ?? null,
+                      'payment_supervisor_fee_amount_minor' => $paymentMeta['supervisor_fee_amount_minor'] ?? null,
+                      'payment_supervisor_fee_is_fixed' => $paymentMeta['supervisor_fee_is_fixed'] ?? null,
                       'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
                       'event' => $booking->event
                         ? [
@@ -676,6 +683,10 @@ class VenuesController extends Controller
                 'pending_review_minutes' => $settings->pending_review_minutes,
                 'pending_before_start_minutes' => $settings->pending_before_start_minutes,
                 'pending_warning_minutes' => $settings->pending_warning_minutes,
+                'supervisor_fee_percent' => $settings->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+                'supervisor_fee_amount_rub' => $settings->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+                'supervisor_fee_is_fixed' => $settings->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
+                'supervisor_active' => $this->hasActiveContractType($venue, ContractType::Supervisor),
             ],
             'canConfirm' => $canConfirm,
             'canCancel' => $canCancel,
@@ -699,10 +710,12 @@ class VenuesController extends Controller
             ->firstOrFail();
         $venue->loadMissing(['venueType:id,name,plural_name,alias']);
 
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
         $checker = app(PermissionChecker::class);
-        $canView = $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
+        $hasActiveSupervisor = $this->hasActiveSupervisorUserContract($user, $venue);
+        $canViewSupervisor = $checker->can($user, PermissionCode::VenueSupervisorView, $venue)
             || $checker->can($user, PermissionCode::VenueSupervisorManage, $venue);
-        if (!$canView) {
+        if (!$isAdmin && !($hasActiveSupervisor && $canViewSupervisor)) {
             abort(403);
         }
 
@@ -718,6 +731,36 @@ class VenuesController extends Controller
             'label' => 'Супервайзер',
         ])['data'];
 
+        $defaultPaymentOrderId = PaymentOrder::query()
+            ->where('code', VenueSettings::DEFAULT_PAYMENT_ORDER->value)
+            ->value('id');
+        $settings = VenueSettings::query()->firstOrCreate(
+            ['venue_id' => $venue->id],
+            [
+                'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
+                'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
+                'payment_order_id' => $defaultPaymentOrderId,
+                'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
+                'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
+                'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
+                'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+                'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
+                'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
+                'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
+                'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+                'supervisor_fee_amount_rub' => VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+                'supervisor_fee_is_fixed' => VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
+            ]
+        );
+        $activeSupervisor = Contract::query()
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', ContractType::Supervisor->value)
+            ->where('status', ContractStatus::Active->value)
+            ->with('user:id,login')
+            ->orderByDesc('id')
+            ->first();
+
         return Inertia::render('VenueSupervisor', [
             'appName' => config('app.name'),
             'venue' => [
@@ -725,12 +768,81 @@ class VenuesController extends Controller
                 'name' => $venue->name,
                 'alias' => $venue->alias,
             ],
-            'canManage' => $checker->can($user, PermissionCode::VenueSupervisorManage, $venue),
+            'settings' => [
+                'supervisor_fee_percent' => $settings->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+                'supervisor_fee_amount_rub' => $settings->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+                'supervisor_fee_is_fixed' => $settings->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
+            ],
+            'supervisor' => [
+                'is_active' => $this->hasActiveContractType($venue, ContractType::Supervisor),
+                'user' => $activeSupervisor?->user
+                    ? [
+                        'id' => $activeSupervisor->user->id,
+                        'login' => $activeSupervisor->user->login,
+                    ]
+                    : null,
+            ],
+            'canManage' => $isAdmin || ($hasActiveSupervisor
+                && $checker->can($user, PermissionCode::VenueSupervisorManage, $venue)),
             'navigation' => $navigation,
             'activeHref' => "/venues/{$type}/{$venue->alias}/admin/supervisor",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);
+    }
+
+    public function updateSupervisor(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        $checker = app(PermissionChecker::class);
+        $hasActiveSupervisor = $this->hasActiveSupervisorUserContract($user, $venue);
+        if (
+            !$isAdmin
+            && !($hasActiveSupervisor && $checker->can($user, PermissionCode::VenueSupervisorManage, $venue))
+        ) {
+            abort(403);
+        }
+
+        $data = $request->validate(
+            [
+                'supervisor_fee_value' => ['required', 'integer', 'min:0'],
+                'supervisor_fee_is_fixed' => ['nullable', 'boolean'],
+            ],
+            [
+                'supervisor_fee_value.required' => 'Укажите комиссию супервайзера.',
+                'supervisor_fee_value.integer' => 'Комиссия должна быть целым числом.',
+                'supervisor_fee_value.min' => 'Комиссия не может быть отрицательной.',
+            ]
+        );
+
+        $isFixed = (bool) ($data['supervisor_fee_is_fixed'] ?? false);
+        $value = (int) $data['supervisor_fee_value'];
+        if (!$isFixed && $value > 100) {
+            return back()->withErrors([
+                'supervisor_fee_value' => 'Комиссия в процентах не может превышать 100%.',
+            ]);
+        }
+
+        VenueSettings::query()->updateOrCreate(
+            ['venue_id' => $venue->id],
+            [
+                'supervisor_fee_percent' => $isFixed ? 0 : $value,
+                'supervisor_fee_amount_rub' => $isFixed ? $value : 0,
+                'supervisor_fee_is_fixed' => $isFixed,
+            ]
+        );
+
+        return back()->with('notice', 'Настройки супервайзера сохранены.');
     }
 
     public function settings(Request $request, string $type, Venue $venue)
@@ -780,6 +892,7 @@ class VenuesController extends Controller
                 'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
                 'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
                 'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
+                'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
             ]
         );
 
@@ -810,6 +923,9 @@ class VenuesController extends Controller
                 'pending_review_minutes' => $settings->pending_review_minutes,
                 'pending_before_start_minutes' => $settings->pending_before_start_minutes,
                 'pending_warning_minutes' => $settings->pending_warning_minutes,
+                'supervisor_fee_percent' => $settings->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+                'supervisor_fee_amount_rub' => $settings->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+                'supervisor_fee_is_fixed' => $settings->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
             ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
@@ -1068,6 +1184,9 @@ class VenuesController extends Controller
             'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
             'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
             'payment_wait_minutes' => VenueSettings::DEFAULT_PAYMENT_WAIT_MINUTES,
+            'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
+            'supervisor_fee_amount_rub' => VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
+            'supervisor_fee_is_fixed' => VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
         ]);
         $waitMinutes = array_key_exists('payment_wait_minutes', $data)
             ? TimeValueNormalizer::toMinutes(
@@ -1093,12 +1212,22 @@ class VenuesController extends Controller
         $unitMinutes = max(1, (int) ($existingMeta['unit_minutes'] ?? $settings->rental_duration_minutes));
         $units = $existingMeta['units'] ?? ($durationMinutes > 0 ? ($durationMinutes / $unitMinutes) : 0);
         $unitPrice = (int) ($existingMeta['unit_price_rub'] ?? $settings->rental_price_rub);
+        $baseAmount = (int) ($existingMeta['base_amount_minor'] ?? (int) round($units * $unitPrice));
+        $commissionPercent = (int) ($existingMeta['supervisor_fee_percent'] ?? 0);
+        $commissionAmount = (int) ($existingMeta['supervisor_fee_amount_minor'] ?? 0);
+        $commissionFixed = (bool) ($existingMeta['supervisor_fee_is_fixed'] ?? false);
+        if (!$existingMeta || $commissionAmount === 0 && $commissionPercent === 0) {
+            $commission = $this->resolveSupervisorCommission($venue, $settings, $baseAmount);
+            $commissionAmount = $commission['amount'];
+            $commissionPercent = $commission['percent'];
+            $commissionFixed = $commission['is_fixed'];
+        }
 
         $existingTotalAmount = $existingMeta['total_amount_minor'] ?? null;
         $existingAmount = $existingPayment?->amount_minor;
         $amount = $existingTotalAmount !== null
             ? (int) $existingTotalAmount
-            : ($existingAmount !== null ? (int) $existingAmount : (int) round($units * $unitPrice));
+            : ($existingAmount !== null ? (int) $existingAmount : (int) ($baseAmount + $commissionAmount));
         $partialAmount = null;
         if ($paymentOrderCode === VenuePaymentOrder::PartialPrepayment->value) {
             $partialAmount = (int) ($data['partial_amount_minor'] ?? (int) ceil($amount * 0.5));
@@ -1140,6 +1269,10 @@ class VenuesController extends Controller
                     'unit_minutes' => $unitMinutes,
                     'unit_price_rub' => $unitPrice,
                     'units' => $units,
+                    'base_amount_minor' => $baseAmount,
+                    'supervisor_fee_percent' => $commissionPercent,
+                    'supervisor_fee_amount_minor' => $commissionAmount,
+                    'supervisor_fee_is_fixed' => $commissionFixed,
                     'total_amount_minor' => $amount,
                     'partial_amount_minor' => $partialAmount,
                     'payment_order_code' => $paymentOrderCode,
@@ -1829,9 +1962,9 @@ class VenuesController extends Controller
             $reason = 'Нужна роль администратора площадки.';
         }
 
-        if ($type === ContractType::Supervisor && $this->hasActiveUserContract($user, $venue)) {
+        if ($type === ContractType::Supervisor && $this->hasActiveUserContractExceptCreator($user, $venue)) {
             $canRequest = false;
-            $reason = 'Нельзя стать супервайзером при наличии активного контракта.';
+            $reason = 'Нельзя стать супервайзером при наличии активного контракта (кроме создателя).';
         }
 
         if ($request && in_array($request->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
@@ -1920,6 +2053,48 @@ class VenuesController extends Controller
             ->exists();
     }
 
+    private function hasActiveUserContractExceptCreator(\App\Models\User $user, Venue $venue): bool
+    {
+        $now = now();
+
+        return Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', '!=', ContractType::Creator->value)
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
+    }
+
+    private function hasActiveSupervisorUserContract(\App\Models\User $user, Venue $venue): bool
+    {
+        $now = now();
+
+        return Contract::query()
+            ->where('user_id', $user->id)
+            ->where('entity_type', $venue->getMorphClass())
+            ->where('entity_id', $venue->getKey())
+            ->where('contract_type', ContractType::Supervisor->value)
+            ->where('status', ContractStatus::Active->value)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('starts_at')
+                    ->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $now);
+            })
+            ->exists();
+    }
+
     private function hasActiveContractType(Venue $venue, ContractType $type): bool
     {
         $now = now();
@@ -1938,6 +2113,30 @@ class VenuesController extends Controller
                     ->orWhere('ends_at', '>=', $now);
             })
             ->exists();
+    }
+
+    private function resolveSupervisorCommission(Venue $venue, ?VenueSettings $settings = null, ?int $baseAmount = null): array
+    {
+        $percent = (int) (($settings?->supervisor_fee_percent) ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT);
+        $fixedAmount = (int) (($settings?->supervisor_fee_amount_rub) ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB);
+        $isFixed = (bool) (($settings?->supervisor_fee_is_fixed) ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED);
+
+        if (!$this->hasActiveContractType($venue, ContractType::Supervisor)) {
+            return ['amount' => 0, 'percent' => 0, 'is_fixed' => $isFixed];
+        }
+
+        if ($isFixed) {
+            $amount = max(0, $fixedAmount);
+            return ['amount' => $amount, 'percent' => 0, 'is_fixed' => true];
+        }
+
+        $base = max(0, (int) ($baseAmount ?? 0));
+        if ($percent <= 0 || $base === 0) {
+            return ['amount' => 0, 'percent' => 0, 'is_fixed' => false];
+        }
+
+        $amount = (int) round($base * $percent / 100);
+        return ['amount' => $amount, 'percent' => $percent, 'is_fixed' => false];
     }
 
 

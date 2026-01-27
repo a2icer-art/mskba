@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -13,6 +14,14 @@ const props = defineProps({
     venue: {
         type: Object,
         default: null,
+    },
+    settings: {
+        type: Object,
+        default: () => ({}),
+    },
+    supervisor: {
+        type: Object,
+        default: () => ({ is_active: false, user: null }),
     },
     canManage: {
         type: Boolean,
@@ -38,6 +47,38 @@ const props = defineProps({
 
 const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
+const page = usePage();
+const actionNotice = computed(() => page.props?.flash?.notice ?? '');
+const localNotice = ref('');
+const successNotice = computed(() => actionNotice.value || localNotice.value);
+const actionError = computed(() => page.props?.errors ?? {});
+const formErrorNotice = computed(() => {
+    if (!actionError.value || !Object.keys(actionError.value).length) {
+        return '';
+    }
+    return 'Не удалось сохранить изменения. Проверьте значения.';
+});
+const feeIsFixed = ref(Boolean(props.settings?.supervisor_fee_is_fixed ?? false));
+const feeValue = ref(feeIsFixed.value
+    ? Number(props.settings?.supervisor_fee_amount_rub ?? 0)
+    : Number(props.settings?.supervisor_fee_percent ?? 0));
+const feeMax = computed(() => (feeIsFixed.value ? null : 100));
+const form = useForm({
+    supervisor_fee_value: feeValue.value,
+    supervisor_fee_is_fixed: feeIsFixed.value,
+});
+const submit = () => {
+    localNotice.value = '';
+    const value = Number(feeValue.value);
+    form.supervisor_fee_value = Number.isFinite(value) ? value : 0;
+    form.supervisor_fee_is_fixed = feeIsFixed.value;
+    form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/supervisor`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            localNotice.value = actionNotice.value || 'Настройки супервайзера сохранены.';
+        },
+    });
+};
 </script>
 
 <template>
@@ -76,8 +117,80 @@ const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
                         </span>
                     </div>
 
-                    <div class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                        Раздел находится в разработке. Здесь появятся настройки супервайзинга и контроль бронирований.
+                    <div v-if="successNotice" class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        {{ successNotice }}
+                    </div>
+                    <div v-if="formErrorNotice" class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        {{ formErrorNotice }}
+                    </div>
+
+                    <div class="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Активный супервайзер</p>
+                                <p class="mt-1 text-base font-semibold text-slate-900">
+                                    {{ supervisor?.user?.login || 'Не назначен' }}
+                                </p>
+                            </div>
+                            <span
+                                class="rounded-full border px-3 py-1 text-xs font-semibold"
+                                :class="supervisor?.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                            >
+                                {{ supervisor?.is_active ? 'Активен' : 'Не активен' }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            Комиссия применяется только при наличии активного супервайзера и влияет на итоговую стоимость бронирования.
+                        </p>
+                    </div>
+
+                    <form
+                        v-if="canManage"
+                        class="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-4"
+                        :class="{ loading: form.processing }"
+                        @submit.prevent="submit"
+                    >
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Комиссия супервайзера</p>
+                        <label class="mt-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                            <input
+                                v-model="feeIsFixed"
+                                type="checkbox"
+                                class="input-switch"
+                            />
+                            <span>Фиксированная надбавка</span>
+                        </label>
+                        <label class="mt-2 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Комиссия
+                            <input
+                                v-model.number="feeValue"
+                                type="number"
+                                min="0"
+                                :max="feeMax || undefined"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                            />
+                        </label>
+                        <div v-if="form.errors.supervisor_fee_value" class="mt-2 text-xs text-rose-700">
+                            {{ form.errors.supervisor_fee_value }}
+                        </div>
+                        <button
+                            class="mt-4 rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                            type="submit"
+                            :disabled="form.processing"
+                        >
+                            Сохранить
+                        </button>
+                    </form>
+
+                    <div v-else class="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+                        <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Комиссия супервайзера</p>
+                        <p class="mt-2 text-lg font-semibold text-slate-900">
+                            <span v-if="settings?.supervisor_fee_is_fixed">
+                                {{ Number(settings?.supervisor_fee_amount_rub ?? 0) }} ₽
+                            </span>
+                            <span v-else>
+                                {{ Number(settings?.supervisor_fee_percent ?? 0) }}%
+                            </span>
+                        </p>
                     </div>
                 </div>
             </main>

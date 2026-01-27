@@ -40,8 +40,8 @@ class SubmitVenueContractModerationRequest
             return new SubmitModerationResult(false, null, ['Нужна роль администратора площадки.']);
         }
 
-        if ($type === ContractType::Supervisor && $this->hasActiveContract($actor, $venue)) {
-            return new SubmitModerationResult(false, null, ['Нельзя стать супервайзером при наличии активного контракта.']);
+        if ($type === ContractType::Supervisor && $this->hasActiveContractExcludingCreator($actor, $venue)) {
+            return new SubmitModerationResult(false, null, ['Нельзя стать супервайзером при наличии активного контракта (кроме создателя).']);
         }
 
         if ($this->hasActiveContractType($venue, $type)) {
@@ -86,7 +86,7 @@ class SubmitVenueContractModerationRequest
             ->exists();
     }
 
-    private function hasActiveContract(User $actor, Venue $venue): bool
+    private function hasActiveContractExcludingCreator(User $actor, Venue $venue): bool
     {
         $now = now();
 
@@ -94,6 +94,7 @@ class SubmitVenueContractModerationRequest
             ->where('user_id', $actor->id)
             ->where('entity_type', $venue->getMorphClass())
             ->where('entity_id', $venue->getKey())
+            ->where('contract_type', '!=', ContractType::Creator->value)
             ->where('status', ContractStatus::Active->value)
             ->where(function ($query) use ($now) {
                 $query->whereNull('starts_at')

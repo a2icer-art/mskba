@@ -203,7 +203,7 @@ const calcDurationMinutes = (booking) => {
     return diff > 0 ? diff : 0;
 };
 
-const calcTotalAmount = (booking) => {
+const calcBaseAmount = (booking) => {
     const durationMinutes = calcDurationMinutes(booking);
     const unitMinutes = Math.max(1, Number(paymentDefaults.value.rental_duration_minutes || 0));
     const unitPrice = Number(paymentDefaults.value.rental_price_rub || 0);
@@ -212,6 +212,75 @@ const calcTotalAmount = (booking) => {
     }
     const units = durationMinutes / unitMinutes;
     return Math.round(units * unitPrice);
+};
+
+const calcSupervisorFeePercent = () => {
+    if (!paymentDefaults.value.supervisor_active) {
+        return 0;
+    }
+    return Number(paymentDefaults.value.supervisor_fee_percent || 0);
+};
+
+const calcSupervisorFeeFixed = () => {
+    if (!paymentDefaults.value.supervisor_active) {
+        return 0;
+    }
+    return Number(paymentDefaults.value.supervisor_fee_amount_rub || 0);
+};
+
+const isSupervisorFeeFixed = computed(() => Boolean(paymentDefaults.value.supervisor_fee_is_fixed));
+
+const resolveBookingBaseAmount = (booking) => {
+    const base = Number(booking?.payment_base_amount_minor);
+    if (Number.isFinite(base) && base > 0) {
+        return base;
+    }
+    return calcBaseAmount(booking);
+};
+
+const resolveBookingSupervisorFeePercent = (booking) => {
+    const percent = Number(booking?.payment_supervisor_fee_percent);
+    if (Number.isFinite(percent) && percent >= 0) {
+        return percent;
+    }
+    return calcSupervisorFeePercent();
+};
+
+const resolveBookingSupervisorFeeFixed = (booking) => {
+    const amount = Number(booking?.payment_supervisor_fee_amount_minor);
+    if (Number.isFinite(amount) && amount >= 0) {
+        return amount;
+    }
+    return Math.max(0, calcSupervisorFeeFixed());
+};
+
+const resolveBookingSupervisorFeeIsFixed = (booking) => {
+    if (booking?.payment_supervisor_fee_is_fixed !== undefined && booking?.payment_supervisor_fee_is_fixed !== null) {
+        return Boolean(booking.payment_supervisor_fee_is_fixed);
+    }
+    return isSupervisorFeeFixed.value;
+};
+
+const resolveBookingSupervisorFeeAmount = (booking) => {
+    if (resolveBookingSupervisorFeeIsFixed(booking)) {
+        return resolveBookingSupervisorFeeFixed(booking);
+    }
+    const baseAmount = resolveBookingBaseAmount(booking);
+    const percent = resolveBookingSupervisorFeePercent(booking);
+    return percent > 0 ? Math.round(baseAmount * percent / 100) : 0;
+};
+
+const calcTotalAmount = (booking) => {
+    const baseAmount = calcBaseAmount(booking);
+    if (!baseAmount) {
+        return 0;
+    }
+    if (isSupervisorFeeFixed.value) {
+        return baseAmount + Math.max(0, calcSupervisorFeeFixed());
+    }
+    const percent = calcSupervisorFeePercent();
+    const feeAmount = percent > 0 ? Math.round(baseAmount * percent / 100) : 0;
+    return baseAmount + feeAmount;
 };
 
 const resolveTotalAmount = () => {
@@ -231,6 +300,18 @@ const priceLabelTitle = computed(() => (
         ? `стоимость аренды площадки ${formatAmount(venueDefaultAmount.value)}`
         : ''
 ));
+
+const supervisorFeePercent = computed(() => resolveBookingSupervisorFeePercent(activeBooking.value));
+const supervisorFeeFixed = computed(() => resolveBookingSupervisorFeeFixed(activeBooking.value));
+const supervisorFeeIsFixed = computed(() => resolveBookingSupervisorFeeIsFixed(activeBooking.value));
+const supervisorBaseAmount = computed(() => resolveBookingBaseAmount(activeBooking.value));
+const supervisorFeeAmount = computed(() => resolveBookingSupervisorFeeAmount(activeBooking.value));
+const supervisorTotalAmount = computed(() => {
+    if (!supervisorBaseAmount.value) {
+        return 0;
+    }
+    return supervisorBaseAmount.value + supervisorFeeAmount.value;
+});
 
 const isPartialAmountOverTotal = computed(() => {
     if (!isPartialPrepayment.value) {
@@ -739,6 +820,20 @@ watch(
                                 :class="highlightPartialSwap || isPartialAmountOverTotal ? 'border-amber-400 bg-amber-50' : ''"
                             />
                         </label>
+                        <div v-if="supervisorFeePercent > 0 || supervisorFeeFixed > 0" class="mt-2 text-xs text-slate-500">
+                            <div>Базовая стоимость: {{ formatAmount(supervisorBaseAmount) }}</div>
+                            <div v-if="supervisorFeeIsFixed">
+                                Комиссия супервайзера (фиксированная):
+                                {{ formatAmount(supervisorFeeFixed) }}
+                            </div>
+                            <div v-else>
+                                Комиссия супервайзера ({{ supervisorFeePercent }}%):
+                                {{ formatAmount(supervisorFeeAmount) }}
+                            </div>
+                            <div class="font-semibold text-slate-700">
+                                Итого: {{ formatAmount(supervisorTotalAmount) }}
+                            </div>
+                        </div>
                         <p v-if="isPartialAmountOverTotal" class="text-xs text-amber-700">
                             Стоимость равна или превышает полную. Проверьте порядок оплаты.
                         </p>

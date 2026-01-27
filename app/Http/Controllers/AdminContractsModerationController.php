@@ -167,7 +167,7 @@ class AdminContractsModerationController extends Controller
             abort(404);
         }
 
-        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification, ModerationStatus::Approved], true)) {
             return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
         }
 
@@ -273,7 +273,7 @@ class AdminContractsModerationController extends Controller
             abort(404);
         }
 
-        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification, ModerationStatus::Approved], true)) {
             return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
         }
 
@@ -310,7 +310,7 @@ class AdminContractsModerationController extends Controller
             abort(404);
         }
 
-        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification], true)) {
+        if (!in_array($moderationRequest->status, [ModerationStatus::Pending, ModerationStatus::Clarification, ModerationStatus::Approved], true)) {
             return back()->withErrors(['moderation' => 'Заявка уже обработана.']);
         }
 
@@ -336,6 +336,39 @@ class AdminContractsModerationController extends Controller
                 'approved_permissions' => $permissionCodes,
             ]),
         ]);
+
+        if ($moderationRequest->status === ModerationStatus::Approved) {
+            $venue = $moderationRequest->entityVenue;
+            $submitter = $moderationRequest->submitter;
+            if ($venue && $submitter) {
+                $contract = Contract::query()
+                    ->where('user_id', $submitter->id)
+                    ->where('entity_type', $venue->getMorphClass())
+                    ->where('entity_id', $venue->getKey())
+                    ->where('contract_type', $contractType->value)
+                    ->where('status', ContractStatus::Active->value)
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($contract) {
+                    $permissionIds = [];
+                    if ($permissionCodes !== []) {
+                        $permissionIds = Permission::query()
+                            ->whereIn('code', $permissionCodes)
+                            ->where('scope', PermissionScope::Resource)
+                            ->where('target_model', Venue::class)
+                            ->pluck('id')
+                            ->all();
+                    }
+
+                    $syncData = [];
+                    foreach ($permissionIds as $permissionId) {
+                        $syncData[$permissionId] = ['is_active' => true];
+                    }
+                    $contract->permissions()->sync($syncData);
+                }
+            }
+        }
 
         return back();
     }

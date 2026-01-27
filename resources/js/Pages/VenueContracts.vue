@@ -94,6 +94,10 @@ const userSuggestError = ref('');
 const userSuggestions = ref([]);
 let userSuggestTimer = null;
 let userSuggestRequestId = 0;
+const supervisorOnlyPermissions = [
+    'venue.supervisor.view',
+    'venue.supervisor.manage',
+];
 const isAssignDisabled = computed(() => {
     if (assignForm.processing) {
         return true;
@@ -111,9 +115,14 @@ const filterPermissionsByType = (contractType, options = {}) => {
         return [];
     }
     if (options.ignoreTypeWhenCreator && contractType === 'creator') {
-        return props.availablePermissions;
+        return props.availablePermissions.filter((permission) =>
+            supervisorOnlyPermissions.includes(permission.code) ? contractType === 'supervisor' : true
+        );
     }
     return props.availablePermissions.filter((permission) => {
+        if (contractType !== 'supervisor' && supervisorOnlyPermissions.includes(permission.code)) {
+            return false;
+        }
         if (!permission.allowed_types) {
             return true;
         }
@@ -166,10 +175,14 @@ const openAssign = () => {
 
 const getContractPermissions = (contract) => {
     if (Array.isArray(contract?.permissions)) {
-        return contract.permissions;
+        return contract.permissions.filter((permission) =>
+            contract?.contract_type === 'supervisor' || !supervisorOnlyPermissions.includes(permission.code)
+        );
     }
     if (contract?.permissions && typeof contract.permissions === 'object') {
-        return Object.values(contract.permissions);
+        return Object.values(contract.permissions).filter((permission) =>
+            contract?.contract_type === 'supervisor' || !supervisorOnlyPermissions.includes(permission.code)
+        );
     }
     return [];
 };
