@@ -233,25 +233,33 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::post('/contracts-moderation/{moderationRequest}/permissions', [AdminContractsModerationController::class, 'updatePermissions'])
         ->name('admin.contracts.moderation.permissions');
     Route::get('/logs', [AdminLogsController::class, 'index'])
-        ->middleware('can:logs.view')
+        ->middleware(['can:admin.access', 'can:logs.view'])
         ->name('admin.logs');
     Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])
-        ->middleware('can:logs.view')
+        ->middleware(['can:admin.access', 'can:logs.view'])
         ->name('admin.logs.show');
     Route::get('/settings', [AdminSettingsController::class, 'index'])
+        ->middleware('can:admin.access')
         ->name('admin.settings');
     Route::patch('/settings', [AdminSettingsController::class, 'update'])
+        ->middleware('can:admin.access')
         ->name('admin.settings.update');
     Route::post('/settings/test-email', [AdminSettingsController::class, 'testEmail'])
+        ->middleware('can:admin.access')
         ->name('admin.settings.test-email');
     Route::get('/balances', [AdminBalancesController::class, 'index'])
+        ->middleware('can:admin.access')
         ->name('admin.balances');
     Route::post('/balances/{user}/top-up', [AdminBalancesController::class, 'topUp'])
+        ->middleware('can:admin.access')
         ->name('admin.balances.topup');
     Route::post('/balances/{user}/debit', [AdminBalancesController::class, 'debit'])
+        ->middleware('can:admin.access')
         ->name('admin.balances.debit');
     Route::post('/balances/{user}/block', [AdminBalancesController::class, 'block'])
+        ->middleware('can:admin.access')
         ->name('admin.balances.block');
     Route::post('/balances/{user}/unblock', [AdminBalancesController::class, 'unblock'])
+        ->middleware('can:admin.access')
         ->name('admin.balances.unblock');
 });

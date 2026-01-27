@@ -37,14 +37,15 @@ class AdminNavigationService
             ];
         }
 
-        if ($this->permissionChecker->can($user, PermissionCode::LogsView)) {
+        if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)
+            && $this->permissionChecker->can($user, PermissionCode::LogsView)) {
             $systemItems[] = [
                 'label' => 'Логи',
                 'href' => '/admin/logs',
             ];
         }
 
-        if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
+        if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)) {
             $systemItems[] = [
                 'label' => 'Настройки',
                 'href' => '/admin/settings',
