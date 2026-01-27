@@ -20,8 +20,10 @@ use App\Http\Controllers\Integrations\UserSuggestController;
 use App\Http\Controllers\Integrations\VenueSuggestController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\VenuesController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
@@ -262,4 +264,12 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::post('/balances/{user}/unblock', [AdminBalancesController::class, 'unblock'])
         ->middleware('can:admin.access')
         ->name('admin.balances.unblock');
+});
+
+Route::fallback(function (Request $request) {
+    return Inertia::render('Error', [
+        'status' => 404,
+        'message' => 'Страница не найдена.',
+        'appName' => config('app.name'),
+    ])->toResponse($request)->setStatusCode(404);
 });

@@ -10,6 +10,7 @@ use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use App\Http\Middleware\HandleInertiaRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -28,12 +29,45 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $renderErrorPage = static function (Request $request, int $status, string $message) {
+        $buildSharedProps = static function (Request $request): array {
+            try {
+                return app(HandleInertiaRequests::class)->share($request);
+            } catch (\Throwable $e) {
+                $user = $request->user();
+
+                return [
+                    'auth' => [
+                        'user' => $user
+                            ? [
+                                'id' => $user->id,
+                                'login' => $user->login,
+                                'status' => $user->status?->value,
+                                'roles' => [],
+                                'role_level' => 0,
+                                'permissions' => [],
+                            ]
+                            : null,
+                    ],
+                    'messageCounters' => [
+                        'unread_messages' => 0,
+                    ],
+                    'participantRoles' => [],
+                    'flash' => [
+                        'notice' => session('notice'),
+                        'error' => session('error'),
+                        'info' => session('info'),
+                    ],
+                ];
+            }
+        };
+
+        $renderErrorPage = static function (Request $request, int $status, string $message) use ($buildSharedProps) {
             if ($request->expectsJson() || $request->wantsJson()) {
                 return null;
             }
 
             return Inertia::render('Error', [
+                ...$buildSharedProps($request),
                 'status' => $status,
                 'message' => $message,
                 'appName' => config('app.name'),
