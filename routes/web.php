@@ -237,6 +237,15 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::get('/logs', [AdminLogsController::class, 'index'])
         ->middleware(['can:admin.access', 'can:logs.view'])
         ->name('admin.logs');
+    Route::get('/logs/export', [AdminLogsController::class, 'export'])
+        ->middleware(['can:admin.access', 'can:logs.view'])
+        ->name('admin.logs.export');
+    Route::post('/logs/export-delete', [AdminLogsController::class, 'exportAndDelete'])
+        ->middleware(['can:admin.access', 'can:logs.view'])
+        ->name('admin.logs.export-delete');
+    Route::delete('/logs', [AdminLogsController::class, 'destroy'])
+        ->middleware(['can:admin.access', 'can:logs.view'])
+        ->name('admin.logs.destroy');
     Route::get('/logs/{entity}', [AdminLogsController::class, 'show'])
         ->middleware(['can:admin.access', 'can:logs.view'])
         ->name('admin.logs.show');

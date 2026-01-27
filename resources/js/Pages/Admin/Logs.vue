@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../../Components/Breadcrumbs.vue';
 import MainFooter from '../../Components/MainFooter.vue';
 import MainHeader from '../../Components/MainHeader.vue';
@@ -37,6 +37,7 @@ const props = defineProps({
     },
 });
 
+const page = usePage();
 const navigationData = computed(() => props.navigation?.data ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasEntities = computed(() => props.entities.length > 0);
@@ -53,6 +54,13 @@ const actionClasses = {
 };
 const selectedLog = ref(null);
 const logOpen = ref(false);
+const exportFormat = ref('json');
+const csrfToken = computed(() => document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content') ?? '');
+const currentEntityKey = computed(() => props.activeEntity?.key || 'all');
+const userPermissions = computed(() => page.props.auth?.user?.permissions || []);
+const canManageLogs = computed(
+    () => userPermissions.value.includes('admin.access') && userPermissions.value.includes('logs.view')
+);
 const formatFields = (fields) => {
     if (!Array.isArray(fields) || fields.length === 0) {
         return '—';
@@ -75,6 +83,61 @@ const formatValue = (value) => {
         return JSON.stringify(value);
     }
     return String(value);
+};
+const downloadDump = () => {
+    if (!canManageLogs.value) {
+        return;
+    }
+    const params = new URLSearchParams({
+        format: exportFormat.value,
+        entity: currentEntityKey.value,
+    });
+    window.location.href = `/admin/logs/export?${params.toString()}`;
+};
+const submitForm = (action, fields = {}) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    form.style.display = 'none';
+    const token = document.createElement('input');
+    token.type = 'hidden';
+    token.name = '_token';
+    token.value = csrfToken.value;
+    form.appendChild(token);
+    Object.entries(fields).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+};
+const deleteLogs = () => {
+    if (!canManageLogs.value) {
+        return;
+    }
+    if (!window.confirm('Вы уверены что хотите удалить логи?')) {
+        return;
+    }
+    submitForm('/admin/logs', {
+        _method: 'DELETE',
+        entity: currentEntityKey.value,
+    });
+};
+const downloadAndDelete = () => {
+    if (!canManageLogs.value) {
+        return;
+    }
+    if (!window.confirm('Подтвердите действие \"скачать и удалить\"')) {
+        return;
+    }
+    submitForm('/admin/logs/export-delete', {
+        format: exportFormat.value,
+        entity: currentEntityKey.value,
+    });
 };
 </script>
 
@@ -104,6 +167,40 @@ const formatValue = (value) => {
                     <p class="mt-4 text-sm text-slate-600">
                         Выберите сущность, чтобы просмотреть журнал изменений.
                     </p>
+
+                    <div v-if="canManageLogs" class="mt-4 flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-400">Формат</span>
+                            <select
+                                v-model="exportFormat"
+                                class="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700"
+                            >
+                                <option value="json">JSON</option>
+                                <option value="mysql">MySQL</option>
+                            </select>
+                            <button
+                                class="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                type="button"
+                                @click="downloadDump"
+                            >
+                                Скачать дамп
+                            </button>
+                        </div>
+                        <button
+                            class="rounded-full border border-slate-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition hover:-translate-y-0.5 hover:border-amber-200"
+                            type="button"
+                            @click="downloadAndDelete"
+                        >
+                            Скачать и удалить
+                        </button>
+                        <button
+                            class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-300"
+                            type="button"
+                            @click="deleteLogs"
+                        >
+                            Удалить логи
+                        </button>
+                    </div>
 
                     <div v-if="hasEntities" class="mt-6 flex flex-wrap gap-3">
                         <Link
