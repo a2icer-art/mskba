@@ -70,6 +70,15 @@ const resolvePaymentAmount = (booking) => {
     if (!booking) {
         return null;
     }
+    if (booking.status === 'paid' || booking.status === 'approved') {
+        if (booking.payment_total_amount_minor) {
+            return booking.payment_total_amount_minor;
+        }
+        if (booking.payment_amount_minor) {
+            return booking.payment_amount_minor;
+        }
+        return null;
+    }
     if (booking.payment_partial_amount_minor) {
         return booking.payment_partial_amount_minor;
     }
@@ -80,6 +89,16 @@ const resolvePaymentAmount = (booking) => {
         return booking.payment_total_amount_minor;
     }
     return null;
+};
+
+const paymentAmountLabel = (booking) => {
+    if (!booking) {
+        return 'К оплате';
+    }
+    if (booking.status === 'paid' || booking.status === 'approved') {
+        return 'Оплачено';
+    }
+    return 'К оплате';
 };
 
 const bookingOpen = ref(false);
@@ -415,7 +434,9 @@ const bookingClientError = computed(() => {
                                     <p class="mt-1">{{ booking.payment_code }}</p>
                                 </div>
                                 <div v-if="resolvePaymentAmount(booking)" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">К оплате</span>
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
+                                        {{ paymentAmountLabel(booking) }}
+                                    </span>
                                     <p class="mt-1">{{ formatAmount(resolvePaymentAmount(booking)) }}</p>
                                 </div>
                                 <div v-if="booking.status === 'awaiting_payment'" class="mt-3 text-sm text-slate-700">
