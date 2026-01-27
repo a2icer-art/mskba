@@ -2,6 +2,7 @@
 
 namespace App\Domain\Venues\Models;
 
+use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Enums\VenueBookingMode;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VenueSettings extends Model
 {
     use HasFactory;
+    use Auditable;
 
     public const DEFAULT_BOOKING_LEAD_MINUTES = 15;
     public const DEFAULT_BOOKING_MIN_INTERVAL_MINUTES = 30;

@@ -38,6 +38,12 @@ class AdminLogsService
                 'href' => '/admin/logs/venues',
             ],
             [
+                'key' => 'venue-settings',
+                'label' => 'Настройки площадок',
+                'model' => \App\Domain\Venues\Models\VenueSettings::class,
+                'href' => '/admin/logs/venue-settings',
+            ],
+            [
                 'key' => 'contracts',
                 'label' => 'Контракты',
                 'model' => \App\Domain\Contracts\Models\Contract::class,
