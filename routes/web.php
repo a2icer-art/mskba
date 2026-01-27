@@ -192,6 +192,9 @@ Route::post('/events', [EventsController::class, 'store'])
     ->name('events.store');
 Route::get('/events/{event}', [EventsController::class, 'show'])
     ->name('events.show');
+Route::patch('/events/{event}', [EventsController::class, 'update'])
+    ->middleware('auth')
+    ->name('events.update');
 Route::delete('/events/{event}', [EventsController::class, 'destroy'])
     ->middleware('auth')
     ->name('events.destroy');

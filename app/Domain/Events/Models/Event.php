@@ -25,6 +25,8 @@ class Event extends Model
         'starts_at',
         'ends_at',
         'timezone',
+        'participants_limit',
+        'price_amount_minor',
         'meta',
     ];
 

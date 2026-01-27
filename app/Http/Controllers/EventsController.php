@@ -253,7 +253,7 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        $event->loadMissing(['type', 'organizer', 'bookings.venue', 'bookings.paymentOrder', 'bookings.payment']);
+        $event->loadMissing(['type', 'organizer', 'bookings.venue.venueType', 'bookings.paymentOrder', 'bookings.payment']);
 
         if (!$this->canViewEvent($user, $event, $checker)) {
             return redirect()
@@ -279,6 +279,8 @@ class EventsController extends Controller
             'status' => $event->status,
             'starts_at' => $event->starts_at?->toDateTimeString(),
             'ends_at' => $event->ends_at?->toDateTimeString(),
+            'participants_limit' => $event->participants_limit ?? 0,
+            'price_amount_minor' => $event->price_amount_minor ?? 0,
             'type' => $event->type
                 ? [
                     'code' => $event->type->code,
@@ -292,6 +294,19 @@ class EventsController extends Controller
                 ]
                 : null,
         ];
+        $approvedVenue = $event->bookings
+            ->first(static fn ($booking) => $booking->status === EventBookingStatus::Approved && $booking->venue)
+            ?->venue;
+        $eventPayload['approved_venue'] = $approvedVenue
+            ? [
+                'id' => $approvedVenue->id,
+                'name' => $approvedVenue->name,
+                'alias' => $approvedVenue->alias,
+                'type_slug' => $approvedVenue->venueType?->alias
+                    ? Str::plural($approvedVenue->venueType->alias)
+                    : null,
+            ]
+            : null;
 
         $isAdmin = $user?->roles()->where('alias', 'admin')->exists() ?? false;
         $isOrganizer = $user && $event->organizer_id === $user->id;
@@ -303,6 +318,15 @@ class EventsController extends Controller
                 'breadcrumbs' => $breadcrumbs,
             ]);
         }
+
+        $approvedBooking = $event->bookings
+            ->first(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
+        $approvedBookingCost = null;
+        if ($approvedBooking?->payment) {
+            $paymentMeta = is_array($approvedBooking->payment->meta) ? $approvedBooking->payment->meta : [];
+            $approvedBookingCost = $paymentMeta['total_amount_minor'] ?? $approvedBooking->payment->amount_minor ?? null;
+        }
+        $eventPayload['approved_booking_cost_minor'] = $approvedBookingCost;
 
         $bookings = $event->bookings
             ->map(static function ($booking): array {
@@ -340,6 +364,26 @@ class EventsController extends Controller
             'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,
         ]);
+    }
+
+    public function update(Request $request, Event $event)
+    {
+        $user = $request->user();
+        if (!$user || !$this->canEditEvent($user, $event)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'participants_limit' => ['required', 'integer', 'min:0'],
+            'price_amount_minor' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $event->update([
+            'participants_limit' => $data['participants_limit'],
+            'price_amount_minor' => $data['price_amount_minor'],
+        ]);
+
+        return back()->with('notice', 'Параметры события обновлены.');
     }
 
     public function storeBooking(Request $request, Event $event, EventBookingService $service)
@@ -405,6 +449,17 @@ class EventsController extends Controller
     }
 
     private function canDelete(?\App\Models\User $user, Event $event): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+
+        return $isAdmin || $event->organizer_id === $user->id;
+    }
+
+    private function canEditEvent(?\App\Models\User $user, Event $event): bool
     {
         if (!$user) {
             return false;

@@ -14,6 +14,10 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    participantsCount: {
+        type: Number,
+        default: 0,
+    },
     breadcrumbs: {
         type: Array,
         default: () => [],
@@ -38,6 +42,21 @@ const formatDateRange = (startsAt, endsAt) => {
     const endTime = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     return `${dateLabel}, ${startTime} – ${endTime}`;
 };
+
+const formatAmount = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return '—';
+    }
+    return `${Number(value)} ₽`;
+};
+
+const participantsLimitLabel = computed(() => {
+    const limit = Number(props.event?.participants_limit ?? 0);
+    if (!limit) {
+        return 'Без ограничений';
+    }
+    return String(limit);
+});
 </script>
 
 <template>
@@ -65,6 +84,38 @@ const formatDateRange = (startsAt, endsAt) => {
                     <div class="mt-4 text-sm text-slate-700">
                         <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Дата</span>
                         <div class="mt-1">{{ formatDateRange(event?.starts_at, event?.ends_at) }}</div>
+                    </div>
+
+                    <div class="mt-3 text-sm text-slate-700">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Стоимость события</span>
+                        <div class="mt-1">{{ formatAmount(event?.price_amount_minor ?? 0) }}</div>
+                    </div>
+
+                    <div class="mt-3 text-sm text-slate-700">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Кол-во участников</span>
+                        <div class="mt-1">{{ participantsLimitLabel }}</div>
+                    </div>
+
+                    <div class="mt-3 text-sm text-slate-700">
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Уже участвуют</span>
+                        <div class="mt-1">{{ participantsCount }}</div>
+                    </div>
+
+                    <div
+                        v-if="event?.approved_venue?.alias && event?.approved_venue?.type_slug"
+                        class="mt-3 text-sm text-slate-700"
+                    >
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Площадка</span>
+                        <div class="mt-1">
+                            <a
+                                class="font-semibold text-slate-900 transition hover:text-slate-700"
+                                :href="`/venues/${event.approved_venue.type_slug}/${event.approved_venue.alias}`"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                {{ event.approved_venue.name || 'Площадка' }}
+                            </a>
+                        </div>
                     </div>
 
                     <div v-if="event?.organizer?.login" class="mt-3 text-sm text-slate-700">

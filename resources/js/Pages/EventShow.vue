@@ -48,6 +48,22 @@ const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
+const resolvedPriceAmount = computed(() => {
+    const current = Number(props.event?.price_amount_minor ?? 0);
+    if (current > 0) {
+        return current;
+    }
+    const approvedCost = Number(props.event?.approved_booking_cost_minor ?? 0);
+    if (approvedCost > 0) {
+        return approvedCost;
+    }
+    return 0;
+});
+const isPriceFromApprovedBooking = computed(() => {
+    const stored = Number(props.event?.price_amount_minor ?? 0);
+    const approved = Number(props.event?.approved_booking_cost_minor ?? 0);
+    return stored === 0 && approved > 0;
+});
 const bookingStatusLabel = (status) => {
     if (status === 'awaiting_payment') {
         return 'Ожидает оплату';
@@ -122,6 +138,10 @@ const venueSettings = ref({
     leadMinutes: defaultLeadMinutes,
     minIntervalMinutes: defaultMinIntervalMinutes,
 });
+const eventForm = useForm({
+    participants_limit: Number(props.event?.participants_limit ?? 0),
+    price_amount_minor: resolvedPriceAmount.value,
+});
 const venueQuery = ref('');
 const venueSuggestions = ref([]);
 const venueSuggestLoading = ref(false);
@@ -163,6 +183,12 @@ const submitBooking = () => {
     bookingForm.post(`/events/${props.event?.id}/bookings`, {
         preserveScroll: true,
         onSuccess: closeBooking,
+    });
+};
+
+const submitEventDetails = () => {
+    eventForm.patch(`/events/${props.event?.id}`, {
+        preserveScroll: true,
     });
 };
 
@@ -403,7 +429,65 @@ const bookingClientError = computed(() => {
                         </span>
                     </div>
 
-                    
+                    <section class="mt-8 rounded-3xl border border-slate-200/80 bg-white px-5 py-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-lg font-semibold text-slate-900">Параметры события</h2>
+                        </div>
+
+                        <form class="mt-4 grid gap-4" @submit.prevent="submitEventDetails">
+                            <div>
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Кол-во участников
+                                    <input
+                                        v-model.number="eventForm.participants_limit"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="number"
+                                        min="0"
+                                    />
+                                </label>
+                                <p class="mt-1 text-xs text-slate-500">0 — без ограничений.</p>
+                                <div v-if="eventForm.errors.participants_limit" class="text-xs text-rose-700">
+                                    {{ eventForm.errors.participants_limit }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Стоимость события
+                                    <input
+                                        v-model.number="eventForm.price_amount_minor"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        type="number"
+                                        min="0"
+                                    />
+                                </label>
+                                <p v-if="isPriceFromApprovedBooking" class="mt-1 text-xs text-slate-500">
+                                    По умолчанию подтянута стоимость подтвержденной брони площадки.
+                                </p>
+                                <div v-if="eventForm.errors.price_amount_minor" class="text-xs text-rose-700">
+                                    {{ eventForm.errors.price_amount_minor }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                Приглашение участников — заглушка.
+                            </div>
+
+                            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                Дополнительные опции — заглушка.
+                            </div>
+
+                            <div class="flex flex-wrap justify-end gap-3">
+                                <button
+                                    class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                                    type="submit"
+                                    :disabled="eventForm.processing"
+                                >
+                                    Сохранить параметры
+                                </button>
+                            </div>
+                        </form>
+                    </section>
 
                     <section class="mt-8">
                         <div class="flex items-center justify-between gap-3">
