@@ -295,11 +295,18 @@ const isDefaultAmountMismatch = computed(() => {
     return bookingTotalAmount.value !== venueDefaultAmount.value;
 });
 const priceLabel = computed(() => (isDefaultAmountMismatch.value ? 'Стоимость (!)' : 'Стоимость'));
-const priceLabelTitle = computed(() => (
-    isDefaultAmountMismatch.value
-        ? `стоимость аренды площадки ${formatAmount(venueDefaultAmount.value)}`
-        : ''
-));
+const priceLabelTitle = computed(() => {
+    if (!isDefaultAmountMismatch.value) {
+        return '';
+    }
+    const baseAmount = calcBaseAmount(activeBooking.value);
+    const feeIsFixed = isSupervisorFeeFixed.value;
+    const feeAmount = feeIsFixed
+        ? Math.max(0, calcSupervisorFeeFixed())
+        : Math.round(baseAmount * calcSupervisorFeePercent() / 100);
+    const feeLabel = feeIsFixed ? 'фикс' : `${calcSupervisorFeePercent()}%`;
+    return `стоимость аренды площадки ${formatAmount(venueDefaultAmount.value)}: стоимость аренды самой площадки ${formatAmount(baseAmount)} + комиссия супервайзера ${formatAmount(feeAmount)} (${feeLabel})`;
+});
 
 const supervisorFeePercent = computed(() => resolveBookingSupervisorFeePercent(activeBooking.value));
 const supervisorFeeFixed = computed(() => resolveBookingSupervisorFeeFixed(activeBooking.value));
