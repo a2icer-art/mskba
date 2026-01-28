@@ -4,6 +4,7 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
+import MainSidebar from '../Components/MainSidebar.vue';
 
 const props = defineProps({
     appName: {
@@ -46,12 +47,22 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    navigation: {
+        type: Object,
+        default: () => ({ title: 'Навигация', data: [] }),
+    },
+    activeTypeCode: {
+        type: String,
+        default: '',
+    },
 });
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const isExpired = computed(() => props.isExpired);
+const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const participantRoles = computed(() => {
     const labels = {
         player: 'Игрок',
@@ -229,7 +240,14 @@ const submitRespond = () => {
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader :app-name="appName" :is-authenticated="isAuthenticated" :login-label="loginLabel" />
 
-            <main class="grid gap-6">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+                <MainSidebar
+                    v-if="hasSidebar"
+                    :title="props.navigation.title"
+                    :data="navigationData"
+                    :active-href="props.activeTypeCode ? `/events?type=${props.activeTypeCode}` : '/events'"
+                />
+
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center gap-4">

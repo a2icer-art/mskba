@@ -5,6 +5,7 @@ import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
+import MainSidebar from '../Components/MainSidebar.vue';
 import SystemNoticeStack from '../Components/SystemNoticeStack.vue';
 
 const props = defineProps({
@@ -52,6 +53,14 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    navigation: {
+        type: Object,
+        default: () => ({ title: 'Навигация', data: [] }),
+    },
+    activeTypeCode: {
+        type: String,
+        default: '',
+    },
 });
 
 const page = usePage();
@@ -63,6 +72,8 @@ const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.booking ?? '');
 const isExpired = computed(() => props.isExpired);
 const hasBookings = computed(() => props.bookings.length > 0);
+const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
 const participantsConfirmedCount = computed(() =>
@@ -608,7 +619,14 @@ const bookingClientError = computed(() => {
                 @open-login="openAuthModal"
             />
 
-            <main class="grid gap-6">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+                <MainSidebar
+                    v-if="hasSidebar"
+                    :title="props.navigation.title"
+                    :data="navigationData"
+                    :active-href="props.activeTypeCode ? `/events?type=${props.activeTypeCode}` : '/events'"
+                />
+
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center gap-4">

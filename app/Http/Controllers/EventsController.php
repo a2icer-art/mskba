@@ -19,6 +19,7 @@ use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Presentation\Breadcrumbs\EventBreadcrumbsPresenter;
+use App\Presentation\Navigation\EventNavigationPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,11 +35,19 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        $events = Event::query()
-            ->with(['type', 'organizer', 'bookings.venue.venueType'])
+        $eventsQuery = Event::query()
+            ->with(['type', 'organizer', 'bookings.venue.venueType']);
+
+        if ($user) {
+            $eventsQuery->with(['participants' => function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            }]);
+        }
+
+        $events = $eventsQuery
             ->orderByDesc('created_at')
             ->get()
-            ->map(static function (Event $event): array {
+            ->map(static function (Event $event) use ($user): array {
                 $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
                 $hasCancelledBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Cancelled);
                 $hasPendingBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Pending);
@@ -47,6 +56,7 @@ class EventsController extends Controller
                 $approvedVenue = $event->bookings
                     ->first(static fn ($booking) => $booking->status === EventBookingStatus::Approved && $booking->venue)
                     ?->venue;
+                $isParticipant = $user ? $event->participants->isNotEmpty() : false;
                 return [
                     'id' => $event->id,
                     'title' => $event->title ?: 'Событие',
@@ -58,6 +68,7 @@ class EventsController extends Controller
                     'has_pending_booking' => $hasPendingBooking,
                     'has_awaiting_payment_booking' => $hasAwaitingPaymentBooking,
                     'has_paid_booking' => $hasPaidBooking,
+                    'is_participant' => $isParticipant,
                     'approved_venue' => $approvedVenue
                         ? [
                             'id' => $approvedVenue->id,
@@ -87,6 +98,8 @@ class EventsController extends Controller
         $canCreate = $user && $checker->can($user, PermissionCode::EventCreate);
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present()['data'];
+        $navigation = app(EventNavigationPresenter::class)->present();
+        $activeTypeCode = $request->string('type')->toString() ?: '';
 
         return Inertia::render('Events', [
             'appName' => config('app.name'),
@@ -94,6 +107,8 @@ class EventsController extends Controller
             'canCreate' => $canCreate,
             'canBook' => $canBook,
             'breadcrumbs' => $breadcrumbs,
+            'navigation' => $navigation,
+            'activeTypeCode' => $activeTypeCode,
         ]);
     }
 
@@ -378,6 +393,8 @@ class EventsController extends Controller
                     : null,
                 'breadcrumbs' => $breadcrumbs,
                 'isExpired' => $isExpired,
+                'navigation' => app(EventNavigationPresenter::class)->present(),
+                'activeTypeCode' => $event->type?->code ?? '',
             ]);
         }
 
@@ -449,6 +466,8 @@ class EventsController extends Controller
             'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,
             'isExpired' => $isExpired,
+            'navigation' => app(EventNavigationPresenter::class)->present(),
+            'activeTypeCode' => $event->type?->code ?? '',
         ]);
     }
 
