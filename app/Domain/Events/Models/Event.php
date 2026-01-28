@@ -58,4 +58,9 @@ class Event extends Model
     {
         return $this->hasMany(EventBooking::class);
     }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(EventParticipant::class);
+    }
 }

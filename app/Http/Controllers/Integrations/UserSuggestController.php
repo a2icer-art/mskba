@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Integrations;
 
 use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,9 +15,11 @@ class UserSuggestController
     {
         $data = $request->validate([
             'query' => ['required', 'string', 'min:2'],
+            'role' => ['nullable', 'string', 'exists:participant_roles,alias'],
         ]);
 
         $query = $data['query'];
+        $role = $data['role'] ?? null;
 
         $users = User::query()
             ->where('status', UserStatus::Confirmed->value)
@@ -28,6 +31,15 @@ class UserSuggestController
                             ->whereNotNull('confirmed_at')
                             ->where('value', 'like', "%{$query}%");
                     });
+            })
+            ->when($role, function ($builder) use ($role) {
+                $builder->whereHas('participantRoleAssignments', function ($assignmentQuery) use ($role) {
+                    $assignmentQuery
+                        ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+                        ->whereHas('role', function ($roleQuery) use ($role) {
+                            $roleQuery->where('alias', $role);
+                        });
+                });
             })
             ->with(['contacts' => function ($contactQuery) {
                 $contactQuery

@@ -14,6 +14,7 @@ use App\Domain\Contracts\Models\Contract;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Balances\Models\Balance;
+use App\Domain\Events\Models\EventParticipant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -132,5 +133,10 @@ class User extends Authenticatable
     public function contracts(): HasMany
     {
         return $this->hasMany(Contract::class);
+    }
+
+    public function eventParticipations(): HasMany
+    {
+        return $this->hasMany(EventParticipant::class);
     }
 }

@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
@@ -17,6 +17,10 @@ const props = defineProps({
         default: null,
     },
     bookings: {
+        type: Array,
+        default: () => [],
+    },
+    participants: {
         type: Array,
         default: () => [],
     },
@@ -48,6 +52,37 @@ const actionError = computed(() => page.props?.errors?.booking ?? '');
 const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
+const participantsConfirmedCount = computed(() =>
+    props.participants.filter((participant) => participant.status === 'confirmed').length
+);
+const participantsReserveCount = computed(() =>
+    props.participants.filter((participant) => participant.status === 'reserve').length
+);
+const participantsLimitLabel = computed(() => {
+    const limit = Number(eventForm.participants_limit ?? 0);
+    if (!limit) {
+        return '—';
+    }
+    return String(limit);
+});
+const participantRoles = [
+    { value: 'player', label: 'Игрок' },
+    { value: 'coach', label: 'Тренер' },
+    { value: 'referee', label: 'Судья' },
+    { value: 'media', label: 'Медиа' },
+];
+const participantStatusLabels = {
+    invited: 'Приглашен',
+    confirmed: 'Подтвержден',
+    reserve: 'Резерв',
+    declined: 'Отказался',
+};
+const participantsByRole = computed(() => {
+    return participantRoles.map((role) => ({
+        ...role,
+        items: props.participants.filter((participant) => participant.role === role.value),
+    }));
+});
 const resolvedPriceAmount = computed(() => {
     const current = Number(props.event?.price_amount_minor ?? 0);
     if (current > 0) {
@@ -63,6 +98,14 @@ const isPriceFromApprovedBooking = computed(() => {
     const stored = Number(props.event?.price_amount_minor ?? 0);
     const approved = Number(props.event?.approved_booking_cost_minor ?? 0);
     return stored === 0 && approved > 0;
+});
+const perParticipantCost = computed(() => {
+    const total = Number(eventForm.price_amount_minor ?? 0);
+    const limit = Number(eventForm.participants_limit ?? 0);
+    if (!total || !limit) {
+        return 0;
+    }
+    return Math.ceil(total / limit);
 });
 const bookingStatusLabel = (status) => {
     if (status === 'awaiting_payment') {
@@ -142,6 +185,22 @@ const eventForm = useForm({
     participants_limit: Number(props.event?.participants_limit ?? 0),
     price_amount_minor: resolvedPriceAmount.value,
 });
+const inviteForm = useForm({
+    login: '',
+    user_id: '',
+    role: 'player',
+});
+const participantStatusForm = useForm({
+    status: '',
+    reason: '',
+});
+const statusChangeOpen = ref(false);
+const statusChangeTarget = ref(null);
+const userSuggestLoading = ref(false);
+const userSuggestError = ref('');
+const userSuggestions = ref([]);
+let userSuggestTimer = null;
+let userSuggestRequestId = 0;
 const venueQuery = ref('');
 const venueSuggestions = ref([]);
 const venueSuggestLoading = ref(false);
@@ -190,6 +249,112 @@ const submitEventDetails = () => {
     eventForm.patch(`/events/${props.event?.id}`, {
         preserveScroll: true,
     });
+};
+
+const submitInvite = () => {
+    inviteForm.post(`/events/${props.event?.id}/participants/invite`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            inviteForm.reset('login', 'user_id');
+            userSuggestions.value = [];
+            userSuggestError.value = '';
+        },
+    });
+};
+
+const openStatusChange = (participant, status) => {
+    statusChangeTarget.value = participant;
+    participantStatusForm.status = status;
+    participantStatusForm.reason = '';
+    participantStatusForm.clearErrors();
+    statusChangeOpen.value = true;
+};
+
+const closeStatusChange = () => {
+    statusChangeOpen.value = false;
+    statusChangeTarget.value = null;
+    participantStatusForm.reset('status', 'reason');
+    participantStatusForm.clearErrors();
+};
+
+const submitStatusChange = () => {
+    if (!statusChangeTarget.value) {
+        return;
+    }
+
+    participantStatusForm.post(
+        `/events/${props.event?.id}/participants/${statusChangeTarget.value.id}/status`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeStatusChange();
+            },
+        }
+    );
+};
+
+watch(
+    () => inviteForm.role,
+    () => {
+        inviteForm.user_id = '';
+        userSuggestions.value = [];
+        userSuggestError.value = '';
+        if (inviteForm.login) {
+            scheduleUserSuggestions(inviteForm.login);
+        }
+    }
+);
+
+const scheduleUserSuggestions = (value) => {
+    inviteForm.user_id = '';
+    userSuggestError.value = '';
+    if (userSuggestTimer) {
+        clearTimeout(userSuggestTimer);
+    }
+    if (!value || value.trim().length < 2) {
+        userSuggestLoading.value = false;
+        userSuggestions.value = [];
+        return;
+    }
+    userSuggestTimer = setTimeout(() => {
+        fetchUserSuggestions(value.trim());
+    }, 250);
+};
+
+const fetchUserSuggestions = async (query) => {
+    const requestId = ++userSuggestRequestId;
+    userSuggestLoading.value = true;
+    try {
+        const roleParam = inviteForm.role ? `&role=${encodeURIComponent(inviteForm.role)}` : '';
+        const response = await fetch(`/integrations/user-suggest?query=${encodeURIComponent(query)}${roleParam}`);
+        if (!response.ok) {
+            throw new Error('failed');
+        }
+        const data = await response.json();
+        if (requestId !== userSuggestRequestId) {
+            return;
+        }
+        userSuggestions.value = data?.suggestions ?? [];
+        userSuggestError.value = userSuggestions.value.length ? '' : 'Варианты не найдены.';
+    } catch (error) {
+        if (requestId !== userSuggestRequestId) {
+            return;
+        }
+        userSuggestions.value = [];
+        userSuggestError.value = 'Не удалось получить подсказки.';
+    } finally {
+        if (requestId !== userSuggestRequestId) {
+            return;
+        }
+        userSuggestLoading.value = false;
+    }
+};
+
+const applyUserSuggestion = (suggestion) => {
+    inviteForm.login = suggestion.login;
+    inviteForm.user_id = suggestion.id;
+    userSuggestions.value = [];
+    userSuggestError.value = '';
 };
 
 const openDelete = () => {
@@ -446,6 +611,12 @@ const bookingClientError = computed(() => {
                                     />
                                 </label>
                                 <p class="mt-1 text-xs text-slate-500">0 — без ограничений.</p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Участники: {{ participantsConfirmedCount }}/{{ participantsLimitLabel }}
+                                </p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    В резерве: {{ participantsReserveCount }}
+                                </p>
                                 <div v-if="eventForm.errors.participants_limit" class="text-xs text-rose-700">
                                     {{ eventForm.errors.participants_limit }}
                                 </div>
@@ -464,13 +635,12 @@ const bookingClientError = computed(() => {
                                 <p v-if="isPriceFromApprovedBooking" class="mt-1 text-xs text-slate-500">
                                     По умолчанию подтянута стоимость подтвержденной брони площадки.
                                 </p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Стоимость для одного участника: {{ perParticipantCost ? `${perParticipantCost} ₽` : '—' }}
+                                </p>
                                 <div v-if="eventForm.errors.price_amount_minor" class="text-xs text-rose-700">
                                     {{ eventForm.errors.price_amount_minor }}
                                 </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                                Приглашение участников — заглушка.
                             </div>
 
                             <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
@@ -487,6 +657,138 @@ const bookingClientError = computed(() => {
                                 </button>
                             </div>
                         </form>
+                    </section>
+
+                    <section class="mt-8 rounded-3xl border border-slate-200/80 bg-white px-5 py-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-lg font-semibold text-slate-900">Участники</h2>
+                        </div>
+
+                        <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]" @submit.prevent="submitInvite">
+                            <div class="relative">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Логин пользователя
+                                    <input
+                                        v-model="inviteForm.login"
+                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        :class="{ 'is-loading': userSuggestLoading }"
+                                        type="text"
+                                        placeholder="login"
+                                        @input="scheduleUserSuggestions($event.target.value)"
+                                    />
+                                </label>
+                                <input v-model="inviteForm.user_id" type="hidden" />
+                                <div v-if="inviteForm.errors.login" class="text-xs text-rose-700">
+                                    {{ inviteForm.errors.login }}
+                                </div>
+                                <div v-if="inviteForm.errors.user_id" class="text-xs text-rose-700">
+                                    {{ inviteForm.errors.user_id }}
+                                </div>
+                                <div v-if="userSuggestError" class="text-xs text-rose-700">
+                                    {{ userSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!userSuggestLoading && userSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in userSuggestions"
+                                        :key="`${suggestion.id}-${index}`"
+                                        class="flex w-full items-start gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                        type="button"
+                                        @click="applyUserSuggestion(suggestion)"
+                                    >
+                                        <span class="font-semibold">{{ suggestion.login }}</span>
+                                        <span v-if="suggestion.email" class="text-xs text-slate-500">{{ suggestion.email }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Роль
+                                <select
+                                    v-model="inviteForm.role"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <option v-for="role in participantRoles" :key="role.value" :value="role.value">
+                                        {{ role.label }}
+                                    </option>
+                                </select>
+                            </label>
+                            <div class="flex items-end">
+                                <button
+                                    class="w-full rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                                    type="submit"
+                                    :disabled="inviteForm.processing"
+                                >
+                                    Пригласить
+                                </button>
+                            </div>
+                            <div v-if="inviteForm.errors.role" class="text-xs text-rose-700">
+                                {{ inviteForm.errors.role }}
+                            </div>
+                        </form>
+
+                        <div v-if="participantsByRole.every((group) => group.items.length === 0)" class="mt-4 text-sm text-slate-500">
+                            Участники пока не добавлены.
+                        </div>
+
+                        <div v-else class="mt-4 grid gap-4">
+                            <div v-for="group in participantsByRole" :key="group.value" class="rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
+                                <div class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                    {{ group.label }}
+                                </div>
+                                <div v-if="group.items.length === 0" class="mt-2 text-sm text-slate-500">
+                                    Нет участников.
+                                </div>
+                                <ul v-else class="mt-2 space-y-2">
+                                    <li v-for="participant in group.items" :key="participant.id" class="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <span>{{ participant.user?.login || 'Пользователь' }}</span>
+                                            <span
+                                                class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600"
+                                                :class="{
+                                                    'border-emerald-200 bg-emerald-50 text-emerald-700': participant.status === 'confirmed',
+                                                    'border-amber-200 bg-amber-50 text-amber-700': participant.status === 'reserve',
+                                                    'border-rose-200 bg-rose-50 text-rose-700': participant.status === 'declined',
+                                                    'border-slate-200 bg-slate-100 text-slate-600': participant.status === 'invited',
+                                                }"
+                                            >
+                                                {{ participantStatusLabels[participant.status] || participant.status }}
+                                            </span>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button
+                                                v-if="participant.status !== 'confirmed'"
+                                                class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
+                                                type="button"
+                                                :disabled="participantStatusForm.processing"
+                                                @click="openStatusChange(participant, 'confirmed')"
+                                            >
+                                                Подтвердить
+                                            </button>
+                                            <button
+                                                v-if="participant.status !== 'reserve'"
+                                                class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
+                                                type="button"
+                                                :disabled="participantStatusForm.processing"
+                                                @click="openStatusChange(participant, 'reserve')"
+                                            >
+                                                В резерв
+                                            </button>
+                                            <button
+                                                v-if="participant.status !== 'declined'"
+                                                class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-800 transition hover:-translate-y-0.5 hover:border-rose-400"
+                                                type="button"
+                                                :disabled="participantStatusForm.processing"
+                                                @click="openStatusChange(participant, 'declined')"
+                                            >
+                                                Отклонить
+                                            </button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </section>
 
                     <section class="mt-8">
@@ -716,6 +1018,67 @@ const bookingClientError = computed(() => {
                         :disabled="deleteForm.processing"
                     >
                         Удалить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div v-if="statusChangeOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: participantStatusForm.processing }" @submit.prevent="submitStatusChange">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Изменить статус участника</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeStatusChange"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                    <p class="text-sm text-slate-600">
+                        Укажите причину смены статуса (необязательно).
+                    </p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                            <span class="font-semibold">{{ statusChangeTarget?.user?.login || '—' }}</span>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Новый статус</span>
+                            <span>{{ participantStatusLabels[participantStatusForm.status] || participantStatusForm.status }}</span>
+                        </div>
+                    </div>
+                    <textarea
+                        v-model="participantStatusForm.reason"
+                        class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                        placeholder="Причина (необязательно)"
+                    ></textarea>
+                    <div v-if="participantStatusForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                        {{ participantStatusForm.errors.reason }}
+                    </div>
+                    <div v-if="participantStatusForm.errors.status" class="mt-2 text-xs text-rose-700">
+                        {{ participantStatusForm.errors.status }}
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="participantStatusForm.processing"
+                        @click="closeStatusChange"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="participantStatusForm.processing"
+                    >
+                        Подтвердить
                     </button>
                 </div>
             </form>

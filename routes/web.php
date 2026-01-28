@@ -201,6 +201,18 @@ Route::delete('/events/{event}', [EventsController::class, 'destroy'])
 Route::post('/events/{event}/bookings', [EventsController::class, 'storeBooking'])
     ->middleware(['auth', 'can:venue.booking'])
     ->name('events.bookings.store');
+Route::post('/events/{event}/participants/invite', [EventsController::class, 'inviteParticipant'])
+    ->middleware('auth')
+    ->name('events.participants.invite');
+Route::post('/events/{event}/participants/join', [EventsController::class, 'joinEvent'])
+    ->middleware('auth')
+    ->name('events.participants.join');
+Route::post('/events/{event}/participants/{participant}/respond', [EventsController::class, 'respondParticipant'])
+    ->middleware('auth')
+    ->name('events.participants.respond');
+Route::post('/events/{event}/participants/{participant}/status', [EventsController::class, 'updateParticipantStatus'])
+    ->middleware('auth')
+    ->name('events.participants.status');
 
 Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');

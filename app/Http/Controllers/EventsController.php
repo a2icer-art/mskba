@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Events\Enums\EventBookingStatus;
+use App\Domain\Events\Enums\EventParticipantRole;
+use App\Domain\Events\Enums\EventParticipantStatus;
 use App\Domain\Events\Models\Event;
+use App\Domain\Events\Models\EventParticipant;
 use App\Domain\Events\Models\EventType;
 use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Events\Services\EventBookingService;
+use App\Domain\Events\Services\EventParticipantService;
 use App\Domain\Admin\Services\EventDefaultsService;
+use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Users\Enums\UserStatus;
@@ -18,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -253,7 +259,14 @@ class EventsController extends Controller
         $user = $request->user();
         $checker = app(PermissionChecker::class);
 
-        $event->loadMissing(['type', 'organizer', 'bookings.venue.venueType', 'bookings.paymentOrder', 'bookings.payment']);
+        $event->loadMissing([
+            'type',
+            'organizer',
+            'bookings.venue.venueType',
+            'bookings.paymentOrder',
+            'bookings.payment',
+            'participants.user',
+        ]);
 
         if (!$this->canViewEvent($user, $event, $checker)) {
             return redirect()
@@ -310,11 +323,32 @@ class EventsController extends Controller
 
         $isAdmin = $user?->roles()->where('alias', 'admin')->exists() ?? false;
         $isOrganizer = $user && $event->organizer_id === $user->id;
+        $participants = $event->participants;
+        $participantsCount = $participants
+            ->where('status', EventParticipantStatus::Confirmed)
+            ->count();
+        $reserveCount = $participants
+            ->where('status', EventParticipantStatus::Reserve)
+            ->count();
+        $userParticipation = $user
+            ? $participants->first(static fn ($participant) => $participant->user_id === $user->id)
+            : null;
 
         if (!$isAdmin && !$isOrganizer) {
             return Inertia::render('EventShowPublic', [
                 'appName' => config('app.name'),
                 'event' => $eventPayload,
+                'participantsCount' => $participantsCount,
+                'reserveCount' => $reserveCount,
+                'userParticipation' => $userParticipation
+                    ? [
+                        'id' => $userParticipation->id,
+                        'role' => $userParticipation->role?->value,
+                        'status' => $userParticipation->status?->value,
+                        'user_status_reason' => $userParticipation->user_status_reason,
+                        'status_changed_by' => $userParticipation->status_changed_by,
+                    ]
+                    : null,
                 'breadcrumbs' => $breadcrumbs,
             ]);
         }
@@ -355,10 +389,31 @@ class EventsController extends Controller
             })
             ->all();
 
+        $participantsPayload = $participants
+            ->map(static function (EventParticipant $participant): array {
+                return [
+                    'id' => $participant->id,
+                    'role' => $participant->role?->value,
+                    'status' => $participant->status?->value,
+                    'joined_at' => $participant->joined_at?->toDateTimeString(),
+                    'status_change_reason' => $participant->status_change_reason,
+                    'status_changed_at' => $participant->status_changed_at?->toDateTimeString(),
+                    'user_status_reason' => $participant->user_status_reason,
+                    'user' => $participant->user
+                        ? [
+                            'id' => $participant->user->id,
+                            'login' => $participant->user->login,
+                        ]
+                        : null,
+                ];
+            })
+            ->all();
+
         return Inertia::render('EventShow', [
             'appName' => config('app.name'),
             'event' => $eventPayload,
             'bookings' => $bookings,
+            'participants' => $participantsPayload,
             'canBook' => $canBook,
             'bookingDeadlinePassed' => $bookingDeadlinePassed,
             'canDelete' => $canDelete,
@@ -384,6 +439,179 @@ class EventsController extends Controller
         ]);
 
         return back()->with('notice', 'Параметры события обновлены.');
+    }
+
+    public function inviteParticipant(Request $request, Event $event, EventParticipantService $service)
+    {
+        $user = $request->user();
+        if (!$user || !$this->canEditEvent($user, $event)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'login' => ['nullable', 'string', 'max:255'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'role' => ['required', Rule::in(EventParticipantRole::values())],
+        ]);
+
+        if (empty($data['user_id']) && empty($data['login'])) {
+            return back()->withErrors(['login' => 'Укажите пользователя.']);
+        }
+
+        $participantQuery = \App\Models\User::query();
+        if (!empty($data['user_id'])) {
+            $participantQuery->whereKey($data['user_id']);
+        } else {
+            $participantQuery->where('login', $data['login']);
+        }
+
+        $participant = $participantQuery->first();
+
+        if (!$participant) {
+            return back()->withErrors(['login' => 'Пользователь не найден.']);
+        }
+
+        $roleAlias = $data['role'];
+        $hasRole = $participant->participantRoleAssignments()
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+            ->whereHas('role', function ($roleQuery) use ($roleAlias) {
+                $roleQuery->where('alias', $roleAlias);
+            })
+            ->exists();
+
+        if (!$hasRole) {
+            return back()->withErrors([
+                'login' => 'У пользователя нет подтвержденной роли для этого приглашения.',
+            ]);
+        }
+
+        $service->invite($event, $user, $participant, EventParticipantRole::from($data['role']));
+
+        return back()->with('notice', 'Приглашение отправлено.');
+    }
+
+    public function joinEvent(Request $request, Event $event, EventParticipantService $service)
+    {
+        $user = $request->user();
+        if (!$user || $user->status !== UserStatus::Confirmed) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'role' => ['required', Rule::in(EventParticipantRole::values())],
+            'status' => ['nullable', Rule::in([EventParticipantStatus::Confirmed->value, EventParticipantStatus::Reserve->value])],
+        ]);
+
+        $roleAlias = $data['role'];
+        $hasRole = $user->participantRoleAssignments()
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+            ->whereHas('role', function ($roleQuery) use ($roleAlias) {
+                $roleQuery->where('alias', $roleAlias);
+            })
+            ->exists();
+
+        if (!$hasRole) {
+            return back()->withErrors([
+                'role' => 'Для участия требуется подтвержденная роль.',
+            ]);
+        }
+
+        $desiredStatus = !empty($data['status']) ? EventParticipantStatus::from($data['status']) : null;
+        $participant = $service->join($event, $user, EventParticipantRole::from($data['role']), $desiredStatus);
+
+        $notice = $participant->status === EventParticipantStatus::Reserve
+            ? 'Вы добавлены в резерв.'
+            : 'Вы участвуете в событии.';
+
+        return back()->with('notice', $notice);
+    }
+
+    public function respondParticipant(
+        Request $request,
+        Event $event,
+        EventParticipant $participant,
+        EventParticipantService $service
+    ) {
+        $user = $request->user();
+        if (!$user || $participant->event_id !== $event->id) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'status' => ['required', Rule::in([
+                EventParticipantStatus::Confirmed->value,
+                EventParticipantStatus::Reserve->value,
+                EventParticipantStatus::Declined->value,
+            ])],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $currentStatus = $participant->status?->value ?? EventParticipantStatus::Invited->value;
+        if (
+            $participant->status_changed_by !== null &&
+            $participant->status_changed_by !== $user->id &&
+            $this->isStatusUpgrade($currentStatus, $data['status'])
+        ) {
+            return back()->withErrors([
+                'status' => 'Нельзя повысить статус без согласования с организатором.',
+            ]);
+        }
+
+        $service->respond(
+            $participant,
+            $user,
+            EventParticipantStatus::from($data['status']),
+            $data['reason'] ?? null
+        );
+
+        return back()->with('notice', 'Ответ сохранен.');
+    }
+
+    private function isStatusUpgrade(string $current, string $next): bool
+    {
+        $ranks = [
+            EventParticipantStatus::Declined->value => 0,
+            EventParticipantStatus::Invited->value => 1,
+            EventParticipantStatus::Reserve->value => 2,
+            EventParticipantStatus::Confirmed->value => 3,
+        ];
+
+        return ($ranks[$next] ?? 0) > ($ranks[$current] ?? 0);
+    }
+
+    public function updateParticipantStatus(
+        Request $request,
+        Event $event,
+        EventParticipant $participant,
+        EventParticipantService $service
+    ) {
+        $user = $request->user();
+        if (!$user || !$this->canEditEvent($user, $event) || $participant->event_id !== $event->id) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'status' => ['required', Rule::in([
+                EventParticipantStatus::Confirmed->value,
+                EventParticipantStatus::Reserve->value,
+                EventParticipantStatus::Declined->value,
+                EventParticipantStatus::Invited->value,
+            ])],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $participant = $service->changeStatus(
+            $participant,
+            $user,
+            EventParticipantStatus::from($data['status']),
+            $data['reason'] ?? null
+        );
+
+        $notice = $participant->status === EventParticipantStatus::Reserve
+            ? 'Статус изменён: резерв.'
+            : 'Статус участника обновлён.';
+
+        return back()->with('notice', $notice);
     }
 
     public function storeBooking(Request $request, Event $event, EventBookingService $service)

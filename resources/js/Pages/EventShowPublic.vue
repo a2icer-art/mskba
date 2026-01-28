@@ -1,6 +1,6 @@
 ﻿<script setup>
-import { computed } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -18,6 +18,14 @@ const props = defineProps({
         type: Number,
         default: 0,
     },
+    reserveCount: {
+        type: Number,
+        default: 0,
+    },
+    userParticipation: {
+        type: Object,
+        default: null,
+    },
     breadcrumbs: {
         type: Array,
         default: () => [],
@@ -27,6 +35,44 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const participantRoles = [
+    { value: 'player', label: 'Игрок' },
+    { value: 'coach', label: 'Тренер' },
+    { value: 'referee', label: 'Судья' },
+    { value: 'media', label: 'Медиа' },
+];
+const resolveParticipantStatusLabel = (status, statusChangedBy) => {
+    const currentUserId = page.props.auth?.user?.id;
+    const changedByOrganizer = statusChangedBy && statusChangedBy !== currentUserId;
+    if (status === 'confirmed') {
+        return changedByOrganizer ? 'Организатор подтвердил участие' : 'Вы участвуете';
+    }
+    if (status === 'reserve') {
+        return changedByOrganizer ? 'Организатор перевел в резерв' : 'Вы в резерве';
+    }
+    if (status === 'declined') {
+        return changedByOrganizer ? 'Организатор отклонил участие' : 'Вы отказались от участия';
+    }
+    if (status === 'invited') {
+        return 'Вас пригласили';
+    }
+    return 'Статус неизвестен';
+};
+const statusRank = {
+    declined: 0,
+    invited: 1,
+    reserve: 2,
+    confirmed: 3,
+};
+const joinForm = useForm({
+    role: 'player',
+    status: 'confirmed',
+});
+const respondForm = useForm({
+    status: 'confirmed',
+    reason: '',
+});
+const respondOpen = ref(false);
 
 const formatDateRange = (startsAt, endsAt) => {
     if (!startsAt || !endsAt) {
@@ -53,10 +99,74 @@ const formatAmount = (value) => {
 const participantsLimitLabel = computed(() => {
     const limit = Number(props.event?.participants_limit ?? 0);
     if (!limit) {
-        return 'Без ограничений';
+        return '—';
     }
     return String(limit);
 });
+const perParticipantCost = computed(() => {
+    const total = Number(props.event?.price_amount_minor ?? 0);
+    const limit = Number(props.event?.participants_limit ?? 0);
+    if (!total || !limit) {
+        return 0;
+    }
+    return Math.ceil(total / limit);
+});
+
+const isLimitReached = computed(() => {
+    const limit = Number(props.event?.participants_limit ?? 0);
+    if (!limit) {
+        return false;
+    }
+    return Number(props.participantsCount ?? 0) >= limit;
+});
+const isUpgradeBlocked = (targetStatus) => {
+    if (!props.userParticipation?.status_changed_by) {
+        return false;
+    }
+    const current = props.userParticipation?.status || 'invited';
+    return (statusRank[targetStatus] ?? 0) > (statusRank[current] ?? 0);
+};
+
+const syncUserReason = () => {
+    respondForm.reason = props.userParticipation?.user_status_reason || '';
+};
+
+watch(
+    () => props.userParticipation,
+    () => {
+        syncUserReason();
+    },
+    { immediate: true }
+);
+
+const submitJoin = () => {
+    joinForm.status = isLimitReached.value ? 'reserve' : 'confirmed';
+    joinForm.post(`/events/${props.event?.id}/participants/join`, {
+        preserveScroll: true,
+    });
+};
+
+const respondInvitation = (status) => {
+    respondForm.status = status;
+    respondForm.reason = props.userParticipation?.user_status_reason || '';
+    respondForm.clearErrors();
+    respondOpen.value = true;
+};
+
+const closeRespond = () => {
+    respondOpen.value = false;
+    respondForm.reset('status', 'reason');
+    respondForm.clearErrors();
+};
+
+const submitRespond = () => {
+    respondForm.post(`/events/${props.event?.id}/participants/${props.userParticipation?.id}/respond`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeRespond();
+        },
+    });
+};
 </script>
 
 <template>
@@ -87,18 +197,18 @@ const participantsLimitLabel = computed(() => {
                     </div>
 
                     <div class="mt-3 text-sm text-slate-700">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Стоимость события</span>
-                        <div class="mt-1">{{ formatAmount(event?.price_amount_minor ?? 0) }}</div>
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Стоимость участия</span>
+                        <div class="mt-1">{{ perParticipantCost ? formatAmount(perParticipantCost) : '—' }}</div>
                     </div>
 
                     <div class="mt-3 text-sm text-slate-700">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Кол-во участников</span>
-                        <div class="mt-1">{{ participantsLimitLabel }}</div>
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Участники</span>
+                        <div class="mt-1">{{ participantsCount }}/{{ participantsLimitLabel }}</div>
                     </div>
 
                     <div class="mt-3 text-sm text-slate-700">
-                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Уже участвуют</span>
-                        <div class="mt-1">{{ participantsCount }}</div>
+                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">В резерве</span>
+                        <div class="mt-1">{{ reserveCount }}</div>
                     </div>
 
                     <div
@@ -118,6 +228,75 @@ const participantsLimitLabel = computed(() => {
                         </div>
                     </div>
 
+                    <div class="mt-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm text-slate-700">
+                        <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Участие</div>
+                        <div v-if="userParticipation" class="mt-2 space-y-2">
+                            <div class="text-sm text-slate-700">
+                                {{ resolveParticipantStatusLabel(userParticipation.status, userParticipation.status_changed_by) }}
+                            </div>
+                            <p
+                                v-if="userParticipation.status_changed_by && isUpgradeBlocked('confirmed')"
+                                class="text-xs text-slate-500"
+                            >
+                                Статус изменён организатором, изменение недоступно.
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    v-if="userParticipation.status !== 'confirmed' && !isLimitReached"
+                                    class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                                    type="button"
+                                    :disabled="respondForm.processing || isUpgradeBlocked('confirmed')"
+                                    @click="respondInvitation('confirmed')"
+                                >
+                                    Подтвердить
+                                </button>
+                                <button
+                                    v-if="userParticipation.status !== 'reserve'"
+                                    class="rounded-full border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                                    type="button"
+                                    :disabled="respondForm.processing || isUpgradeBlocked('reserve')"
+                                    @click="respondInvitation('reserve')"
+                                >
+                                    В резерв
+                                </button>
+                                <button
+                                    v-if="userParticipation.status !== 'declined'"
+                                    class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300 disabled:cursor-not-allowed disabled:text-slate-400"
+                                    type="button"
+                                    :disabled="respondForm.processing"
+                                    @click="respondInvitation('declined')"
+                                >
+                                    Отказаться
+                                </button>
+                            </div>
+                        </div>
+                        <form v-else class="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="submitJoin">
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Роль
+                                <select
+                                    v-model="joinForm.role"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <option v-for="role in participantRoles" :key="role.value" :value="role.value">
+                                        {{ role.label }}
+                                    </option>
+                                </select>
+                            </label>
+                            <div class="flex items-end">
+                                <button
+                                    class="w-full rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                                    type="submit"
+                                    :disabled="joinForm.processing"
+                                >
+                                    {{ isLimitReached ? 'В резерв' : 'Участвовать' }}
+                                </button>
+                            </div>
+                            <div v-if="joinForm.errors.role" class="text-xs text-rose-700">
+                                {{ joinForm.errors.role }}
+                            </div>
+                        </form>
+                    </div>
+
                     <div v-if="event?.organizer?.login" class="mt-3 text-sm text-slate-700">
                         <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Организатор</span>
                         <div class="mt-1">{{ event.organizer.login }}</div>
@@ -126,6 +305,63 @@ const participantsLimitLabel = computed(() => {
             </main>
 
             <MainFooter :app-name="appName" />
+        </div>
+    </div>
+
+    <div v-if="respondOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: respondForm.processing }" @submit.prevent="submitRespond">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Изменить статус участия</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeRespond"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                    <p class="text-sm text-slate-600">
+                        Укажите причину изменения статуса (необязательно).
+                    </p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Новый статус</span>
+                            <span>{{ resolveParticipantStatusLabel(respondForm.status, page.props.auth?.user?.id) }}</span>
+                        </div>
+                    </div>
+                    <textarea
+                        v-model="respondForm.reason"
+                        class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                        placeholder="Причина (необязательно)"
+                    ></textarea>
+                    <div v-if="respondForm.errors.reason" class="mt-2 text-xs text-rose-700">
+                        {{ respondForm.errors.reason }}
+                    </div>
+                    <div v-if="respondForm.errors.status" class="mt-2 text-xs text-rose-700">
+                        {{ respondForm.errors.status }}
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="respondForm.processing"
+                        @click="closeRespond"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="respondForm.processing"
+                    >
+                        Подтвердить
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </template>
