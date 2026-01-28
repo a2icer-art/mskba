@@ -22,6 +22,14 @@ const props = defineProps({
         type: Number,
         default: 0,
     },
+    allowedRoles: {
+        type: Array,
+        default: () => [],
+    },
+    limitRole: {
+        type: String,
+        default: 'player',
+    },
     userParticipation: {
         type: Object,
         default: null,
@@ -35,12 +43,21 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
-const participantRoles = [
-    { value: 'player', label: 'Игрок' },
-    { value: 'coach', label: 'Тренер' },
-    { value: 'referee', label: 'Судья' },
-    { value: 'media', label: 'Медиа' },
-];
+const participantRoles = computed(() => {
+    const labels = {
+        player: 'Игрок',
+        coach: 'Тренер',
+        referee: 'Судья',
+        media: 'Медиа',
+        seller: 'Продавец',
+        staff: 'Стафф',
+    };
+    const allowed = props.allowedRoles?.length ? props.allowedRoles : ['player'];
+    return allowed.map((value) => ({
+        value,
+        label: labels[value] || value,
+    }));
+});
 const resolveParticipantStatusLabel = (status, statusChangedBy) => {
     const currentUserId = page.props.auth?.user?.id;
     const changedByOrganizer = statusChangedBy && statusChangedBy !== currentUserId;
@@ -65,7 +82,7 @@ const statusRank = {
     confirmed: 3,
 };
 const joinForm = useForm({
-    role: 'player',
+    role: props.allowedRoles?.[0] || 'player',
     status: 'confirmed',
 });
 const respondForm = useForm({
@@ -123,6 +140,9 @@ const isUpgradeBlocked = (targetStatus) => {
     if (!props.userParticipation?.status_changed_by) {
         return false;
     }
+    if (props.userParticipation?.status === 'invited') {
+        return false;
+    }
     const current = props.userParticipation?.status || 'invited';
     return (statusRank[targetStatus] ?? 0) > (statusRank[current] ?? 0);
 };
@@ -139,8 +159,21 @@ watch(
     { immediate: true }
 );
 
+watch(
+    () => props.allowedRoles,
+    (roles) => {
+        if (Array.isArray(roles) && roles.length) {
+            joinForm.role = roles.includes(joinForm.role) ? joinForm.role : roles[0];
+        } else {
+            joinForm.role = 'player';
+        }
+    },
+    { immediate: true }
+);
+
 const submitJoin = () => {
-    joinForm.status = isLimitReached.value ? 'reserve' : 'confirmed';
+    const isLimitRole = joinForm.role === props.limitRole;
+    joinForm.status = isLimitReached.value && isLimitRole ? 'reserve' : 'confirmed';
     joinForm.post(`/events/${props.event?.id}/participants/join`, {
         preserveScroll: true,
     });
@@ -234,15 +267,18 @@ const submitRespond = () => {
                             <div class="text-sm text-slate-700">
                                 {{ resolveParticipantStatusLabel(userParticipation.status, userParticipation.status_changed_by) }}
                             </div>
+                            <div v-if="userParticipation.status === 'invited' && userParticipation.status_change_reason" class="text-sm text-slate-600">
+                                Комментарий организатора: {{ userParticipation.status_change_reason }}
+                            </div>
                             <p
-                                v-if="userParticipation.status_changed_by && isUpgradeBlocked('confirmed')"
+                                v-if="userParticipation.status_changed_by && userParticipation.status !== 'invited' && isUpgradeBlocked('confirmed')"
                                 class="text-xs text-slate-500"
                             >
                                 Статус изменён организатором, изменение недоступно.
                             </p>
                             <div class="flex flex-wrap gap-2">
                                 <button
-                                    v-if="userParticipation.status !== 'confirmed' && !isLimitReached"
+                                    v-if="userParticipation.status !== 'confirmed' && !(isLimitReached && props.limitRole === userParticipation.role)"
                                     class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
                                     type="button"
                                     :disabled="respondForm.processing || isUpgradeBlocked('confirmed')"

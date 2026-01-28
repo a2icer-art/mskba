@@ -294,6 +294,7 @@ class EventsController extends Controller
             'ends_at' => $event->ends_at?->toDateTimeString(),
             'participants_limit' => $event->participants_limit ?? 0,
             'price_amount_minor' => $event->price_amount_minor ?? 0,
+            'event_type_code' => $event->type?->code,
             'type' => $event->type
                 ? [
                     'code' => $event->type->code,
@@ -324,11 +325,14 @@ class EventsController extends Controller
         $isAdmin = $user?->roles()->where('alias', 'admin')->exists() ?? false;
         $isOrganizer = $user && $event->organizer_id === $user->id;
         $participants = $event->participants;
+        $limitRole = $this->getEventLimitRole($event);
         $participantsCount = $participants
             ->where('status', EventParticipantStatus::Confirmed)
+            ->where('role', $limitRole)
             ->count();
         $reserveCount = $participants
             ->where('status', EventParticipantStatus::Reserve)
+            ->where('role', $limitRole)
             ->count();
         $userParticipation = $user
             ? $participants->first(static fn ($participant) => $participant->user_id === $user->id)
@@ -340,6 +344,8 @@ class EventsController extends Controller
                 'event' => $eventPayload,
                 'participantsCount' => $participantsCount,
                 'reserveCount' => $reserveCount,
+                'allowedRoles' => $this->getEventAllowedRoles($event),
+                'limitRole' => $limitRole,
                 'userParticipation' => $userParticipation
                     ? [
                         'id' => $userParticipation->id,
@@ -347,6 +353,7 @@ class EventsController extends Controller
                         'status' => $userParticipation->status?->value,
                         'user_status_reason' => $userParticipation->user_status_reason,
                         'status_changed_by' => $userParticipation->status_changed_by,
+                        'status_change_reason' => $userParticipation->status_change_reason,
                     ]
                     : null,
                 'breadcrumbs' => $breadcrumbs,
@@ -414,6 +421,8 @@ class EventsController extends Controller
             'event' => $eventPayload,
             'bookings' => $bookings,
             'participants' => $participantsPayload,
+            'allowedRoles' => $this->getEventAllowedRoles($event),
+            'limitRole' => $limitRole,
             'canBook' => $canBook,
             'bookingDeadlinePassed' => $bookingDeadlinePassed,
             'canDelete' => $canDelete,
@@ -452,6 +461,7 @@ class EventsController extends Controller
             'login' => ['nullable', 'string', 'max:255'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'role' => ['required', Rule::in(EventParticipantRole::values())],
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         if (empty($data['user_id']) && empty($data['login'])) {
@@ -471,6 +481,18 @@ class EventsController extends Controller
             return back()->withErrors(['login' => 'Пользователь не найден.']);
         }
 
+        $existing = EventParticipant::query()
+            ->where('event_id', $event->id)
+            ->where('user_id', $participant->id)
+            ->where('role', $data['role'])
+            ->exists();
+
+        if ($existing) {
+            return back()->withErrors([
+                'login' => 'Пользователь уже добавлен в событие для этой роли.',
+            ]);
+        }
+
         $roleAlias = $data['role'];
         $hasRole = $participant->participantRoleAssignments()
             ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
@@ -485,7 +507,13 @@ class EventsController extends Controller
             ]);
         }
 
-        $service->invite($event, $user, $participant, EventParticipantRole::from($data['role']));
+        $service->invite(
+            $event,
+            $user,
+            $participant,
+            EventParticipantRole::from($data['role']),
+            $data['reason'] ?? null
+        );
 
         return back()->with('notice', 'Приглашение отправлено.');
     }
@@ -577,6 +605,29 @@ class EventsController extends Controller
         ];
 
         return ($ranks[$next] ?? 0) > ($ranks[$current] ?? 0);
+    }
+
+    private function getEventAllowedRoles(Event $event): array
+    {
+        $event->loadMissing('type');
+        $rules = config('events.event_type_rules', []);
+        $default = ['player'];
+        $code = $event->type?->code;
+        if ($code && isset($rules[$code]['allowed_roles'])) {
+            return $rules[$code]['allowed_roles'];
+        }
+        return $default;
+    }
+
+    private function getEventLimitRole(Event $event): string
+    {
+        $event->loadMissing('type');
+        $rules = config('events.event_type_rules', []);
+        $code = $event->type?->code;
+        if ($code && isset($rules[$code]['limit_role'])) {
+            return $rules[$code]['limit_role'];
+        }
+        return 'player';
     }
 
     public function updateParticipantStatus(

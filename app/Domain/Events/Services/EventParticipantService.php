@@ -12,8 +12,16 @@ use Illuminate\Validation\ValidationException;
 
 class EventParticipantService
 {
-    public function invite(Event $event, User $inviter, User $participant, EventParticipantRole $role): EventParticipant
+    public function invite(
+        Event $event,
+        User $inviter,
+        User $participant,
+        EventParticipantRole $role,
+        ?string $reason = null
+    ): EventParticipant
     {
+        $this->ensureRoleAllowed($event, $role);
+
         return EventParticipant::updateOrCreate(
             [
                 'event_id' => $event->id,
@@ -25,7 +33,7 @@ class EventParticipantService
                 'invited_by' => $inviter->id,
                 'created_by' => $inviter->id,
                 'joined_at' => null,
-                'status_change_reason' => null,
+                'status_change_reason' => $reason,
                 'status_changed_by' => $inviter->id,
                 'status_changed_at' => Carbon::now(),
             ]
@@ -38,8 +46,10 @@ class EventParticipantService
         EventParticipantRole $role,
         ?EventParticipantStatus $desiredStatus = null
     ): EventParticipant {
+        $this->ensureRoleAllowed($event, $role);
+
         $status = $desiredStatus ?? EventParticipantStatus::Confirmed;
-        if ($status === EventParticipantStatus::Confirmed && $this->isLimitReached($event)) {
+        if ($status === EventParticipantStatus::Confirmed && $this->isLimitRole($event, $role) && $this->isLimitReached($event)) {
             $status = EventParticipantStatus::Reserve;
         }
 
@@ -74,7 +84,11 @@ class EventParticipantService
         }
 
         $finalStatus = $status;
-        if ($status === EventParticipantStatus::Confirmed && $this->isLimitReached($participant->event)) {
+        if (
+            $status === EventParticipantStatus::Confirmed
+            && $this->isLimitRole($participant->event, $participant->role)
+            && $this->isLimitReached($participant->event)
+        ) {
             $finalStatus = EventParticipantStatus::Reserve;
         }
 
@@ -95,7 +109,11 @@ class EventParticipantService
         ?string $reason = null
     ): EventParticipant {
         $finalStatus = $status;
-        if ($status === EventParticipantStatus::Confirmed && $this->isLimitReached($participant->event)) {
+        if (
+            $status === EventParticipantStatus::Confirmed
+            && $this->isLimitRole($participant->event, $participant->role)
+            && $this->isLimitReached($participant->event)
+        ) {
             $finalStatus = EventParticipantStatus::Reserve;
         }
 
@@ -116,10 +134,55 @@ class EventParticipantService
             return false;
         }
 
+        $limitRole = $this->getLimitRole($event);
         $confirmedCount = $event->participants
             ->where('status', EventParticipantStatus::Confirmed)
+            ->where('role', $limitRole)
             ->count();
 
         return $confirmedCount >= $limit;
+    }
+
+    private function ensureRoleAllowed(Event $event, EventParticipantRole $role): void
+    {
+        $rules = $this->getEventRules($event);
+        $allowed = $rules['allowed_roles'] ?? ['player'];
+        if (!in_array($role->value, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'role' => 'Роль недоступна для данного типа события.',
+            ]);
+        }
+    }
+
+    private function getLimitRole(Event $event): string
+    {
+        $rules = $this->getEventRules($event);
+        return $rules['limit_role'] ?? 'player';
+    }
+
+    private function isLimitRole(Event $event, ?EventParticipantRole $role): bool
+    {
+        if ($role === null) {
+            return false;
+        }
+        return $role->value === $this->getLimitRole($event);
+    }
+
+    private function getEventRules(Event $event): array
+    {
+        $event->loadMissing('type');
+        $code = $event->type?->code;
+        $rules = config('events.event_type_rules', []);
+
+        $default = [
+            'limit_role' => 'player',
+            'allowed_roles' => ['player'],
+        ];
+
+        if ($code && isset($rules[$code])) {
+            return array_merge($default, $rules[$code]);
+        }
+
+        return $default;
     }
 }

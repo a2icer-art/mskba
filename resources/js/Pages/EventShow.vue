@@ -24,6 +24,14 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    allowedRoles: {
+        type: Array,
+        default: () => [],
+    },
+    limitRole: {
+        type: String,
+        default: 'player',
+    },
     canBook: {
         type: Boolean,
         default: false,
@@ -53,10 +61,10 @@ const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
 const participantsConfirmedCount = computed(() =>
-    props.participants.filter((participant) => participant.status === 'confirmed').length
+    props.participants.filter((participant) => participant.status === 'confirmed' && participant.role === props.limitRole).length
 );
 const participantsReserveCount = computed(() =>
-    props.participants.filter((participant) => participant.status === 'reserve').length
+    props.participants.filter((participant) => participant.status === 'reserve' && participant.role === props.limitRole).length
 );
 const participantsLimitLabel = computed(() => {
     const limit = Number(eventForm.participants_limit ?? 0);
@@ -65,12 +73,21 @@ const participantsLimitLabel = computed(() => {
     }
     return String(limit);
 });
-const participantRoles = [
-    { value: 'player', label: 'Игрок' },
-    { value: 'coach', label: 'Тренер' },
-    { value: 'referee', label: 'Судья' },
-    { value: 'media', label: 'Медиа' },
-];
+const participantRoles = computed(() => {
+    const labels = {
+        player: 'Игрок',
+        coach: 'Тренер',
+        referee: 'Судья',
+        media: 'Медиа',
+        seller: 'Продавец',
+        staff: 'Стафф',
+    };
+    const allowed = props.allowedRoles?.length ? props.allowedRoles : ['player'];
+    return allowed.map((value) => ({
+        value,
+        label: labels[value] || value,
+    }));
+});
 const participantStatusLabels = {
     invited: 'Приглашен',
     confirmed: 'Подтвержден',
@@ -78,7 +95,7 @@ const participantStatusLabels = {
     declined: 'Отказался',
 };
 const participantsByRole = computed(() => {
-    return participantRoles.map((role) => ({
+    return participantRoles.value.map((role) => ({
         ...role,
         items: props.participants.filter((participant) => participant.role === role.value),
     }));
@@ -188,7 +205,14 @@ const eventForm = useForm({
 const inviteForm = useForm({
     login: '',
     user_id: '',
-    role: 'player',
+    role: '',
+    reason: '',
+});
+const inviteOpen = ref(false);
+const inviteRole = ref(props.allowedRoles?.[0] || 'player');
+const inviteTitle = computed(() => {
+    const label = participantRoles.value.find((role) => role.value === inviteRole.value)?.label || inviteRole.value;
+    return `Пригласить: ${label}`;
 });
 const participantStatusForm = useForm({
     status: '',
@@ -254,12 +278,34 @@ const submitEventDetails = () => {
 const submitInvite = () => {
     inviteForm.post(`/events/${props.event?.id}/participants/invite`, {
         preserveScroll: true,
+        data: {
+            login: inviteForm.login,
+            user_id: inviteForm.user_id,
+            role: inviteForm.role,
+            reason: inviteForm.reason,
+        },
         onSuccess: () => {
-            inviteForm.reset('login', 'user_id');
-            userSuggestions.value = [];
-            userSuggestError.value = '';
+            closeInvite();
         },
     });
+};
+
+const openInvite = (role) => {
+    inviteForm.reset('login', 'user_id', 'role', 'reason');
+    inviteForm.clearErrors();
+    inviteRole.value = role;
+    inviteForm.role = role;
+    userSuggestions.value = [];
+    userSuggestError.value = '';
+    inviteOpen.value = true;
+};
+
+const closeInvite = () => {
+    inviteOpen.value = false;
+    inviteForm.reset('login', 'user_id', 'role', 'reason');
+    inviteForm.clearErrors();
+    userSuggestions.value = [];
+    userSuggestError.value = '';
 };
 
 const openStatusChange = (participant, status) => {
@@ -294,15 +340,17 @@ const submitStatusChange = () => {
 };
 
 watch(
-    () => inviteForm.role,
-    () => {
-        inviteForm.user_id = '';
-        userSuggestions.value = [];
-        userSuggestError.value = '';
-        if (inviteForm.login) {
-            scheduleUserSuggestions(inviteForm.login);
+    () => props.allowedRoles,
+    (roles) => {
+        if (Array.isArray(roles) && roles.length) {
+            inviteRole.value = roles.includes(inviteRole.value) ? inviteRole.value : roles[0];
+            inviteForm.role = inviteRole.value;
+        } else {
+            inviteRole.value = 'player';
+            inviteForm.role = 'player';
         }
-    }
+    },
+    { immediate: true }
 );
 
 const scheduleUserSuggestions = (value) => {
@@ -325,7 +373,7 @@ const fetchUserSuggestions = async (query) => {
     const requestId = ++userSuggestRequestId;
     userSuggestLoading.value = true;
     try {
-        const roleParam = inviteForm.role ? `&role=${encodeURIComponent(inviteForm.role)}` : '';
+        const roleParam = inviteRole.value ? `&role=${encodeURIComponent(inviteRole.value)}` : '';
         const response = await fetch(`/integrations/user-suggest?query=${encodeURIComponent(query)}${roleParam}`);
         if (!response.ok) {
             throw new Error('failed');
@@ -664,69 +712,20 @@ const bookingClientError = computed(() => {
                             <h2 class="text-lg font-semibold text-slate-900">Участники</h2>
                         </div>
 
-                        <form class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]" @submit.prevent="submitInvite">
-                            <div class="relative">
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                    Логин пользователя
-                                    <input
-                                        v-model="inviteForm.login"
-                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        :class="{ 'is-loading': userSuggestLoading }"
-                                        type="text"
-                                        placeholder="login"
-                                        @input="scheduleUserSuggestions($event.target.value)"
-                                    />
-                                </label>
-                                <input v-model="inviteForm.user_id" type="hidden" />
-                                <div v-if="inviteForm.errors.login" class="text-xs text-rose-700">
-                                    {{ inviteForm.errors.login }}
-                                </div>
-                                <div v-if="inviteForm.errors.user_id" class="text-xs text-rose-700">
-                                    {{ inviteForm.errors.user_id }}
-                                </div>
-                                <div v-if="userSuggestError" class="text-xs text-rose-700">
-                                    {{ userSuggestError }}
-                                </div>
-                                <div
-                                    v-else-if="!userSuggestLoading && userSuggestions.length"
-                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
-                                >
-                                    <button
-                                        v-for="(suggestion, index) in userSuggestions"
-                                        :key="`${suggestion.id}-${index}`"
-                                        class="flex w-full items-start gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
-                                        type="button"
-                                        @click="applyUserSuggestion(suggestion)"
-                                    >
-                                        <span class="font-semibold">{{ suggestion.login }}</span>
-                                        <span v-if="suggestion.email" class="text-xs text-slate-500">{{ suggestion.email }}</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Роль
-                                <select
-                                    v-model="inviteForm.role"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                >
-                                    <option v-for="role in participantRoles" :key="role.value" :value="role.value">
-                                        {{ role.label }}
-                                    </option>
-                                </select>
-                            </label>
-                            <div class="flex items-end">
+                        <div class="mt-4">
+                            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Пригласить участника</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
                                 <button
-                                    class="w-full rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
-                                    type="submit"
-                                    :disabled="inviteForm.processing"
+                                    v-for="role in participantRoles"
+                                    :key="role.value"
+                                    class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
+                                    type="button"
+                                    @click="openInvite(role.value)"
                                 >
-                                    Пригласить
+                                    {{ role.label }}
                                 </button>
                             </div>
-                            <div v-if="inviteForm.errors.role" class="text-xs text-rose-700">
-                                {{ inviteForm.errors.role }}
-                            </div>
-                        </form>
+                        </div>
 
                         <div v-if="participantsByRole.every((group) => group.items.length === 0)" class="mt-4 text-sm text-slate-500">
                             Участники пока не добавлены.
@@ -1079,6 +1078,96 @@ const bookingClientError = computed(() => {
                         :disabled="participantStatusForm.processing"
                     >
                         Подтвердить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div v-if="inviteOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: inviteForm.processing }" @submit.prevent="submitInvite">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">{{ inviteTitle }}</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeInvite"
+                    >
+                        x
+                    </button>
+                </div>
+                        <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                            <div class="relative">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Логин пользователя
+                                    <input
+                                        v-model="inviteForm.login"
+                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                :class="{ 'is-loading': userSuggestLoading }"
+                                type="text"
+                                placeholder="login"
+                                @input="scheduleUserSuggestions($event.target.value)"
+                            />
+                                </label>
+                                <input v-model="inviteForm.user_id" type="hidden" />
+                                <input v-model="inviteForm.role" type="hidden" />
+                                <div v-if="inviteForm.errors.login" class="text-xs text-rose-700">
+                                    {{ inviteForm.errors.login }}
+                                </div>
+                                <div v-if="inviteForm.errors.user_id" class="text-xs text-rose-700">
+                                    {{ inviteForm.errors.user_id }}
+                                </div>
+                                <div v-if="inviteForm.errors.role" class="text-xs text-rose-700">
+                                    {{ inviteForm.errors.role }}
+                                </div>
+                                <div v-if="userSuggestError" class="text-xs text-rose-700">
+                                    {{ userSuggestError }}
+                                </div>
+                        <div
+                            v-else-if="!userSuggestLoading && userSuggestions.length"
+                            class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                        >
+                            <button
+                                v-for="(suggestion, index) in userSuggestions"
+                                :key="`${suggestion.id}-${index}`"
+                                class="flex w-full items-start gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                type="button"
+                                @click="applyUserSuggestion(suggestion)"
+                            >
+                                <span class="font-semibold">{{ suggestion.login }}</span>
+                                <span v-if="suggestion.email" class="text-xs text-slate-500">{{ suggestion.email }}</span>
+                            </button>
+                            </div>
+                            <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Комментарий для приглашения
+                                <textarea
+                                    v-model="inviteForm.reason"
+                                    class="min-h-[96px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    placeholder="Комментарий (необязательно)"
+                                ></textarea>
+                            </label>
+                            <div v-if="inviteForm.errors.reason" class="text-xs text-rose-700">
+                                {{ inviteForm.errors.reason }}
+                            </div>
+                        </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="inviteForm.processing"
+                        @click="closeInvite"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="inviteForm.processing"
+                    >
+                        Пригласить
                     </button>
                 </div>
             </form>

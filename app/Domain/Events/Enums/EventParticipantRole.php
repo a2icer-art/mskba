@@ -8,6 +8,8 @@ enum EventParticipantRole: string
     case Coach = 'coach';
     case Referee = 'referee';
     case Media = 'media';
+    case Seller = 'seller';
+    case Staff = 'staff';
 
     public static function values(): array
     {
