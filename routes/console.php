@@ -3,6 +3,7 @@
 use App\Jobs\RunBookingPaymentExpiryJob;
 use App\Jobs\RunBookingPendingExpiryJob;
 use App\Jobs\RunContractExpiryJob;
+use App\Jobs\RunEventExpiryJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -23,6 +24,10 @@ Artisan::command('contracts:expire', function () {
     RunContractExpiryJob::dispatchSync();
 })->purpose('Expire contracts that reached end date');
 
+Artisan::command('events:expire', function () {
+    RunEventExpiryJob::dispatchSync();
+})->purpose('Expire events that ended');
+
 Schedule::job(new RunBookingPaymentExpiryJob())
     ->everyMinute()
     ->withoutOverlapping(1);
@@ -32,5 +37,9 @@ Schedule::job(new RunBookingPendingExpiryJob())
     ->withoutOverlapping(1);
 
 Schedule::job(new RunContractExpiryJob())
+    ->everyMinute()
+    ->withoutOverlapping(1);
+
+Schedule::job(new RunEventExpiryJob())
     ->everyMinute()
     ->withoutOverlapping(1);

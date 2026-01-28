@@ -282,6 +282,7 @@ class EventsController extends Controller
         $canBook = $user && $checker->can($user, PermissionCode::VenueBooking);
         $hasApprovedBooking = $event->bookings->contains(static fn ($booking) => $booking->status === EventBookingStatus::Approved);
         $canDelete = !$hasApprovedBooking && $this->canDelete($user, $event);
+        $isExpired = $this->isEventExpired($event);
         $breadcrumbs = app(EventBreadcrumbsPresenter::class)->present([
             'event' => $event,
         ])['data'];
@@ -376,6 +377,7 @@ class EventsController extends Controller
                     ]
                     : null,
                 'breadcrumbs' => $breadcrumbs,
+                'isExpired' => $isExpired,
             ]);
         }
 
@@ -446,6 +448,7 @@ class EventsController extends Controller
             'bookingDeadlinePassed' => $bookingDeadlinePassed,
             'canDelete' => $canDelete,
             'breadcrumbs' => $breadcrumbs,
+            'isExpired' => $isExpired,
         ]);
     }
 
@@ -455,6 +458,7 @@ class EventsController extends Controller
         if (!$user || !$this->canEditEvent($user, $event)) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate([
             'participants_limit' => ['required', 'integer', 'min:0'],
@@ -475,6 +479,7 @@ class EventsController extends Controller
         if (!$user || !$this->canEditEvent($user, $event)) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate([
             'login' => ['nullable', 'string', 'max:255'],
@@ -543,6 +548,7 @@ class EventsController extends Controller
         if (!$user || $user->status !== UserStatus::Confirmed) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate([
             'role' => ['required', Rule::in(EventParticipantRole::values())],
@@ -583,6 +589,7 @@ class EventsController extends Controller
         if (!$user || $participant->event_id !== $event->id) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate([
             'status' => ['required', Rule::in([
@@ -659,6 +666,7 @@ class EventsController extends Controller
         if (!$user || !$this->canEditEvent($user, $event) || $participant->event_id !== $event->id) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate([
             'status' => ['required', Rule::in([
@@ -690,6 +698,7 @@ class EventsController extends Controller
         if (!$user) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         $data = $request->validate(
             [
@@ -734,6 +743,7 @@ class EventsController extends Controller
         if (!$user || !$this->canDelete($user, $event)) {
             abort(403);
         }
+        $this->ensureEventNotExpired($event);
 
         if ($event->bookings()->where('status', EventBookingStatus::Approved->value)->exists()) {
             return back()->withErrors([
@@ -805,5 +815,23 @@ class EventsController extends Controller
         }
 
         return false;
+    }
+
+    private function isEventExpired(Event $event): bool
+    {
+        if (!$event->ends_at) {
+            return false;
+        }
+
+        return $event->ends_at->lt(Carbon::now());
+    }
+
+    private function ensureEventNotExpired(Event $event): void
+    {
+        if ($this->isEventExpired($event)) {
+            throw ValidationException::withMessages([
+                'event' => 'Событие уже завершено.',
+            ]);
+        }
     }
 }

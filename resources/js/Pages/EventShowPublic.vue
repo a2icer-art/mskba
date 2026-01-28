@@ -42,11 +42,16 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    isExpired: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
 const loginLabel = computed(() => page.props.auth?.user?.login || '');
+const isExpired = computed(() => props.isExpired);
 const participantRoles = computed(() => {
     const labels = {
         player: 'Игрок',
@@ -180,6 +185,9 @@ watch(
 );
 
 const submitJoin = () => {
+    if (isExpired.value) {
+        return;
+    }
     const isLimitRole = joinForm.role === props.limitRole;
     joinForm.status = isLimitReached.value && isLimitRole ? 'reserve' : 'confirmed';
     joinForm.post(`/events/${props.event?.id}/participants/join`, {
@@ -188,6 +196,9 @@ const submitJoin = () => {
 };
 
 const respondInvitation = (status) => {
+    if (isExpired.value) {
+        return;
+    }
     respondForm.status = status;
     respondForm.reason = props.userParticipation?.user_status_reason || '';
     respondForm.clearErrors();
@@ -228,6 +239,9 @@ const submitRespond = () => {
                             </h1>
                             <p class="mt-2 text-sm text-slate-600">
                                 {{ event?.type?.label || 'Тип не задан' }}
+                            </p>
+                            <p v-if="isExpired" class="mt-2 text-sm font-semibold text-rose-600">
+                                Событие завершено. Действия недоступны.
                             </p>
                         </div>
                     </div>
@@ -284,7 +298,7 @@ const submitRespond = () => {
                             >
                                 Статус изменён организатором, изменение недоступно.
                             </p>
-                            <div class="flex flex-wrap gap-2">
+                            <div v-if="!isExpired" class="flex flex-wrap gap-2">
                                 <button
                                     v-if="userParticipation.status !== 'confirmed' && !(isLimitReached && props.limitRole === userParticipation.role)"
                                     class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
@@ -314,7 +328,7 @@ const submitRespond = () => {
                                 </button>
                             </div>
                         </div>
-                        <form v-else class="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="submitJoin">
+                        <form v-else-if="!isExpired" class="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="submitJoin">
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Роль
                                 <select

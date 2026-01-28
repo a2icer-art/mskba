@@ -48,6 +48,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    isExpired: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
@@ -57,6 +61,7 @@ const showAuthModal = ref(false);
 const authMode = ref('login');
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.booking ?? '');
+const isExpired = computed(() => props.isExpired);
 const hasBookings = computed(() => props.bookings.length > 0);
 const hasApprovedBooking = computed(() => props.bookings.some((booking) => booking.status === 'approved'));
 const hasCancelledBooking = computed(() => props.bookings.some((booking) => booking.status === 'cancelled'));
@@ -238,6 +243,9 @@ const openAuthModal = () => {
 };
 
 const openBooking = () => {
+    if (isExpired.value) {
+        return;
+    }
     bookingForm.clearErrors();
     if (!bookingForm.date && props.event?.starts_at) {
         bookingForm.date = toLocalDate(props.event.starts_at);
@@ -291,6 +299,9 @@ const submitInvite = () => {
 };
 
 const openInvite = (role) => {
+    if (isExpired.value) {
+        return;
+    }
     inviteForm.reset('login', 'user_id', 'role', 'reason');
     inviteForm.clearErrors();
     inviteRole.value = role;
@@ -309,6 +320,9 @@ const closeInvite = () => {
 };
 
 const openStatusChange = (participant, status) => {
+    if (isExpired.value) {
+        return;
+    }
     statusChangeTarget.value = participant;
     participantStatusForm.status = status;
     participantStatusForm.reason = '';
@@ -406,6 +420,9 @@ const applyUserSuggestion = (suggestion) => {
 };
 
 const openDelete = () => {
+    if (isExpired.value) {
+        return;
+    }
     deleteOpen.value = true;
 };
 
@@ -602,10 +619,13 @@ const bookingClientError = computed(() => {
                             <p class="mt-2 text-sm text-slate-600">
                                 {{ event?.type?.label || 'Тип не задан' }}
                             </p>
+                            <p v-if="isExpired" class="mt-2 text-sm font-semibold text-rose-600">
+                                Событие завершено. Действия недоступны.
+                            </p>
                         </div>
                         <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                             <button
-                                v-if="canDelete"
+                                v-if="canDelete && !isExpired"
                                 class="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:border-rose-400"
                                 type="button"
                                 @click="openDelete"
@@ -613,7 +633,7 @@ const bookingClientError = computed(() => {
                                 Удалить событие
                             </button>
                             <button
-                                v-if="canBook && !hasApprovedBooking && !bookingDeadlinePassed"
+                                v-if="canBook && !hasApprovedBooking && !bookingDeadlinePassed && !isExpired"
                                 class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
                                 type="button"
                                 @click="openBooking"
@@ -656,6 +676,7 @@ const bookingClientError = computed(() => {
                                         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                                         type="number"
                                         min="0"
+                                        :disabled="isExpired"
                                     />
                                 </label>
                                 <p class="mt-1 text-xs text-slate-500">0 — без ограничений.</p>
@@ -678,6 +699,7 @@ const bookingClientError = computed(() => {
                                         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                                         type="number"
                                         min="0"
+                                        :disabled="isExpired"
                                     />
                                 </label>
                                 <p v-if="isPriceFromApprovedBooking" class="mt-1 text-xs text-slate-500">
@@ -699,7 +721,7 @@ const bookingClientError = computed(() => {
                                 <button
                                     class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
                                     type="submit"
-                                    :disabled="eventForm.processing"
+                                    :disabled="eventForm.processing || isExpired"
                                 >
                                     Сохранить параметры
                                 </button>
@@ -712,7 +734,7 @@ const bookingClientError = computed(() => {
                             <h2 class="text-lg font-semibold text-slate-900">Участники</h2>
                         </div>
 
-                        <div class="mt-4">
+                        <div v-if="!isExpired" class="mt-4">
                             <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Пригласить участника</p>
                             <div class="mt-2 flex flex-wrap gap-2">
                                 <button
@@ -755,7 +777,7 @@ const bookingClientError = computed(() => {
                                                 {{ participantStatusLabels[participant.status] || participant.status }}
                                             </span>
                                         </div>
-                                        <div class="flex flex-wrap items-center gap-2">
+                                        <div v-if="!isExpired" class="flex flex-wrap items-center gap-2">
                                             <button
                                                 v-if="participant.status !== 'confirmed'"
                                                 class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
