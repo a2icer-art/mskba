@@ -172,6 +172,9 @@ onBeforeUnmount(() => {
                     </ul>
                 </div>
             </div>
+            <div v-if="$slots.default" class="pt-4">
+                <slot />
+            </div>
         </aside>
     </div>
 </template>

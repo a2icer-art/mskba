@@ -52,41 +52,7 @@ const eventsList = computed(() => (Array.isArray(props.events) ? props.events : 
 const hasEvents = computed(() => eventsList.value.length > 0);
 const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
-const sidebarGroups = computed(() => {
-    const items = navigationData.value;
-    if (!Array.isArray(items) || items.length === 0) {
-        return [];
-    }
-    const isGrouped = items.some((item) => Array.isArray(item?.items));
-    if (!isGrouped) {
-        return [
-            {
-                title: '',
-                items,
-            },
-        ];
-    }
-    return items
-        .filter((group) => Array.isArray(group?.items) && group.items.length > 0)
-        .map((group) => ({
-            title: group?.title ?? '',
-            items: group.items,
-        }));
-});
 const activeSidebarHref = computed(() => (props.activeTypeCode ? `/events?type=${props.activeTypeCode}` : '/events'));
-const formatSidebarBadge = (value) => {
-    if (value === null || value === undefined || value === '') {
-        return '';
-    }
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-        if (numeric <= 0) {
-            return '';
-        }
-        return numeric > 9 ? '…' : String(numeric);
-    }
-    return String(value);
-};
 const createOpen = ref(false);
 const createPrefill = ref({});
 const titleFilter = ref('');
@@ -279,43 +245,12 @@ watch(
             />
 
             <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
-                <aside
+                <MainSidebar
                     v-if="hasSidebar"
-                    class="hidden self-start rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm sm:flex sm:flex-col sm:gap-4"
+                    :title="props.navigation.title"
+                    :data="navigationData"
+                    :active-href="activeSidebarHref"
                 >
-                    <p v-if="props.navigation.title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        {{ props.navigation.title }}
-                    </p>
-                    <div class="space-y-4">
-                        <div v-for="group in sidebarGroups" :key="group.title || group.items[0]?.href" class="space-y-3">
-                            <p v-if="group.title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                {{ group.title }}
-                            </p>
-                            <ul class="space-y-3 text-sm font-medium">
-                                <li
-                                    v-for="item in group.items"
-                                    :key="item.href"
-                                    class="rounded-2xl px-4 py-3 transition"
-                                    :class="
-                                        item.href === activeSidebarHref
-                                            ? 'bg-slate-900 text-white'
-                                            : 'bg-slate-100 text-slate-700 hover:bg-amber-100/70'
-                                    "
-                                >
-                                    <Link class="flex items-center justify-between gap-3" :href="item.href">
-                                        <span>{{ item.label }}</span>
-                                        <span
-                                            v-if="formatSidebarBadge(item.badge)"
-                                            class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
-                                        >
-                                            {{ formatSidebarBadge(item.badge) }}
-                                        </span>
-                                    </Link>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
                     <details class="rounded-2xl border border-slate-200/80 bg-white/80 p-4">
                         <summary class="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Фильтры
@@ -383,7 +318,7 @@ watch(
                             </label>
                         </div>
                     </details>
-                </aside>
+                </MainSidebar>
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
