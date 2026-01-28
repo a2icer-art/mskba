@@ -326,6 +326,7 @@ class EventsController extends Controller
         $isOrganizer = $user && $event->organizer_id === $user->id;
         $participants = $event->participants;
         $limitRole = $this->getEventLimitRole($event);
+        $allowedRoles = $this->getEventAllowedRoles($event);
         $participantsCount = $participants
             ->where('status', EventParticipantStatus::Confirmed)
             ->where('role', $limitRole)
@@ -339,12 +340,30 @@ class EventsController extends Controller
             : null;
 
         if (!$isAdmin && !$isOrganizer) {
+            $userAllowedRoles = [];
+            if ($user) {
+                $userAllowedRoles = $user->participantRoleAssignments()
+                    ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+                    ->whereHas('role', function ($roleQuery) {
+                        $roleQuery->whereNotNull('alias');
+                    })
+                    ->with('role:id,alias')
+                    ->get()
+                    ->pluck('role.alias')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                $userAllowedRoles = array_values(array_intersect($allowedRoles, $userAllowedRoles));
+            }
+
             return Inertia::render('EventShowPublic', [
                 'appName' => config('app.name'),
                 'event' => $eventPayload,
                 'participantsCount' => $participantsCount,
                 'reserveCount' => $reserveCount,
-                'allowedRoles' => $this->getEventAllowedRoles($event),
+                'allowedRoles' => $allowedRoles,
+                'userAllowedRoles' => $userAllowedRoles,
                 'limitRole' => $limitRole,
                 'userParticipation' => $userParticipation
                     ? [
@@ -421,7 +440,7 @@ class EventsController extends Controller
             'event' => $eventPayload,
             'bookings' => $bookings,
             'participants' => $participantsPayload,
-            'allowedRoles' => $this->getEventAllowedRoles($event),
+            'allowedRoles' => $allowedRoles,
             'limitRole' => $limitRole,
             'canBook' => $canBook,
             'bookingDeadlinePassed' => $bookingDeadlinePassed,

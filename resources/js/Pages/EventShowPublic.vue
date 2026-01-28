@@ -26,6 +26,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    userAllowedRoles: {
+        type: Array,
+        default: () => [],
+    },
     limitRole: {
         type: String,
         default: 'player',
@@ -52,7 +56,11 @@ const participantRoles = computed(() => {
         seller: 'Продавец',
         staff: 'Стафф',
     };
-    const allowed = props.allowedRoles?.length ? props.allowedRoles : ['player'];
+    const allowed = props.userAllowedRoles?.length
+        ? props.userAllowedRoles
+        : props.allowedRoles?.length
+            ? props.allowedRoles
+            : ['player'];
     return allowed.map((value) => ({
         value,
         label: labels[value] || value,
@@ -82,7 +90,7 @@ const statusRank = {
     confirmed: 3,
 };
 const joinForm = useForm({
-    role: props.allowedRoles?.[0] || 'player',
+    role: props.userAllowedRoles?.[0] || props.allowedRoles?.[0] || 'player',
     status: 'confirmed',
 });
 const respondForm = useForm({
@@ -160,12 +168,12 @@ watch(
 );
 
 watch(
-    () => props.allowedRoles,
+    () => props.userAllowedRoles,
     (roles) => {
         if (Array.isArray(roles) && roles.length) {
             joinForm.role = roles.includes(joinForm.role) ? joinForm.role : roles[0];
         } else {
-            joinForm.role = 'player';
+            joinForm.role = props.allowedRoles?.[0] || 'player';
         }
     },
     { immediate: true }
