@@ -80,35 +80,57 @@
 
     .prime-date-range .p-inputtext {
         height: 40px;
-        border-color: #e2e8f0;
-        border-radius: 12px 0 0 12px;
+        border-color: #e2e8f0 !important;
+        border-radius: 16px 0 0 16px;
         font-size: 0.875rem;
         font-family: inherit;
         color: #334155;
+        background-color: #ffffff !important;
+    }
+
+    .prime-date-range .p-inputgroup {
+        border-radius: 16px;
+        overflow: hidden;
     }
 
     .prime-date-range .p-inputtext::placeholder {
         color: #94a3b8;
+        font-size: 0.8125rem;
     }
 
     .prime-date-range .p-inputgroup .p-inputtext:focus {
-        border-color: #cbd5e1;
-        box-shadow: none;
+        border-color: #cbd5e1 !important;
+        box-shadow: none !important;
     }
 
     .prime-date-range .p-datepicker-trigger {
         height: 40px;
         width: 40px;
-        border-color: #0f172a;
-        background-color: #0f172a;
-        color: #ffffff;
-        border-radius: 0 12px 12px 0;
+        border-color: #0f172a !important;
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        border-radius: 0 16px 16px 0;
     }
 
     .prime-date-range .p-datepicker-trigger:hover {
-        background-color: #1e293b;
-        border-color: #1e293b;
-        color: #ffffff;
+        background-color: #1e293b !important;
+        border-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+
+    .event-filters[open] {
+        padding: 0;
+        border: none;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .event-filters[open] .event-filters__summary {
+        padding: 0 0 8px;
+    }
+
+    .event-filters[open] .event-filters__body {
+        padding: 0;
     }
 }
 

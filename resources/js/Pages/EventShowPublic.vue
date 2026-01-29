@@ -240,7 +240,7 @@ const submitRespond = () => {
         <div class="relative mx-auto flex max-w-[1360px] flex-col gap-8 px-6 py-8">
             <MainHeader :app-name="appName" :is-authenticated="isAuthenticated" :login-label="loginLabel" />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="props.navigation.title"

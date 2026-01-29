@@ -57,11 +57,19 @@ const activeSidebarHref = computed(() => (props.activeTypeCode ? `/events?type=$
 const createOpen = ref(false);
 const createPrefill = ref({});
 const titleFilter = ref('');
+const titleSuggestions = ref([]);
+const titleSuggestOpen = ref(false);
 const typeFilter = ref('');
-const bookingFilter = ref('');
 const myEventsOnly = ref(false);
 const participantOnly = ref(false);
 const dateRange = ref(null);
+const venueQuery = ref('');
+const venueFilterId = ref('');
+const venueSuggestions = ref([]);
+const venueSuggestLoading = ref(false);
+const venueSuggestError = ref('');
+let venueSuggestTimer = null;
+let venueSuggestRequestId = 0;
 const pageIndex = ref(1);
 const perPage = 6;
 
@@ -123,28 +131,6 @@ const formatDateRange = (startsAt, endsAt) => {
 
 const normalized = (value) => (value ?? '').toString().toLowerCase();
 
-const typeOptions = computed(() => {
-    const map = new Map();
-    eventsList.value.forEach((event) => {
-        if (!event) {
-            return;
-        }
-        if (event.type?.code) {
-            map.set(event.type.code, event.type.label || event.type.code);
-        }
-    });
-    return Array.from(map.entries()).map(([code, label]) => ({ code, label }));
-});
-
-const bookingOptions = [
-    { value: '', label: 'Все бронирования' },
-    { value: 'approved', label: 'Подтвержденные' },
-    { value: 'cancelled', label: 'Отмененные' },
-    { value: 'pending', label: 'Ожидают подтверждения' },
-    { value: 'awaiting_payment', label: 'Ожидают оплату' },
-    { value: 'paid', label: 'Оплачены' },
-];
-
 const formatDateValue = (value) => {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -168,6 +154,92 @@ const dateToValue = computed(() => {
     return formatDateValue(dateRange.value[1]);
 });
 
+const buildTitleSuggestions = (query) => {
+    const needle = normalized(query);
+    if (!needle || needle.length < 2) {
+        return [];
+    }
+    const suggestions = new Set();
+    eventsList.value.forEach((event) => {
+        if (!event?.title) {
+            return;
+        }
+        const title = event.title.toString();
+        if (normalized(title).includes(needle)) {
+            suggestions.add(title);
+        }
+    });
+    return Array.from(suggestions).slice(0, 8);
+};
+
+const updateTitleSuggestions = (value) => {
+    titleSuggestions.value = buildTitleSuggestions(value);
+    titleSuggestOpen.value = titleSuggestions.value.length > 0;
+};
+
+const applyTitleSuggestion = (value) => {
+    titleFilter.value = value;
+    titleSuggestions.value = [];
+    titleSuggestOpen.value = false;
+};
+
+const scheduleVenueSuggestions = (value) => {
+    venueFilterId.value = '';
+    venueSuggestError.value = '';
+    if (venueSuggestTimer) {
+        clearTimeout(venueSuggestTimer);
+    }
+    if (!value || value.trim().length < 2) {
+        venueSuggestLoading.value = false;
+        venueSuggestions.value = [];
+        return;
+    }
+    venueSuggestTimer = setTimeout(() => {
+        fetchVenueSuggestions(value.trim());
+    }, 250);
+};
+
+const fetchVenueSuggestions = async (query) => {
+    const requestId = ++venueSuggestRequestId;
+    venueSuggestLoading.value = true;
+    try {
+        const response = await fetch(`/integrations/venue-suggest?query=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error('suggest_failed');
+        }
+        const data = await response.json();
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = data?.suggestions ?? [];
+        venueSuggestError.value = venueSuggestions.value.length ? '' : 'Варианты не найдены.';
+    } catch (error) {
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = [];
+        venueSuggestError.value = 'Не удалось получить подсказки.';
+    } finally {
+        if (requestId === venueSuggestRequestId) {
+            venueSuggestLoading.value = false;
+        }
+    }
+};
+
+const applyVenueSuggestion = (suggestion) => {
+    venueFilterId.value = suggestion.id;
+    venueQuery.value = suggestion.label || suggestion.name || '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
+};
+
+const clearVenueSelection = () => {
+    venueFilterId.value = '';
+    venueQuery.value = '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
+};
+
 const filtered = computed(() => {
     const needle = normalized(titleFilter.value);
     const fromValue = dateFromValue.value ? new Date(`${dateFromValue.value}T00:00:00`) : null;
@@ -176,13 +248,13 @@ const filtered = computed(() => {
         if (!event) {
             return false;
         }
-        if (typeFilter.value && event.type?.code !== typeFilter.value) {
-            return false;
-        }
         if (myEventsOnly.value && event.organizer?.id !== page.props.auth?.user?.id) {
             return false;
         }
         if (participantOnly.value && !event.is_participant) {
+            return false;
+        }
+        if (venueFilterId.value && Number(event.approved_venue?.id) !== Number(venueFilterId.value)) {
             return false;
         }
         if (needle && !normalized(event.title).includes(needle)) {
@@ -200,18 +272,6 @@ const filtered = computed(() => {
                 return false;
             }
         }
-        if (bookingFilter.value) {
-            const statusMap = {
-                approved: event.has_approved_booking,
-                cancelled: event.has_cancelled_booking,
-                pending: event.has_pending_booking,
-                awaiting_payment: event.has_awaiting_payment_booking,
-                paid: event.has_paid_booking,
-            };
-            if (!statusMap[bookingFilter.value]) {
-                return false;
-            }
-        }
         return true;
     });
 });
@@ -223,7 +283,10 @@ const paged = computed(() => {
     return filtered.value.slice(start, start + perPage);
 });
 
-watch([titleFilter, typeFilter, bookingFilter, myEventsOnly, participantOnly, dateRange], () => {
+watch([titleFilter, myEventsOnly, participantOnly, dateRange], () => {
+    pageIndex.value = 1;
+});
+watch(venueFilterId, () => {
     pageIndex.value = 1;
 });
 
@@ -267,62 +330,97 @@ watch(
                 @open-login="openAuthModal"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="props.navigation.title"
                     :data="navigationData"
                     :active-href="activeSidebarHref"
                 >
-                    <details class="rounded-2xl border border-slate-200/80 bg-white/80 p-4">
-                        <summary class="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <details class="event-filters rounded-2xl border border-slate-200/80 bg-white/80 p-4">
+                        <summary class="event-filters__summary cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                             Фильтры
                         </summary>
-                        <div class="mt-4 flex flex-col gap-3 text-sm text-slate-700">
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Поиск
+                        <div class="event-filters__body mt-4 flex flex-col gap-3 text-sm text-slate-700 w-full">
+                            <Calendar
+                                v-model="dateRange"
+                                selection-mode="range"
+                                date-format="dd.mm.yy"
+                                show-icon
+                                show-button-bar
+                                class="prime-date-range w-full"
+                                input-class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
+                                panel-class="rounded-2xl border border-slate-200"
+                                placeholder="Выберите диапазон"
+                            />
+                            <div class="relative w-full">
                                 <input
                                     v-model="titleFilter"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
                                     type="text"
                                     placeholder="Название события"
+                                    @input="updateTitleSuggestions($event.target.value)"
+                                    @focus="updateTitleSuggestions(titleFilter)"
                                 />
-                            </label>
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Тип события
-                                <select v-model="typeFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                    <option value="">Все типы</option>
-                                    <option v-for="type in typeOptions" :key="type.code" :value="type.code">
-                                        {{ type.label }}
-                                    </option>
-                                </select>
-                            </label>
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Бронирования
-                                <select v-model="bookingFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                    <option v-for="option in bookingOptions" :key="option.value" :value="option.value">
-                                        {{ option.label }}
-                                    </option>
-                                </select>
-                            </label>
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Дата
-                                <Calendar
-                                    v-model="dateRange"
-                                    selection-mode="range"
-                                    date-format="dd.mm.yy"
-                                    show-icon
-                                    show-button-bar
-                                    class="prime-date-range w-full"
-                                    input-class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
-                                    panel-class="rounded-2xl border border-slate-200"
-                                    placeholder="Выберите диапазон"
+                                <div
+                                    v-if="titleSuggestOpen && titleSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in titleSuggestions"
+                                        :key="`${suggestion}-${index}`"
+                                        class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                        type="button"
+                                        @click="applyTitleSuggestion(suggestion)"
+                                    >
+                                        {{ suggestion }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="relative w-full">
+                                <input
+                                    v-model="venueQuery"
+                                    class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
+                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    type="text"
+                                    placeholder="Название площадки"
+                                    @input="scheduleVenueSuggestions($event.target.value)"
                                 />
-                            </label>
+                                <div
+                                    v-if="venueSuggestError"
+                                    class="text-xs text-rose-700"
+                                >
+                                    {{ venueSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!venueSuggestLoading && venueSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in venueSuggestions"
+                                        :key="`${suggestion.id}-${index}`"
+                                        class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                        type="button"
+                                        @click="applyVenueSuggestion(suggestion)"
+                                    >
+                                        {{ suggestion.label || suggestion.name }}
+                                    </button>
+                                </div>
+                                <div v-if="venueFilterId" class="flex items-center justify-between text-xs text-slate-500">
+                                    <span>Площадка выбрана.</span>
+                                    <button
+                                        class="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
+                                        type="button"
+                                        @click="clearVenueSelection"
+                                    >
+                                        Очистить
+                                    </button>
+                                </div>
+                            </div>
                             <label class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 <input
                                     v-model="myEventsOnly"
-                                    class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                    class="input-switch"
                                     type="checkbox"
                                     :disabled="!isAuthenticated"
                                 />
@@ -331,7 +429,7 @@ watch(
                             <label class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 <input
                                     v-model="participantOnly"
-                                    class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                    class="input-switch"
                                     type="checkbox"
                                     :disabled="!isAuthenticated"
                                 />
@@ -376,7 +474,7 @@ watch(
                     </div>
 
                     <div v-if="!paged.length" class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                        События пока не созданы.
+                        События не найдены.
                     </div>
                     <div v-else class="mt-6 grid gap-4">
                         <article
