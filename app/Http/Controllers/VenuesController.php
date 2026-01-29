@@ -83,6 +83,7 @@ class VenuesController extends Controller
             'navigation' => $navigation,
             'types' => $types,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
+            'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
         ]);
     }
@@ -113,6 +114,7 @@ class VenuesController extends Controller
             'navigation' => $navigation,
             'types' => $types,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
+            'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
         ]);
     }

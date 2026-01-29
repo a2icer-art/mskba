@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
@@ -35,6 +35,10 @@ const props = defineProps({
     metros: {
         type: Array,
         default: () => [],
+    },
+    mapApiKey: {
+        type: String,
+        default: '',
     },
     breadcrumbs: {
         type: Array,
@@ -80,6 +84,11 @@ let venueSuggestTimer = null;
 let venueSuggestRequestId = 0;
 const myVenuesOnly = ref(false);
 const groupByType = ref(false);
+const mapOpen = ref(false);
+const mapTarget = ref(null);
+const mapRef = ref(null);
+const mapError = ref('');
+let mapInstance = null;
 const pageIndex = ref(1);
 const perPage = 6;
 
@@ -138,6 +147,97 @@ const normalizeMetroColor = (metro) => {
 };
 
 const normalized = (value) => (value ?? '').toString().toLowerCase();
+
+const loadYandexMaps = () =>
+    new Promise((resolve, reject) => {
+        if (window.ymaps) {
+            resolve(window.ymaps);
+            return;
+        }
+        if (!props.mapApiKey) {
+            reject(new Error('API key not provided'));
+            return;
+        }
+        const existing = document.querySelector('script[data-ymaps]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window.ymaps));
+            existing.addEventListener('error', () => reject(new Error('failed')));
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = `https://api-maps.yandex.ru/2.1/?apikey=${props.mapApiKey}&lang=ru_RU`;
+        script.async = true;
+        script.dataset.ymaps = 'true';
+        script.onload = () => resolve(window.ymaps);
+        script.onerror = () => reject(new Error('failed'));
+        document.head.appendChild(script);
+    });
+
+const initMap = async (address) => {
+    if (!mapRef.value) {
+        return;
+    }
+    if (!address) {
+        mapError.value = 'Адрес не указан.';
+        return;
+    }
+    try {
+        const ymaps = await loadYandexMaps();
+        await ymaps.ready();
+        const result = await ymaps.geocode(address);
+        const first = result.geoObjects.get(0);
+        if (!first) {
+            mapError.value = 'Не удалось определить координаты.';
+            return;
+        }
+        const coords = first.geometry.getCoordinates();
+        mapInstance = new ymaps.Map(
+            mapRef.value,
+            {
+                center: coords,
+                zoom: 15,
+                controls: [],
+            },
+            {
+                suppressMapOpenBlock: true,
+            }
+        );
+        mapInstance.behaviors.disable('scrollZoom');
+        const placemark = new ymaps.Placemark(coords, {}, { preset: 'islands#redIcon' });
+        mapInstance.geoObjects.add(placemark);
+    } catch (error) {
+        mapError.value = 'Не удалось загрузить карту.';
+    }
+};
+
+const openMap = (hall) => {
+    if (!hall?.address) {
+        return;
+    }
+    mapTarget.value = hall;
+    mapError.value = '';
+    mapOpen.value = true;
+    nextTick(() => {
+        initMap(hall.address);
+    });
+};
+
+const closeMap = () => {
+    mapOpen.value = false;
+    mapTarget.value = null;
+    mapError.value = '';
+    if (mapInstance) {
+        mapInstance.destroy();
+        mapInstance = null;
+    }
+};
+
+onBeforeUnmount(() => {
+    if (mapInstance) {
+        mapInstance.destroy();
+        mapInstance = null;
+    }
+});
 
 const pluralize = (value, forms) => {
     const absValue = Math.abs(value);
@@ -625,14 +725,27 @@ const applyAddressSuggestion = (suggestion) => {
                                         <p class="mt-1 text-sm text-slate-600">
                                             {{ hall.type?.name || 'Тип не указан' }}
                                         </p>
-                                        <p v-if="hall.address" class="mt-2 text-sm text-slate-600">
-                                            {{ hall.address }}
-                                        </p>
+                                        <button
+                                            v-if="hall.address"
+                                            class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
+                                            type="button"
+                                            @click="openMap(hall)"
+                                        >
+                                            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500">
+                                                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6">
+                                                    <path d="M12 13.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5z"></path>
+                                                    <path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0z"></path>
+                                                </svg>
+                                            </span>
+                                            <span>{{ hall.address }}</span>
+                                        </button>
                                         <div v-if="hall.metro" class="flex items-center gap-2 text-sm text-slate-700">
-                                            <span
-                                                class="h-2.5 w-2.5 rounded-full"
-                                                :style="{ backgroundColor: normalizeMetroColor(hall.metro) || '#94a3b8' }"
-                                            ></span>
+                                            <span class="inline-flex h-5 w-5 items-center justify-center">
+                                                <span
+                                                    class="h-2.5 w-2.5 rounded-full"
+                                                    :style="{ backgroundColor: normalizeMetroColor(hall.metro) || '#94a3b8' }"
+                                                ></span>
+                                            </span>
                                             <span>{{ formatMetroLabel(hall.metro) }}</span>
                                         </div>
                                     </div>
@@ -706,6 +819,40 @@ const applyAddressSuggestion = (suggestion) => {
             :initial-mode="authMode"
             @close="showAuthModal = false"
         />
+
+        <div v-if="mapOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeMap">
+            <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">{{ mapTarget?.name || 'Площадка' }}</h2>
+                    </div>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeMap"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[520px] overflow-y-auto px-6 py-4">
+                    <div ref="mapRef" class="h-72 w-full overflow-hidden rounded-2xl border border-slate-200"></div>
+                    <p class="mt-4 text-sm text-slate-600">{{ mapTarget?.address || 'Адрес не указан.' }}</p>
+                    <div v-if="mapError" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {{ mapError }}
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeMap"
+                    >
+                        Закрыть
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div v-if="createOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" @click.self="closeCreate">
             <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
