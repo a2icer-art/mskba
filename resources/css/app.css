@@ -77,6 +77,39 @@
     .popup-body {
         padding-bottom: 50px;
     }
+
+    .prime-date-range .p-inputtext {
+        height: 40px;
+        border-color: #e2e8f0;
+        border-radius: 12px 0 0 12px;
+        font-size: 0.875rem;
+        font-family: inherit;
+        color: #334155;
+    }
+
+    .prime-date-range .p-inputtext::placeholder {
+        color: #94a3b8;
+    }
+
+    .prime-date-range .p-inputgroup .p-inputtext:focus {
+        border-color: #cbd5e1;
+        box-shadow: none;
+    }
+
+    .prime-date-range .p-datepicker-trigger {
+        height: 40px;
+        width: 40px;
+        border-color: #0f172a;
+        background-color: #0f172a;
+        color: #ffffff;
+        border-radius: 0 12px 12px 0;
+    }
+
+    .prime-date-range .p-datepicker-trigger:hover {
+        background-color: #1e293b;
+        border-color: #1e293b;
+        color: #ffffff;
+    }
 }
 
 @layer utilities {

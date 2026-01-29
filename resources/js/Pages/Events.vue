@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import Calendar from 'primevue/calendar';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import EventCreateModal from '../Components/EventCreateModal.vue';
@@ -60,8 +61,7 @@ const typeFilter = ref('');
 const bookingFilter = ref('');
 const myEventsOnly = ref(false);
 const participantOnly = ref(false);
-const dateFrom = ref('');
-const dateTo = ref('');
+const dateRange = ref(null);
 const pageIndex = ref(1);
 const perPage = 6;
 
@@ -145,10 +145,33 @@ const bookingOptions = [
     { value: 'paid', label: 'Оплачены' },
 ];
 
+const formatDateValue = (value) => {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const dateFromValue = computed(() => {
+    if (!Array.isArray(dateRange.value) || !dateRange.value[0]) {
+        return '';
+    }
+    return formatDateValue(dateRange.value[0]);
+});
+
+const dateToValue = computed(() => {
+    if (!Array.isArray(dateRange.value) || !dateRange.value[1]) {
+        return '';
+    }
+    return formatDateValue(dateRange.value[1]);
+});
+
 const filtered = computed(() => {
     const needle = normalized(titleFilter.value);
-    const fromValue = dateFrom.value ? new Date(`${dateFrom.value}T00:00:00`) : null;
-    const toValue = dateTo.value ? new Date(`${dateTo.value}T23:59:59`) : null;
+    const fromValue = dateFromValue.value ? new Date(`${dateFromValue.value}T00:00:00`) : null;
+    const toValue = dateToValue.value ? new Date(`${dateToValue.value}T23:59:59`) : null;
     return eventsList.value.filter((event) => {
         if (!event) {
             return false;
@@ -200,7 +223,7 @@ const paged = computed(() => {
     return filtered.value.slice(start, start + perPage);
 });
 
-watch([titleFilter, typeFilter, bookingFilter, myEventsOnly, participantOnly, dateFrom, dateTo], () => {
+watch([titleFilter, typeFilter, bookingFilter, myEventsOnly, participantOnly, dateRange], () => {
     pageIndex.value = 1;
 });
 
@@ -283,19 +306,17 @@ watch(
                                 </select>
                             </label>
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Дата с
-                                <input
-                                    v-model="dateFrom"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    type="date"
-                                />
-                            </label>
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Дата по
-                                <input
-                                    v-model="dateTo"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    type="date"
+                                Дата
+                                <Calendar
+                                    v-model="dateRange"
+                                    selection-mode="range"
+                                    date-format="dd.mm.yy"
+                                    show-icon
+                                    show-button-bar
+                                    class="prime-date-range w-full"
+                                    input-class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
+                                    panel-class="rounded-2xl border border-slate-200"
+                                    placeholder="Выберите диапазон"
                                 />
                             </label>
                             <label class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-slate-500">
