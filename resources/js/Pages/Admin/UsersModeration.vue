@@ -322,7 +322,7 @@ const hasRequests = computed(() => (props.requests?.data?.length ?? 0) > 0);
                 :login-label="$page.props.auth?.user?.login"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"

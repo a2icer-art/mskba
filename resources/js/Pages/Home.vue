@@ -64,7 +64,7 @@ watch(
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar v-if="hasSidebar" />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">

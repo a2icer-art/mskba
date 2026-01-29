@@ -70,11 +70,14 @@ watch(
     { immediate: true }
 );
 
-const typeFilter = ref('');
 const statusFilter = ref('');
-const addressFilter = ref('');
-const metroFilter = ref('');
-const sortBy = ref('name_asc');
+const venueQuery = ref('');
+const venueFilterId = ref('');
+const venueSuggestions = ref([]);
+const venueSuggestLoading = ref(false);
+const venueSuggestError = ref('');
+let venueSuggestTimer = null;
+let venueSuggestRequestId = 0;
 const myVenuesOnly = ref(false);
 const groupByType = ref(false);
 const pageIndex = ref(1);
@@ -97,18 +100,6 @@ const createForm = useForm({
     street: '',
     building: '',
     str_address: '',
-});
-
-const metroOptions = computed(() => props.metros ?? []);
-
-const typeOptions = computed(() => {
-    const map = new Map();
-    props.venues.forEach((hall) => {
-        if (hall.type?.alias) {
-            map.set(hall.type.alias, hall.type.name || hall.type.alias);
-        }
-    });
-    return Array.from(map.entries()).map(([alias, name]) => ({ alias, name }));
 });
 
 const statusOptions = [
@@ -148,12 +139,103 @@ const normalizeMetroColor = (metro) => {
 
 const normalized = (value) => (value ?? '').toString().toLowerCase();
 
+const pluralize = (value, forms) => {
+    const absValue = Math.abs(value);
+    const mod100 = absValue % 100;
+    if (mod100 >= 11 && mod100 <= 14) {
+        return forms[2];
+    }
+    const mod10 = absValue % 10;
+    if (mod10 === 1) {
+        return forms[0];
+    }
+    if (mod10 >= 2 && mod10 <= 4) {
+        return forms[1];
+    }
+    return forms[2];
+};
+
+const formatRentalUnit = (minutes) => {
+    const value = Number(minutes) || 60;
+    if (value % 60 === 0) {
+        const hours = value / 60;
+        return `${hours} ${pluralize(hours, ['час', 'часа', 'часов'])}`;
+    }
+    return `${value} мин`;
+};
+
+const formatPriceLabel = (hall) => {
+    const basePrice = Number(hall?.rental_price_rub) || 0;
+    if (basePrice <= 0) {
+        return '';
+    }
+    const totalPrice = Number(hall?.price_with_fee_rub) || basePrice;
+    const unitLabel = formatRentalUnit(hall?.rental_duration_minutes);
+    return `от ${totalPrice.toLocaleString('ru-RU')} р / ${unitLabel}`;
+};
+
+const scheduleVenueSuggestions = (value) => {
+    venueFilterId.value = '';
+    venueSuggestError.value = '';
+    if (venueSuggestTimer) {
+        clearTimeout(venueSuggestTimer);
+    }
+    if (!value || value.trim().length < 2) {
+        venueSuggestLoading.value = false;
+        venueSuggestions.value = [];
+        return;
+    }
+    venueSuggestTimer = setTimeout(() => {
+        fetchVenueSuggestions(value.trim());
+    }, 250);
+};
+
+const fetchVenueSuggestions = async (query) => {
+    const requestId = ++venueSuggestRequestId;
+    venueSuggestLoading.value = true;
+    try {
+        const response = await fetch(`/integrations/venue-suggest?query=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error('suggest_failed');
+        }
+        const data = await response.json();
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = data?.suggestions ?? [];
+        venueSuggestError.value = venueSuggestions.value.length ? '' : 'Варианты не найдены.';
+    } catch (error) {
+        if (requestId !== venueSuggestRequestId) {
+            return;
+        }
+        venueSuggestions.value = [];
+        venueSuggestError.value = 'Не удалось получить подсказки.';
+    } finally {
+        if (requestId === venueSuggestRequestId) {
+            venueSuggestLoading.value = false;
+        }
+    }
+};
+
+const applyVenueSuggestion = (suggestion) => {
+    venueFilterId.value = suggestion.id;
+    venueQuery.value = suggestion.label || suggestion.name || '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
+};
+
+const clearVenueSelection = () => {
+    venueFilterId.value = '';
+    venueQuery.value = '';
+    venueSuggestions.value = [];
+    venueSuggestError.value = '';
+};
+
 const filtered = computed(() => {
-    const addressNeedle = normalized(addressFilter.value);
-    const metroSelected = metroFilter.value ? Number(metroFilter.value) : null;
+    const searchNeedle = normalized(venueQuery.value);
 
     return props.venues.filter((hall) => {
-        if (typeFilter.value && hall.type?.alias !== typeFilter.value) {
+        if (props.activeType && hall.type?.alias !== props.activeType) {
             return false;
         }
 
@@ -165,12 +247,17 @@ const filtered = computed(() => {
             return false;
         }
 
-        if (addressNeedle && !normalized(hall.address).includes(addressNeedle)) {
+        if (venueFilterId.value && Number(hall.id) !== Number(venueFilterId.value)) {
             return false;
         }
 
-        if (metroSelected && hall.metro?.id !== metroSelected) {
-            return false;
+        if (searchNeedle && !venueFilterId.value) {
+            const nameMatch = normalized(hall.name).includes(searchNeedle);
+            const addressMatch = normalized(hall.address).includes(searchNeedle);
+            const metroMatch = normalized(hall.metro?.name).includes(searchNeedle);
+            if (!nameMatch && !addressMatch && !metroMatch) {
+                return false;
+            }
         }
 
         return true;
@@ -183,19 +270,7 @@ const sorted = computed(() => {
     list.sort((a, b) => {
         const nameA = normalized(a.name);
         const nameB = normalized(b.name);
-        const dateA = a.created_at ? Date.parse(a.created_at) : 0;
-        const dateB = a.created_at ? Date.parse(b.created_at) : 0;
-
-        switch (sortBy.value) {
-            case 'name_desc':
-                return nameB.localeCompare(nameA);
-            case 'created_asc':
-                return dateA - dateB;
-            case 'created_desc':
-                return dateB - dateA;
-            default:
-                return nameA.localeCompare(nameB);
-        }
+        return nameA.localeCompare(nameB);
     });
 
     return list;
@@ -203,7 +278,7 @@ const sorted = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / perPage)));
 
-watch([typeFilter, statusFilter, addressFilter, metroFilter, sortBy, myVenuesOnly, groupByType], () => {
+watch([statusFilter, venueQuery, venueFilterId, myVenuesOnly, groupByType], () => {
     pageIndex.value = 1;
 });
 
@@ -244,7 +319,7 @@ const grouped = computed(() => {
 watch(
     () => props.activeType,
     (value) => {
-        typeFilter.value = value || '';
+        pageIndex.value = 1;
         if (activeTypeOption.value) {
             createForm.venue_type_id = activeTypeOption.value.id;
         }
@@ -407,22 +482,82 @@ const applyAddressSuggestion = (suggestion) => {
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
                     :data="navigationData"
-                    :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : ''"
-                />
+                    :active-href="activeTypeSlug ? `/venues/${activeTypeSlug}` : '/venues'"
+                >
+                    <details class="event-filters rounded-2xl border border-slate-200/80 bg-white/80 p-4">
+                        <summary class="event-filters__summary cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Фильтры
+                        </summary>
+                        <div class="event-filters__body mt-4 flex flex-col gap-3 text-sm text-slate-700 w-full">
+                            <div class="relative w-full">
+                                <input
+                                    v-model="venueQuery"
+                                    class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
+                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    placeholder="Поиск площадки"
+                                    type="text"
+                                    @input="scheduleVenueSuggestions($event.target.value)"
+                                />
+                                <div v-if="venueSuggestError" class="text-xs text-rose-700">
+                                    {{ venueSuggestError }}
+                                </div>
+                                <div
+                                    v-else-if="!venueSuggestLoading && venueSuggestions.length"
+                                    class="absolute left-0 right-0 z-10 mt-2 w-full rounded-2xl border border-slate-200 bg-white text-sm text-slate-700"
+                                >
+                                    <button
+                                        v-for="(suggestion, index) in venueSuggestions"
+                                        :key="`${suggestion.id}-${index}`"
+                                        class="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                        type="button"
+                                        @click="applyVenueSuggestion(suggestion)"
+                                    >
+                                        {{ suggestion.label || suggestion.name }}
+                                    </button>
+                                </div>
+                                <div v-if="venueFilterId" class="flex items-center justify-between text-xs text-slate-500">
+                                    <span>Площадка выбрана.</span>
+                                    <button
+                                        class="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
+                                        type="button"
+                                        @click="clearVenueSelection"
+                                    >
+                                        Очистить
+                                    </button>
+                                </div>
+                            </div>
+                            <select v-model="statusFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full">
+                                <option v-for="status in statusOptions" :key="status.value" :value="status.value">
+                                    {{ status.label }}
+                                </option>
+                            </select>
+                            <label class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <input v-model="groupByType" class="input-switch" type="checkbox" />
+                                Группировать
+                            </label>
+                            <label class="flex items-center gap-3 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <input
+                                    v-model="myVenuesOnly"
+                                    class="input-switch"
+                                    type="checkbox"
+                                    :disabled="!isAuthenticated"
+                                />
+                                Мои площадки
+                            </label>
+                        </div>
+                    </details>
+                </MainSidebar>
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 class="text-3xl font-semibold text-slate-900">Список площадок</h1>
-                            <p class="mt-3 max-w-2xl text-sm text-slate-600">
-                                Выберите тип площадки, адрес или метро, чтобы быстро найти подходящее место.
-                            </p>
                         </div>
                         <button
                             v-if="canCreateVenue"
@@ -432,72 +567,6 @@ const applyAddressSuggestion = (suggestion) => {
                         >
                             {{ addButtonLabel }}
                         </button>
-                    </div>
-
-                    <div class="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Тип
-                            <select v-model="typeFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option value="">Все типы</option>
-                                <option v-for="type in typeOptions" :key="type.alias" :value="type.alias">
-                                    {{ type.name }}
-                                </option>
-                            </select>
-                        </label>
-
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Статус
-                            <select v-model="statusFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option v-for="status in statusOptions" :key="status.value" :value="status.value">
-                                    {{ status.label }}
-                                </option>
-                            </select>
-                        </label>
-
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Адрес
-                            <input
-                                v-model="addressFilter"
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                placeholder="Например, Тверская"
-                                type="text"
-                            />
-                        </label>
-
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Метро
-                            <select v-model="metroFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option value="">Любое</option>
-                                <option v-for="metro in metroOptions" :key="metro.id" :value="metro.id">
-                                    {{ formatMetroLabel(metro) }}
-                                </option>
-                            </select>
-                        </label>
-
-                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Сортировка
-                            <select v-model="sortBy" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <option value="name_asc">Название A-Z</option>
-                                <option value="name_desc">Название Z-A</option>
-                                <option value="created_desc">Дата добавления: новые</option>
-                                <option value="created_asc">Дата добавления: старые</option>
-                            </select>
-                        </label>
-
-                        <label class="flex items-center gap-2 text-sm text-slate-600">
-                            <input v-model="groupByType" class="h-4 w-4 rounded border-slate-300" type="checkbox" />
-                            Группировать по типу
-                        </label>
-
-                        <label class="flex items-center gap-2 text-sm text-slate-600">
-                            <input
-                                v-model="myVenuesOnly"
-                                class="h-4 w-4 rounded border-slate-300"
-                                type="checkbox"
-                                :disabled="!isAuthenticated"
-                            />
-                            Мои площадки
-                        </label>
                     </div>
 
                     <div v-if="paged.length" class="mt-6 grid gap-4">
@@ -513,7 +582,36 @@ const applyAddressSuggestion = (suggestion) => {
                             >
                                 <div class="flex flex-wrap items-start justify-between gap-4">
                                     <div>
-                                        <h3 class="text-lg font-semibold text-slate-900">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                v-if="hall.status === 'confirmed'"
+                                                class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.15em] text-emerald-700"
+                                                title="Подтверждено"
+                                            >
+                                                ✓
+                                            </span>
+                                            <span
+                                                v-else-if="hall.status === 'blocked'"
+                                                class="flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.15em] text-rose-700"
+                                                title="Заблокирован"
+                                            >
+                                                ✕
+                                            </span>
+                                            <span
+                                                v-else-if="hall.status === 'moderation'"
+                                                class="flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.15em] text-amber-800"
+                                                title="На модерации"
+                                            >
+                                                •
+                                            </span>
+                                            <span
+                                                v-else
+                                                class="flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.15em] text-slate-700"
+                                                title="Не подтвержден"
+                                            >
+                                                ?
+                                            </span>
+                                            <h3 class="text-lg font-semibold text-slate-900">
                                             <Link
                                                 v-if="hall.type_slug"
                                                 class="transition hover:text-slate-700"
@@ -522,7 +620,8 @@ const applyAddressSuggestion = (suggestion) => {
                                                 {{ hall.name }}
                                             </Link>
                                             <span v-else>{{ hall.name }}</span>
-                                        </h3>
+                                            </h3>
+                                        </div>
                                         <p class="mt-1 text-sm text-slate-600">
                                             {{ hall.type?.name || 'Тип не указан' }}
                                         </p>
@@ -537,38 +636,18 @@ const applyAddressSuggestion = (suggestion) => {
                                             <span>{{ formatMetroLabel(hall.metro) }}</span>
                                         </div>
                                     </div>
-                                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em]">
-                                        <span
-                                            v-if="hall.status === 'confirmed'"
-                                            class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
-                                            title="Подтверждено"
-                                        >
-                                            <span class="text-sm leading-none">✓</span>
+                                    <div class="mt-1 text-sm text-slate-600">
+                                        <span v-if="formatPriceLabel(hall)">
+                                            {{ formatPriceLabel(hall) }}
                                         </span>
-
-                                        <span
-                                            v-else-if="hall.status === 'blocked'"
-                                            class="flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700"
-                                            title="Заблокирован"
+                                        <Link
+                                            v-else-if="hall.type_slug"
+                                            class="font-semibold text-slate-900 transition hover:text-slate-700"
+                                            :href="`/venues/${hall.type_slug}/${hall.alias}`"
                                         >
-                                            <span class="text-sm leading-none">✕</span>
-                                        </span>
-
-                                        <span
-                                            v-else-if="hall.status === 'moderation'"
-                                            class="flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800"
-                                            title="На модерации"
-                                        >
-                                            <span class="text-sm leading-none">•</span>
-                                        </span>
-
-                                        <span
-                                            v-else
-                                            class="flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700"
-                                            title="Не подтвержден"
-                                        >
-                                            <span class="text-sm leading-none">?</span>
-                                        </span>
+                                            Уточнить цену
+                                        </Link>
+                                        <span v-else>Уточнить цену</span>
                                     </div>
                                 </div>
                             </article>

@@ -14,14 +14,25 @@ class VenueNavigationPresenter extends NavigationPresenter
 
     protected function buildItems(array $ctx): array
     {
-        return VenueType::query()
+        $items = [
+            [
+                'label' => 'Все площадки',
+                'href' => '/venues',
+            ],
+        ];
+
+        $types = VenueType::query()
             ->forNavigation()
-            ->get()
+            ->get();
+
+        $items = array_merge($items, $types
             ->map(fn (VenueType $type) => [
                 'label' => $type->plural_name ?: $type->name,
                 'href' => '/venues/' . Str::plural($type->alias),
             ])
             ->values()
-            ->all();
+            ->all());
+
+        return $items;
     }
 }

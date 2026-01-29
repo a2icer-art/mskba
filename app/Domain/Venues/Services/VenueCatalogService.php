@@ -8,6 +8,7 @@ use App\Domain\Metros\Models\Metro;
 use App\Domain\Contracts\Models\Contract;
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Support\DateFormatter;
+use App\Domain\Venues\Models\VenueSettings;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -91,7 +92,7 @@ class VenueCatalogService
     private function getHalls(?User $user): array
     {
         $query = Venue::query()
-            ->with(['venueType:id,name,alias', 'latestAddress.metro:id,name,line_name,line_color,city'])
+            ->with(['venueType:id,name,alias', 'latestAddress.metro:id,name,line_name,line_color,city', 'settings'])
             ->orderBy('name');
 
         $query->visibleFor($user);
@@ -101,18 +102,38 @@ class VenueCatalogService
         $myVenueLookup = array_fill_keys($myVenueIds, true);
 
         return $venues
-            ->map(fn (Venue $venue) => [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'alias' => $venue->alias,
-                'status' => $venue->status?->value,
-                'address' => $venue->latestAddress?->display_address,
-                'metro' => $venue->latestAddress?->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
-                'created_at' => DateFormatter::dateTime($venue->created_at),
-                'type' => $venue->venueType?->only(['id', 'name', 'alias']),
-                'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,
-                'is_my_venue' => (bool) ($myVenueLookup[$venue->id] ?? false),
-            ])
+            ->map(function (Venue $venue) use ($myVenueLookup) {
+                $settings = $venue->settings;
+                $basePrice = (int) ($settings?->rental_price_rub ?? VenueSettings::DEFAULT_RENTAL_PRICE_RUB);
+                $unitMinutes = (int) ($settings?->rental_duration_minutes ?? VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES);
+                $feePercent = (int) ($settings?->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT);
+                $feeAmount = (int) ($settings?->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB);
+                $isFixed = (bool) ($settings?->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED);
+
+                $commission = 0;
+                if ($basePrice > 0) {
+                    $commission = $isFixed ? max(0, $feeAmount) : (int) round($basePrice * max(0, $feePercent) / 100);
+                }
+
+                return [
+                    'id' => $venue->id,
+                    'name' => $venue->name,
+                    'alias' => $venue->alias,
+                    'status' => $venue->status?->value,
+                    'address' => $venue->latestAddress?->display_address,
+                    'metro' => $venue->latestAddress?->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),
+                    'created_at' => DateFormatter::dateTime($venue->created_at),
+                    'type' => $venue->venueType?->only(['id', 'name', 'alias']),
+                    'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,
+                    'is_my_venue' => (bool) ($myVenueLookup[$venue->id] ?? false),
+                    'rental_price_rub' => $basePrice,
+                    'rental_duration_minutes' => $unitMinutes,
+                    'supervisor_fee_is_fixed' => $isFixed,
+                    'supervisor_fee_percent' => $feePercent,
+                    'supervisor_fee_amount_rub' => $feeAmount,
+                    'price_with_fee_rub' => $basePrice > 0 ? ($basePrice + $commission) : 0,
+                ];
+            })
             ->values()
             ->all();
     }

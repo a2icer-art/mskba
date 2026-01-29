@@ -153,7 +153,7 @@ const downloadAndDelete = () => {
                 :login-label="$page.props.auth?.user?.login"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[240px_1fr]': hasSidebar }">
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
                 <MainSidebar
                     v-if="hasSidebar"
                     :title="navigation.title"
