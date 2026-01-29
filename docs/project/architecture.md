@@ -123,6 +123,16 @@
   - У модератора доступ ограничен только группой «Модерация» (пользователи/площадки/контракты).
   - Системные разделы (логи/настройки/балансы) доступны только при `admin.access` и защищены на уровне роутов.
 
+## Домен SEO
+
+- `PageMeta` (app/Domain/Seo/Models/PageMeta)
+  - Таблица метатегов по паре `page_type` + `page_id`.
+- `PageMetaService` (app/Domain/Seo/Services/PageMetaService)
+  - Резолвит метатеги для страниц и сохраняет изменения из админки.
+- `PageMetaCatalogService` (app/Domain/Seo/Services/PageMetaCatalogService)
+  - Формирует группы страниц для SEO‑админки (статические страницы, площадки, события).
+- Доступ к SEO-админке ограничен правом `seo.manage` (admin/editor).
+
 ## Сидеры (локальное тестирование)
 
 - `MariqSeeder` (database/seeders/MariqSeeder.php)

@@ -7,6 +7,7 @@ enum PermissionCode: string
     case AdminAccess = 'admin.access';
     case ModerationAccess = 'moderation.access';
     case LogsView = 'logs.view';
+    case SeoManage = 'seo.manage';
 
     case VenueCreate = 'venue.create';
     case VenueBooking = 'venue.booking';

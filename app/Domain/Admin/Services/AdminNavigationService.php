@@ -56,6 +56,13 @@ class AdminNavigationService
             ];
         }
 
+        if ($this->permissionChecker->can($user, PermissionCode::SeoManage)) {
+            $contentItems[] = [
+                'label' => 'SEO',
+                'href' => '/admin/seo',
+            ];
+        }
+
         if ($moderationItems !== []) {
             $groups[] = [
                 'title' => 'Модерация',

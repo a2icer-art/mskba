@@ -27,6 +27,7 @@ class RolePermissionPreset
                 PermissionCode::ArticleCategoryCreate,
                 PermissionCode::ArticleCategoryUpdate,
                 PermissionCode::ArticleCategoryDelete,
+                PermissionCode::SeoManage,
             ],
             default => [],
         };

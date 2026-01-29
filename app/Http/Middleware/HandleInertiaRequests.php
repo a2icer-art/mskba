@@ -4,7 +4,9 @@ namespace App\Http\Middleware;
 
 use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
+use App\Domain\Admin\Services\SiteAssetsService;
 use App\Domain\Permissions\Models\Permission;
+use App\Domain\Seo\Services\PageMetaService;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Messages\Services\MessageCountersService;
 use Illuminate\Http\Request;
@@ -59,6 +61,9 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            'meta' => $this->resolveMeta($request),
+            'faviconUrl' => $this->resolveFaviconUrl(),
+            'metaSettings' => $this->resolveMetaSettings(),
             'auth' => [
                 'user' => $user
                     ? [
@@ -87,6 +92,68 @@ class HandleInertiaRequests extends Middleware
                 'error' => session('error'),
                 'info' => session('info'),
             ],
+        ];
+    }
+
+    private function resolveFaviconUrl(): string
+    {
+        $assets = app(SiteAssetsService::class)->get();
+        return (string) ($assets['favicon_url'] ?? '');
+    }
+
+    private function resolveMetaSettings(): array
+    {
+        return app(SiteAssetsService::class)->getMetaSettings();
+    }
+
+    private function resolveMeta(Request $request): ?array
+    {
+        $payload = $this->resolveMetaPayload($request);
+        if (!$payload) {
+            return null;
+        }
+
+        return app(PageMetaService::class)->resolve($payload['page_type'], $payload['page_id']);
+    }
+
+    private function resolveMetaPayload(Request $request): ?array
+    {
+        $route = $request->route();
+        if (!$route) {
+            return null;
+        }
+
+        $routeName = (string) ($route->getName() ?? '');
+        $pageType = null;
+        $pageId = 0;
+
+        switch ($routeName) {
+            case 'home':
+                $pageType = 'page.home';
+                break;
+            case 'venues':
+                $pageType = 'page.venues.index';
+                break;
+            case 'events.index':
+                $pageType = 'page.events.index';
+                break;
+            case 'venues.show':
+                $pageType = 'venue.show';
+                $venue = $route->parameter('venue');
+                $pageId = is_object($venue) ? (int) $venue->id : (int) $venue;
+                break;
+            case 'events.show':
+                $pageType = 'event.show';
+                $event = $route->parameter('event');
+                $pageId = is_object($event) ? (int) $event->id : (int) $event;
+                break;
+            default:
+                return null;
+        }
+
+        return [
+            'page_type' => $pageType,
+            'page_id' => $pageId,
         ];
     }
 }

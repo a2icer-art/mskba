@@ -11,6 +11,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
 use App\Http\Controllers\AdminContractsModerationController;
 use App\Http\Controllers\AdminLogsController;
+use App\Http\Controllers\AdminSeoController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
@@ -213,6 +214,14 @@ Route::post('/events/{event}/participants/{participant}/respond', [EventsControl
 Route::post('/events/{event}/participants/{participant}/status', [EventsController::class, 'updateParticipantStatus'])
     ->middleware('auth')
     ->name('events.participants.status');
+
+Route::middleware(['auth', 'can:seo.manage', 'confirmed.role:10'])->prefix('admin')->group(function () {
+    Route::get('/seo', [AdminSeoController::class, 'index'])->name('admin.seo');
+    Route::patch('/seo', [AdminSeoController::class, 'update'])->name('admin.seo.update');
+    Route::post('/seo/bulk', [AdminSeoController::class, 'bulkUpdate'])->name('admin.seo.bulk');
+    Route::post('/seo/favicon', [AdminSeoController::class, 'uploadFavicon'])->name('admin.seo.favicon');
+    Route::patch('/seo/settings', [AdminSeoController::class, 'updateMetaSettings'])->name('admin.seo.settings');
+});
 
 Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');

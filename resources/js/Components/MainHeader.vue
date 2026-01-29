@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import BrandLogo from './BrandLogo.vue';
 import MainHeaderNav from './MainHeaderNav.vue';
+import SeoHead from './SeoHead.vue';
 import { useMessageRealtime } from '../Composables/useMessageRealtime';
 
 const props = defineProps({
@@ -36,9 +37,20 @@ defineEmits(['open-login']);
 
 const page = usePage();
 const roleLevel = computed(() => Number(page.props.auth?.user?.role_level ?? 0));
-const canSeeControlPanel = computed(
-    () => props.isAuthenticated && roleLevel.value > 10
-);
+const userPermissions = computed(() => page.props.auth?.user?.permissions ?? []);
+const adminHref = computed(() => {
+    if (!props.isAuthenticated || roleLevel.value <= 10) {
+        return '';
+    }
+    if (userPermissions.value.includes('admin.access') || userPermissions.value.includes('moderation.access')) {
+        return '/admin';
+    }
+    if (userPermissions.value.includes('seo.manage')) {
+        return '/admin/seo';
+    }
+    return '';
+});
+const canSeeControlPanel = computed(() => Boolean(adminHref.value));
 const navItems = computed(() => {
     const items = [
         { label: 'Площадки', href: '/venues' },
@@ -47,7 +59,7 @@ const navItems = computed(() => {
         { label: 'Сообщество', href: '#' },
     ];
     if (canSeeControlPanel.value) {
-        items.push({ label: 'Панель управления', href: '/admin', variant: 'admin' });
+        items.push({ label: 'Панель управления', href: adminHref.value, variant: 'admin' });
     }
     return items;
 });
@@ -178,6 +190,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+    <SeoHead />
     <div ref="wrapperRef">
         <div v-if="isFixed" :style="{ height: `${headerHeight}px` }"></div>
         <header

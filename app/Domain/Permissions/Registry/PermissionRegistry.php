@@ -30,6 +30,12 @@ class PermissionRegistry
                 'target_model' => null,
             ],
             [
+                'code' => PermissionCode::SeoManage,
+                'label' => 'Управление SEO',
+                'scope' => PermissionScope::Global,
+                'target_model' => null,
+            ],
+            [
                 'code' => PermissionCode::VenueCreate,
                 'label' => 'Создание площадки',
                 'scope' => PermissionScope::Global,
