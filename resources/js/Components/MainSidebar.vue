@@ -82,15 +82,25 @@ const topOffset = ref(0);
 const gapOffset = 12;
 const isFixed = ref(false);
 
+const resolveAvailableHeight = () => {
+    const footerElement = document.querySelector('footer');
+    const footerTop = footerElement?.getBoundingClientRect?.().top;
+    const viewportBottom = window.innerHeight;
+    const effectiveBottom = Number.isFinite(footerTop) ? Math.min(footerTop, viewportBottom) : viewportBottom;
+    const bottomOffset = 30;
+    const availableHeight = effectiveBottom - topOffset.value - bottomOffset;
+    return availableHeight > 0 ? Math.floor(availableHeight) : 0;
+};
+
 const updateSidebarMetrics = () => {
     if (!sidebarRef.value || !wrapperRef.value) {
         return;
     }
     const rect = wrapperRef.value.getBoundingClientRect();
-    const mainElement = wrapperRef.value.closest?.('main');
-    const mainRect = mainElement?.getBoundingClientRect?.();
-    const maxHeight = (mainRect?.height ?? rect.height) - 45;
-    maxSidebarHeight.value = maxHeight > 0 ? Math.floor(maxHeight) : 0;
+    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
+    const parsedOffset = parseInt(cssOffset, 10);
+    topOffset.value = (Number.isFinite(parsedOffset) ? parsedOffset : 0) + gapOffset;
+    maxSidebarHeight.value = resolveAvailableHeight();
     const sidebarRect = sidebarRef.value.getBoundingClientRect();
     sidebarHeight.value = Math.min(
         sidebarRect.height || 0,
@@ -101,9 +111,6 @@ const updateSidebarMetrics = () => {
     if (!isFixed.value) {
         sidebarInitialOffset.value = window.scrollY + rect.top;
     }
-    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
-    const parsed = parseInt(cssOffset, 10);
-    topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
 };
 
 const updateSidebarFixed = () => {
@@ -113,6 +120,7 @@ const updateSidebarFixed = () => {
     const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
     const parsed = parseInt(cssOffset, 10);
     topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
+    maxSidebarHeight.value = resolveAvailableHeight();
     isFixed.value = window.scrollY >= sidebarInitialOffset.value - topOffset.value;
 };
 
