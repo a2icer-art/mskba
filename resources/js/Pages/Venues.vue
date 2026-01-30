@@ -44,6 +44,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    avatarPlaceholderUrl: {
+        type: String,
+        default: '',
+    },
 });
 
 const page = usePage();
@@ -681,8 +685,21 @@ const applyAddressSuggestion = (suggestion) => {
                                 class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                             >
                                 <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div>
-                                        <div class="flex flex-wrap items-center gap-2">
+                                    <div class="flex items-start gap-4">
+                                        <Link
+                                            v-if="hall.type_slug"
+                                            class="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-[rgb(190_219_255)] bg-white p-0.5 ring-1 ring-[rgb(190_219_255/0.45)]"
+                                            :href="`/venues/${hall.type_slug}/${hall.alias}`"
+                                        >
+                                            <img
+                                                v-if="hall.avatar_url || avatarPlaceholderUrl"
+                                                :src="hall.avatar_url || avatarPlaceholderUrl"
+                                                alt=""
+                                                class="h-full w-full rounded-full object-cover"
+                                            />
+                                        </Link>
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
                                             <span
                                                 v-if="hall.status === 'confirmed'"
                                                 class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.15em] text-emerald-700"
@@ -721,32 +738,33 @@ const applyAddressSuggestion = (suggestion) => {
                                             </Link>
                                             <span v-else>{{ hall.name }}</span>
                                             </h3>
-                                        </div>
-                                        <p class="mt-1 text-sm text-slate-600">
-                                            {{ hall.type?.name || 'Тип не указан' }}
-                                        </p>
-                                        <button
-                                            v-if="hall.address"
-                                            class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
-                                            type="button"
-                                            @click="openMap(hall)"
-                                        >
-                                            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500">
-                                                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6">
-                                                    <path d="M12 13.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5z"></path>
-                                                    <path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0z"></path>
-                                                </svg>
-                                            </span>
-                                            <span>{{ hall.address }}</span>
-                                        </button>
-                                        <div v-if="hall.metro" class="flex items-center gap-2 text-sm text-slate-700">
-                                            <span class="inline-flex h-5 w-5 items-center justify-center">
-                                                <span
-                                                    class="h-2.5 w-2.5 rounded-full"
-                                                    :style="{ backgroundColor: normalizeMetroColor(hall.metro) || '#94a3b8' }"
-                                                ></span>
-                                            </span>
-                                            <span>{{ formatMetroLabel(hall.metro) }}</span>
+                                            </div>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                {{ hall.type?.name || 'Тип не указан' }}
+                                            </p>
+                                            <button
+                                                v-if="hall.address"
+                                                class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
+                                                type="button"
+                                                @click="openMap(hall)"
+                                            >
+                                                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500">
+                                                    <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6">
+                                                        <path d="M12 13.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5z"></path>
+                                                        <path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0z"></path>
+                                                    </svg>
+                                                </span>
+                                                <span>{{ hall.address }}</span>
+                                            </button>
+                                            <div v-if="hall.metro" class="flex items-center gap-2 text-sm text-slate-700">
+                                                <span class="inline-flex h-5 w-5 items-center justify-center">
+                                                    <span
+                                                        class="h-2.5 w-2.5 rounded-full"
+                                                        :style="{ backgroundColor: normalizeMetroColor(hall.metro) || '#94a3b8' }"
+                                                    ></span>
+                                                </span>
+                                                <span>{{ formatMetroLabel(hall.metro) }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="mt-1 text-sm text-slate-600">

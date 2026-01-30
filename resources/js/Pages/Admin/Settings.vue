@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../../Components/Breadcrumbs.vue';
 import MainFooter from '../../Components/MainFooter.vue';
@@ -31,6 +31,10 @@ const props = defineProps({
     contactDelivery: {
         type: Object,
         default: () => ({ email: { enabled: false, smtp: {} } }),
+    },
+    assets: {
+        type: Object,
+        default: () => ({}),
     },
 });
 
@@ -73,6 +77,10 @@ const form = useForm({
     smtp_from_address: props.contactDelivery?.email?.smtp?.from_address ?? '',
     smtp_from_name: props.contactDelivery?.email?.smtp?.from_name ?? props.appName ?? '',
 });
+const avatarPlaceholderForm = useForm({
+    avatar_placeholder: null,
+});
+const avatarInputKey = ref(0);
 const testForm = useForm({
     test_email: '',
     test_body: '',
@@ -88,6 +96,20 @@ const submitTest = () => {
         preserveScroll: true,
         onSuccess: () => {
             testForm.reset('test_email', 'test_body');
+        },
+    });
+};
+
+const submitAvatarPlaceholder = () => {
+    if (!avatarPlaceholderForm.avatar_placeholder) {
+        return;
+    }
+    avatarPlaceholderForm.post('/admin/settings/avatar-placeholder', {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            avatarPlaceholderForm.reset('avatar_placeholder');
+            avatarInputKey.value += 1;
         },
     });
 };
@@ -162,6 +184,45 @@ const submitTest = () => {
                                     :disabled="form.processing"
                                 >
                                     Сохранить
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-6">
+                        <h2 class="text-lg font-semibold text-slate-900">Заглушка аватара</h2>
+                        <p class="mt-2 text-sm text-slate-600">
+                            Изображение по умолчанию для аватаров, когда медиа отсутствует.
+                        </p>
+
+                        <form class="mt-6 space-y-4" @submit.prevent="submitAvatarPlaceholder">
+                            <div class="flex flex-wrap items-center gap-4">
+                                <div class="h-16 w-16 overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                                    <img
+                                        v-if="props.assets?.avatar_placeholder_url"
+                                        :src="props.assets.avatar_placeholder_url"
+                                        alt="Заглушка"
+                                        class="h-full w-full object-cover"
+                                    />
+                                </div>
+                                <div class="flex-1">
+                                    <input
+                                        :key="avatarInputKey"
+                                        type="file"
+                                        accept="image/*"
+                                        class="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
+                                        @change="(event) => { avatarPlaceholderForm.avatar_placeholder = event.target.files?.[0] ?? null; }"
+                                    />
+                                    <p v-if="actionErrors.avatar_placeholder" class="mt-1 text-xs text-rose-700">
+                                        {{ actionErrors.avatar_placeholder }}
+                                    </p>
+                                </div>
+                                <button
+                                    type="submit"
+                                    class="rounded-full border border-slate-900 bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                    :disabled="avatarPlaceholderForm.processing"
+                                >
+                                    Загрузить
                                 </button>
                             </div>
                         </form>

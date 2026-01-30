@@ -38,6 +38,7 @@ use App\Domain\Venues\Models\VenueScheduleException;
 use App\Domain\Venues\Models\VenueScheduleExceptionInterval;
 use App\Domain\Venues\Models\VenueScheduleInterval;
 use App\Domain\Venues\Services\VenueCatalogService;
+use App\Domain\Admin\Services\SiteAssetsService;
 use App\Domain\Venues\Services\VenueAboutDataBuilder;
 use App\Domain\Venues\UseCases\CreateVenue;
 use App\Domain\Venues\UseCases\UpdateVenue;
@@ -64,7 +65,7 @@ use Inertia\Inertia;
 
 class VenuesController extends Controller
 {
-    public function index()
+    public function index(SiteAssetsService $siteAssets)
     {
         $user = request()->user();
 
@@ -74,7 +75,8 @@ class VenuesController extends Controller
 
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $catalog = app(VenueCatalogService::class);
-        $catalogData = $catalog->getHallsList(null, $user);
+        $assets = $siteAssets->get();
+        $catalogData = $catalog->getHallsList(null, $user, $assets['avatar_placeholder_url'] ?? null);
         $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present()['data'];
 
         return Inertia::render('Venues', [
@@ -87,10 +89,11 @@ class VenuesController extends Controller
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
             'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
+            'avatarPlaceholderUrl' => $assets['avatar_placeholder_url'] ?? '',
         ]);
     }
 
-    public function type(string $type)
+    public function type(string $type, SiteAssetsService $siteAssets)
     {
         $user = request()->user();
 
@@ -99,7 +102,8 @@ class VenuesController extends Controller
         ]);
         $catalog = app(VenueCatalogService::class);
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
-        $catalogData = $catalog->getHallsList($type, $user);
+        $assets = $siteAssets->get();
+        $catalogData = $catalog->getHallsList($type, $user, $assets['avatar_placeholder_url'] ?? null);
         $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
             'typeSlug' => $type,
         ])['data'];
@@ -118,6 +122,7 @@ class VenuesController extends Controller
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
             'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
+            'avatarPlaceholderUrl' => $assets['avatar_placeholder_url'] ?? '',
         ]);
     }
 

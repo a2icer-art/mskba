@@ -317,6 +317,9 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::patch('/settings', [AdminSettingsController::class, 'update'])
         ->middleware('can:admin.access')
         ->name('admin.settings.update');
+    Route::post('/settings/avatar-placeholder', [AdminSettingsController::class, 'uploadAvatarPlaceholder'])
+        ->middleware('can:admin.access')
+        ->name('admin.settings.avatar-placeholder');
     Route::post('/settings/test-email', [AdminSettingsController::class, 'testEmail'])
         ->middleware('can:admin.access')
         ->name('admin.settings.test-email');

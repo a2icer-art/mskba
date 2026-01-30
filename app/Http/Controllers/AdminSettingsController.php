@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Admin\Services\EventDefaultsService;
 use App\Domain\Users\Services\ContactDeliverySettingsService;
+use App\Domain\Admin\Services\SiteAssetsService;
 use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
 use Illuminate\Http\Request;
@@ -18,7 +19,8 @@ class AdminSettingsController extends Controller
     public function index(
         Request $request,
         EventDefaultsService $defaultsService,
-        ContactDeliverySettingsService $contactDeliverySettings
+        ContactDeliverySettingsService $contactDeliverySettings,
+        SiteAssetsService $siteAssets
     )
     {
         $roleLevel = $this->getRoleLevel($request);
@@ -41,6 +43,7 @@ class AdminSettingsController extends Controller
             'breadcrumbs' => $breadcrumbs,
             'defaults' => $defaults,
             'contactDelivery' => $deliverySettings,
+            'assets' => $siteAssets->get(),
         ]);
     }
 
@@ -172,6 +175,24 @@ class AdminSettingsController extends Controller
         }
 
         return back()->with('notice', 'Тестовое письмо отправлено.');
+    }
+
+    public function uploadAvatarPlaceholder(Request $request, SiteAssetsService $siteAssets)
+    {
+        $roleLevel = $this->getRoleLevel($request);
+        $this->ensureAccess($roleLevel, 20);
+
+        $data = $request->validate([
+            'avatar_placeholder' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ], [
+            'avatar_placeholder.required' => 'Выберите файл заглушки.',
+            'avatar_placeholder.mimes' => 'Поддерживаются форматы jpg, jpeg, png, webp.',
+            'avatar_placeholder.max' => 'Размер файла не должен превышать 4 МБ.',
+        ]);
+
+        $siteAssets->updateAvatarPlaceholder($data['avatar_placeholder']);
+
+        return back()->with('notice', 'Заглушка аватара обновлена.');
     }
 
     private function getRoleLevel(Request $request): int

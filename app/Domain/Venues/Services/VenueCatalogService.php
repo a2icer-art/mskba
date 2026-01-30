@@ -3,6 +3,7 @@
 namespace App\Domain\Venues\Services;
 
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Media\Services\MediaService;
 use App\Domain\Venues\Models\VenueType;
 use App\Domain\Metros\Models\Metro;
 use App\Domain\Contracts\Models\Contract;
@@ -47,11 +48,11 @@ class VenueCatalogService
             ->all();
     }
 
-    public function getHallsList(?string $typeSlug = null, ?User $user = null): ?array
+    public function getHallsList(?string $typeSlug = null, ?User $user = null, ?string $avatarPlaceholderUrl = null): ?array
     {
         if (!$typeSlug) {
             return [
-                'venues' => $this->getHalls($user),
+                'venues' => $this->getHalls($user, $avatarPlaceholderUrl),
                 'activeType' => null,
                 'activeTypeSlug' => null,
             ];
@@ -63,7 +64,7 @@ class VenueCatalogService
         }
 
         return [
-            'venues' => $this->getHalls($user),
+            'venues' => $this->getHalls($user, $avatarPlaceholderUrl),
             'activeType' => $venueType->alias,
             'activeTypeSlug' => Str::plural($venueType->alias),
         ];
@@ -89,10 +90,19 @@ class VenueCatalogService
             ->first();
     }
 
-    private function getHalls(?User $user): array
+    private function getHalls(?User $user, ?string $avatarPlaceholderUrl = null): array
     {
+        $mediaService = app(MediaService::class);
         $query = Venue::query()
-            ->with(['venueType:id,name,alias', 'latestAddress.metro:id,name,line_name,line_color,city', 'settings'])
+            ->with([
+                'venueType:id,name,alias',
+                'latestAddress.metro:id,name,line_name,line_color,city',
+                'settings',
+                'media' => function ($query) {
+                    $query->where('is_avatar', true)
+                        ->select(['id', 'mediable_id', 'mediable_type', 'disk', 'path', 'is_avatar']);
+                },
+            ])
             ->orderBy('name');
 
         $query->visibleFor($user);
@@ -102,8 +112,10 @@ class VenueCatalogService
         $myVenueLookup = array_fill_keys($myVenueIds, true);
 
         return $venues
-            ->map(function (Venue $venue) use ($myVenueLookup) {
+            ->map(function (Venue $venue) use ($myVenueLookup, $mediaService, $avatarPlaceholderUrl) {
                 $settings = $venue->settings;
+                $avatar = $venue->media->first();
+                $avatarUrl = $avatar ? $mediaService->toPublicUrl($avatar) : $avatarPlaceholderUrl;
                 $basePrice = (int) ($settings?->rental_price_rub ?? VenueSettings::DEFAULT_RENTAL_PRICE_RUB);
                 $unitMinutes = (int) ($settings?->rental_duration_minutes ?? VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES);
                 $feePercent = (int) ($settings?->supervisor_fee_percent ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT);
@@ -119,6 +131,7 @@ class VenueCatalogService
                     'id' => $venue->id,
                     'name' => $venue->name,
                     'alias' => $venue->alias,
+                    'avatar_url' => $avatarUrl,
                     'status' => $venue->status?->value,
                     'address' => $venue->latestAddress?->display_address,
                     'metro' => $venue->latestAddress?->metro?->only(['id', 'name', 'line_name', 'line_color', 'city']),

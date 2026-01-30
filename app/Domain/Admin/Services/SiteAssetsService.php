@@ -17,11 +17,15 @@ class SiteAssetsService
         $value = is_array($settings?->value) ? $settings->value : [];
         $path = $value['favicon_path'] ?? null;
         $url = $path ? $this->toPublicUrl($path) : '';
+        $avatarPath = $value['avatar_placeholder_path'] ?? null;
+        $avatarUrl = $avatarPath ? $this->toPublicUrl($avatarPath) : '';
         $meta = $this->getMetaSettings();
 
         return [
             'favicon_path' => $path,
             'favicon_url' => $url,
+            'avatar_placeholder_path' => $avatarPath,
+            'avatar_placeholder_url' => $avatarUrl,
             'include_site_title' => $meta['include_site_title'] ?? false,
         ];
     }
@@ -49,6 +53,32 @@ class SiteAssetsService
         return [
             'favicon_path' => $path,
             'favicon_url' => $this->toPublicUrl($path),
+        ];
+    }
+
+    public function updateAvatarPlaceholder(UploadedFile $file): array
+    {
+        $disk = Storage::disk('public');
+        $settings = AdminSetting::query()->where('key', self::KEY)->first();
+        $value = is_array($settings?->value) ? $settings->value : [];
+        $oldPath = $value['avatar_placeholder_path'] ?? null;
+
+        $extension = $file->getClientOriginalExtension() ?: 'png';
+        $filename = 'avatar_placeholder_' . now()->format('Ymd_His') . '.' . $extension;
+        $path = $file->storeAs('site', $filename, 'public');
+
+        AdminSetting::query()->updateOrCreate(
+            ['key' => self::KEY],
+            ['value' => array_merge($value, ['avatar_placeholder_path' => $path])]
+        );
+
+        if ($oldPath && $oldPath !== $path && $disk->exists($oldPath)) {
+            $disk->delete($oldPath);
+        }
+
+        return [
+            'avatar_placeholder_path' => $path,
+            'avatar_placeholder_url' => $this->toPublicUrl($path),
         ];
     }
 
