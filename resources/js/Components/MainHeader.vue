@@ -59,9 +59,27 @@ const navItems = computed(() => {
         { label: 'Сообщество', href: '#' },
     ];
     if (canSeeControlPanel.value) {
-        items.push({ label: 'Панель управления', href: adminHref.value, variant: 'admin' });
+        items.push({ label: 'Панель управления', href: adminHref.value, variant: 'admin', badge: adminModerationBadge.value });
     }
     return items;
+});
+
+const adminModerationBadge = computed(() => {
+    const navigation = page.props?.navigation;
+    if (!navigation || !Array.isArray(navigation.data)) {
+        return '';
+    }
+    const groups = navigation.data;
+    const modGroup = groups.find((g) => g?.title === 'Модерация');
+    if (!modGroup) {
+        return '';
+    }
+    // prefer explicit meta.total_pending, otherwise sum item badges
+    if (modGroup.meta && Number.isFinite(Number(modGroup.meta.total_pending))) {
+        return Number(modGroup.meta.total_pending);
+    }
+    const sum = (modGroup.items ?? []).reduce((acc, it) => acc + (Number(it.badge) || 0), 0);
+    return sum;
 });
 const isMenuOpen = ref(false);
 const isSidebarOpen = ref(false);
@@ -267,7 +285,15 @@ onBeforeUnmount(() => {
                             :class="item.variant === 'admin' ? 'border-blue-200 bg-blue-50 text-blue-700' : ''"
                             @click="closeMenu"
                         >
-                            {{ item.label }}
+                            <span class="inline-flex items-center gap-2">
+                                <span>{{ item.label }}</span>
+                                <span
+                                    v-if="formatSidebarBadge(item.badge)"
+                                    class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                                >
+                                    {{ formatSidebarBadge(item.badge) }}
+                                </span>
+                            </span>
                         </Link>
                         <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
                             <button
@@ -372,7 +398,15 @@ onBeforeUnmount(() => {
                 :class="item.variant === 'admin' ? 'border-blue-200 bg-blue-50 text-blue-700' : ''"
                 @click="closeMenu"
             >
-                {{ item.label }}
+                <span class="inline-flex items-center gap-2">
+                    <span>{{ item.label }}</span>
+                    <span
+                        v-if="formatSidebarBadge(item.badge)"
+                        class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white"
+                    >
+                        {{ formatSidebarBadge(item.badge) }}
+                    </span>
+                </span>
             </Link>
             <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
                 <button

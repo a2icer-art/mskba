@@ -6,6 +6,9 @@ use App\Domain\Admin\Services\AdminLogsService;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Models\User;
+use App\Domain\Moderation\Models\ModerationRequest;
+use App\Domain\Moderation\Enums\ModerationStatus;
+use App\Domain\Moderation\Enums\ModerationEntityType;
 
 class AdminNavigationService
 {
@@ -31,18 +34,37 @@ class AdminNavigationService
         }
 
         if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
+            // Counts of pending moderation requests
+            $totalPending = ModerationRequest::where('status', ModerationStatus::Pending->value)->count();
+            $userPending = ModerationRequest::where('status', ModerationStatus::Pending->value)
+                ->where('entity_type', ModerationEntityType::User->value)
+                ->count();
+            $venuePending = ModerationRequest::where('status', ModerationStatus::Pending->value)
+                ->where('entity_type', ModerationEntityType::Venue->value)
+                ->count();
+            $contractPending = ModerationRequest::where('status', ModerationStatus::Pending->value)
+                ->where('entity_type', ModerationEntityType::VenueContract->value)
+                ->count();
+
             $moderationItems[] = [
                 'label' => 'Пользователи',
                 'href' => '/admin/users-moderation',
+                'badge' => $userPending,
             ];
             $moderationItems[] = [
                 'label' => 'Площадки',
                 'href' => '/admin/venues-moderation',
+                'badge' => $venuePending,
             ];
             $moderationItems[] = [
                 'label' => 'Контракты',
                 'href' => '/admin/contracts-moderation',
+                'badge' => $contractPending,
             ];
+
+            // Attach total pending as meta on moderation group via special key
+            // The presenter will include this in the groups data so frontend can show header badge.
+            $moderationGroupMeta = ['total_pending' => $totalPending];
         }
 
         if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)
@@ -79,10 +101,14 @@ class AdminNavigationService
         }
 
         if ($moderationItems !== []) {
-            $groups[] = [
+            $group = [
                 'title' => 'Модерация',
                 'items' => $moderationItems,
             ];
+            if (isset($moderationGroupMeta)) {
+                $group['meta'] = $moderationGroupMeta;
+            }
+            $groups[] = $group;
         }
 
         if ($systemItems !== []) {
