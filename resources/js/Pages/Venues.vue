@@ -687,15 +687,7 @@ const applyAddressSuggestion = (suggestion) => {
                                             type="checkbox"
                                             :value="amenity.id"
                                         />
-                                        <span class="flex items-center gap-2">
-                                            <img
-                                                v-if="amenity.icon_url"
-                                                :src="amenity.icon_url"
-                                                alt=""
-                                                class="h-5 w-5 rounded-full border border-slate-200 bg-white p-0.5"
-                                            />
-                                            <span>{{ amenity.name }}</span>
-                                        </span>
+                                        <span>{{ amenity.name }}</span>
                                     </label>
                                 </div>
                             </div>
