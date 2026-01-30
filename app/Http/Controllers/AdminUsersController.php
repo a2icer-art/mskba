@@ -271,7 +271,8 @@ class AdminUsersController extends Controller
             $roleIdsByAlias,
             $existingByAlias,
             $user,
-            $profileFactory
+            $profileFactory,
+            $request
         ) {
             foreach ($aliases as $alias) {
                 if ($alias === '' || $existingByAlias->has($alias)) {
