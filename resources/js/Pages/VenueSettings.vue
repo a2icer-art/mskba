@@ -20,6 +20,22 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    amenities: {
+        type: Array,
+        default: () => [],
+    },
+    customAmenities: {
+        type: Array,
+        default: () => [],
+    },
+    selectedAmenityIds: {
+        type: Array,
+        default: () => [],
+    },
+    amenityNotes: {
+        type: Object,
+        default: () => ({}),
+    },
     paymentOrderOptions: {
         type: Array,
         default: () => [],
@@ -55,6 +71,90 @@ const formErrorNotice = computed(() => {
     }
     return 'Не удалось сохранить изменения. Проверьте значения.';
 });
+
+const selectedAmenityIds = ref([...(props.selectedAmenityIds ?? [])]);
+const customAmenityDraft = ref('');
+const customAmenityItems = ref(
+    (props.customAmenities ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        icon_url: item.icon_url ?? null,
+        isNew: false,
+    }))
+);
+const removedCustomAmenityIds = ref([]);
+const amenityNotes = ref({ ...(props.amenityNotes ?? {}) });
+const normalizedCustomAmenityName = computed(() => customAmenityDraft.value.trim().replace(/\s+/g, ' '));
+const hasCustomAmenityName = computed(() => normalizedCustomAmenityName.value.length > 0);
+const isCustomAmenityDuplicate = computed(() => {
+    const name = normalizedCustomAmenityName.value.toLowerCase();
+    if (!name) {
+        return false;
+    }
+    return customAmenityItems.value.some((item) => item.name.toLowerCase() === name);
+});
+const canAddCustomAmenity = computed(() => hasCustomAmenityName.value && !isCustomAmenityDuplicate.value);
+
+const addCustomAmenity = () => {
+    if (!canAddCustomAmenity.value) {
+        return;
+    }
+    customAmenityItems.value.push({
+        id: null,
+        name: normalizedCustomAmenityName.value,
+        icon_url: null,
+        isNew: true,
+    });
+    customAmenityDraft.value = '';
+};
+
+const removeCustomAmenity = (amenity) => {
+    if (amenity.id) {
+        removedCustomAmenityIds.value.push(amenity.id);
+        selectedAmenityIds.value = selectedAmenityIds.value.filter((id) => id !== amenity.id);
+        delete amenityNotes.value[amenity.id];
+    }
+    customAmenityItems.value = customAmenityItems.value.filter((item) => item !== amenity);
+};
+
+const selectedAmenities = computed(() => {
+    const selectedLookup = new Set(selectedAmenityIds.value);
+    const standard = (props.amenities ?? []).filter((item) => selectedLookup.has(item.id));
+    const custom = customAmenityItems.value.filter((item) => item.id && selectedLookup.has(item.id));
+    return [...standard, ...custom];
+});
+
+const descriptionModalOpen = ref(false);
+const descriptionAmenity = ref(null);
+const descriptionDraft = ref('');
+
+const openDescriptionModal = (amenity) => {
+    if (!selectedAmenityIds.value.includes(amenity.id)) {
+        selectedAmenityIds.value.push(amenity.id);
+    }
+    descriptionAmenity.value = amenity;
+    descriptionDraft.value = amenityNotes.value[amenity.id] ?? '';
+    descriptionModalOpen.value = true;
+};
+
+const closeDescriptionModal = () => {
+    descriptionModalOpen.value = false;
+    descriptionAmenity.value = null;
+    descriptionDraft.value = '';
+};
+
+const saveDescription = () => {
+    if (!descriptionAmenity.value) {
+        return;
+    }
+    const trimmed = descriptionDraft.value.trim();
+    if (trimmed) {
+        amenityNotes.value[descriptionAmenity.value.id] = trimmed;
+    } else {
+        delete amenityNotes.value[descriptionAmenity.value.id];
+    }
+    closeDescriptionModal();
+};
 
 const isMinutes = ref(false);
 const rentalDurationValue = ref(1);
@@ -241,7 +341,16 @@ const form = useForm({
     pending_review_is_minutes: true,
     pending_before_start_is_minutes: true,
     pending_warning_is_minutes: true,
+    amenity_ids: props.selectedAmenityIds ?? [],
+    custom_amenities: [],
+    custom_amenities_removed: [],
+    amenity_notes: {},
 });
+
+const customIconForm = useForm({
+    icon: null,
+});
+const customIconKeys = ref({});
 
 const submit = () => {
     localNotice.value = '';
@@ -266,10 +375,36 @@ const submit = () => {
     const warningValue = Number(pendingWarningValue.value);
     form.pending_warning_minutes = Number.isFinite(warningValue) ? warningValue : null;
     form.pending_warning_is_minutes = isPendingWarningMinutes.value;
+    form.amenity_ids = [...selectedAmenityIds.value];
+    form.custom_amenities = customAmenityItems.value
+        .filter((item) => item.isNew)
+        .map((item) => item.name);
+    form.custom_amenities_removed = [...removedCustomAmenityIds.value];
+    form.amenity_notes = selectedAmenityIds.value.reduce((result, id) => {
+        if (amenityNotes.value[id] !== undefined) {
+            result[id] = amenityNotes.value[id];
+        }
+        return result;
+    }, {});
     form.patch(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/settings`, {
         preserveScroll: true,
         onSuccess: () => {
             localNotice.value = actionNotice.value || 'Настройки сохранены.';
+        },
+    });
+};
+
+const uploadCustomIcon = (amenityId, file) => {
+    if (!file) {
+        return;
+    }
+    customIconForm.icon = file;
+    customIconForm.post(`/venues/${props.activeTypeSlug}/${props.venue?.alias}/admin/settings/amenities/${amenityId}/icon`, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            customIconForm.reset('icon');
+            customIconKeys.value[amenityId] = (customIconKeys.value[amenityId] ?? 0) + 1;
         },
     });
 };
@@ -294,18 +429,7 @@ const submit = () => {
                     :title="navigation.title"
                     :data="navigationData"
                     :active-href="activeHref"
-                >
-                    <template #default>
-                        <div v-if="page.props.canManageMedia" class="pt-4">
-                            <a :href="`/venues/${activeTypeSlug}/${venue.alias}/admin/media`" class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.5A1.5 1.5 0 0016.5 6H12V5a2 2 0 00-2-2H4z" />
-                                </svg>
-                                <span>Медиа</span>
-                            </a>
-                        </div>
-                    </template>
-                </MainSidebar>
+                />
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
@@ -574,6 +698,156 @@ const submit = () => {
                                 <hr class="border-slate-200/80" />
                             </div>
 
+                            <div class="space-y-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                    Опции площадки
+                                </p>
+                                <div class="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+                                    <div class="space-y-3">
+                                        <p class="text-sm font-semibold text-slate-700">
+                                            Стандартные опции
+                                        </p>
+                                        <div v-if="props.amenities?.length" class="grid gap-3 sm:grid-cols-2">
+                                            <div
+                                                v-for="amenity in props.amenities"
+                                                :key="amenity.id"
+                                                class="rounded-2xl border border-slate-200/80 px-3 py-2 text-sm text-slate-700"
+                                            >
+                                                <label class="flex items-center gap-3">
+                                                    <input
+                                                        v-model="selectedAmenityIds"
+                                                        type="checkbox"
+                                                        :value="amenity.id"
+                                                        class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                                    />
+                                                    <div class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                                                        <img
+                                                            v-if="amenity.icon_url"
+                                                            :src="amenity.icon_url"
+                                                            :alt="amenity.name"
+                                                            class="h-5 w-5 object-contain"
+                                                        />
+                                                        <span v-else class="text-[10px] text-slate-400">нет</span>
+                                                    </div>
+                                                    <span>{{ amenity.name }}</span>
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-slate-800"
+                                                    @click="openDescriptionModal(amenity)"
+                                                >
+                                                    <span>Описание</span>
+                                                    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-xs text-slate-600">
+                                                        <span v-if="amenityNotes[amenity.id]">✎</span>
+                                                        <span v-else>＋</span>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p v-else class="text-sm text-slate-500">
+                                            Стандартных опций пока нет.
+                                        </p>
+                                        <p v-if="actionError.amenity_ids" class="text-xs text-rose-700">
+                                            {{ actionError.amenity_ids }}
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-3">
+                                        <p class="text-sm font-semibold text-slate-700">
+                                            Свои опции
+                                        </p>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <input
+                                                v-model="customAmenityDraft"
+                                                type="text"
+                                                maxlength="60"
+                                                class="h-11 flex-1 rounded-2xl border border-slate-200 px-4 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                                placeholder="Например: сауна, спортбар"
+                                            />
+                                            <button
+                                                type="button"
+                                                class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+                                                :disabled="!canAddCustomAmenity"
+                                                @click="addCustomAmenity"
+                                            >
+                                                Добавить
+                                            </button>
+                                        </div>
+                                        <p v-if="isCustomAmenityDuplicate" class="text-xs text-rose-700">
+                                            Такая опция уже добавлена.
+                                        </p>
+                                        <div v-if="customAmenityItems.length" class="space-y-2">
+                                            <div
+                                                v-for="amenity in customAmenityItems"
+                                                :key="amenity.id ?? amenity.name"
+                                                class="rounded-2xl border border-slate-200/80 px-3 py-2"
+                                            >
+                                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                                                        <input
+                                                            v-if="amenity.id"
+                                                            v-model="selectedAmenityIds"
+                                                            type="checkbox"
+                                                            :value="amenity.id"
+                                                            class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                                                        />
+                                                        <div class="flex h-7 w-7 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                                                            <img
+                                                                v-if="amenity.icon_url"
+                                                                :src="amenity.icon_url"
+                                                                :alt="amenity.name"
+                                                                class="h-4 w-4 object-contain"
+                                                            />
+                                                            <span v-else class="text-[10px] text-slate-400">нет</span>
+                                                        </div>
+                                                        <span>{{ amenity.name }}</span>
+                                                        <span v-if="amenity.isNew" class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                                                            новая
+                                                        </span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        class="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                                                        @click="removeCustomAmenity(amenity)"
+                                                    >
+                                                        Удалить
+                                                    </button>
+                                                </div>
+                                                <div class="mt-2 flex flex-wrap items-center gap-3">
+                                                    <input
+                                                        v-if="amenity.id"
+                                                        :key="customIconKeys[amenity.id] || 0"
+                                                        type="file"
+                                                        accept="image/svg+xml,image/png,image/jpeg,image/webp"
+                                                        class="text-xs text-slate-500"
+                                                        @change="uploadCustomIcon(amenity.id, $event.target.files[0])"
+                                                    />
+                                                    <button
+                                                        v-if="amenity.id"
+                                                        type="button"
+                                                        class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-slate-800"
+                                                        @click="openDescriptionModal(amenity)"
+                                                    >
+                                                        <span>Описание</span>
+                                                        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-xs text-slate-600">
+                                                            <span v-if="amenityNotes[amenity.id]">✎</span>
+                                                            <span v-else>＋</span>
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p v-else class="text-sm text-slate-500">
+                                            Добавьте индивидуальные опции для этой площадки.
+                                        </p>
+                                        <p v-if="actionError.custom_amenities" class="text-xs text-rose-700">
+                                            {{ actionError.custom_amenities }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <hr class="border-slate-200/80" />
+                            </div>
+
                             <div class="flex flex-wrap items-center justify-end gap-3">
                                 <button
                                     type="submit"
@@ -589,6 +863,51 @@ const submit = () => {
             </main>
 
             <MainFooter :app-name="appName" />
+        </div>
+
+        <div
+            v-if="descriptionModalOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+        >
+            <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="text-lg font-semibold text-slate-900">
+                        Описание опции
+                    </h3>
+                    <button
+                        type="button"
+                        class="text-slate-400 transition hover:text-slate-600"
+                        @click="closeDescriptionModal"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <p class="mt-2 text-sm text-slate-600">
+                    {{ descriptionAmenity?.name || '' }}
+                </p>
+                <textarea
+                    v-model="descriptionDraft"
+                    rows="4"
+                    class="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                    placeholder="Краткое описание (например: бесплатная, рядом со входом)"
+                ></textarea>
+                <div class="mt-4 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300"
+                        @click="closeDescriptionModal"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        @click="saveDescription"
+                    >
+                        Сохранить
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </template>

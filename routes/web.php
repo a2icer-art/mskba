@@ -16,6 +16,7 @@ use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUsersController;
 use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
+use App\Http\Controllers\AdminVenuesController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\Integrations\UserSuggestController;
@@ -182,6 +183,9 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/settings', [VenuesController::class, 'updateSettings'])
         ->middleware('auth')
         ->name('venues.settings.update');
+    Route::post('/{type}/{venue}/admin/settings/amenities/{amenity}/icon', [VenuesController::class, 'uploadCustomAmenityIcon'])
+        ->middleware('auth')
+        ->name('venues.settings.amenities.icon');
     Route::get('/{type}/{venue}/admin/media', [VenuesController::class, 'media'])
         ->middleware('auth')
         ->name('venues.media');
@@ -256,6 +260,15 @@ Route::middleware(['auth', 'can:seo.manage', 'confirmed.role:10'])->prefix('admi
 });
 
 Route::middleware(['auth', 'can:admin.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
+    Route::get('/venues', [AdminVenuesController::class, 'index'])->name('admin.venues');
+    Route::post('/venues/amenities', [AdminVenuesController::class, 'storeAmenity'])
+        ->name('admin.venues.amenities.store');
+    Route::patch('/venues/amenities/{amenity}', [AdminVenuesController::class, 'updateAmenity'])
+        ->name('admin.venues.amenities.update');
+    Route::delete('/venues/amenities/{amenity}', [AdminVenuesController::class, 'destroyAmenity'])
+        ->name('admin.venues.amenities.destroy');
+    Route::post('/venues/amenities/{amenity}/icon', [AdminVenuesController::class, 'uploadAmenityIcon'])
+        ->name('admin.venues.amenities.icon');
     Route::get('/users', [AdminUsersController::class, 'index'])->name('admin.users');
     Route::post('/users/{user}/contacts/{contact}/reset-confirmation', [AdminUsersController::class, 'resetContactConfirmation'])
         ->name('admin.users.contacts.reset');

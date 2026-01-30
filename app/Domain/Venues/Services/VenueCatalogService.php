@@ -10,6 +10,7 @@ use App\Domain\Contracts\Models\Contract;
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Support\DateFormatter;
 use App\Domain\Venues\Models\VenueSettings;
+use App\Domain\Venues\Services\AmenityIconService;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -93,11 +94,16 @@ class VenueCatalogService
     private function getHalls(?User $user, ?string $avatarPlaceholderUrl = null): array
     {
         $mediaService = app(MediaService::class);
+        $amenityIcons = app(AmenityIconService::class);
         $query = Venue::query()
             ->with([
                 'venueType:id,name,alias',
                 'latestAddress.metro:id,name,line_name,line_color,city',
                 'settings',
+                'amenities' => function ($query) {
+                    $query->where('is_active', true)
+                        ->select(['amenities.id', 'amenities.name', 'amenities.alias', 'amenities.icon_path', 'amenities.is_custom', 'amenities.sort_order']);
+                },
                 'media' => function ($query) {
                     $query->where('is_avatar', true)
                         ->select(['id', 'mediable_id', 'mediable_type', 'disk', 'path', 'is_avatar']);
@@ -112,7 +118,7 @@ class VenueCatalogService
         $myVenueLookup = array_fill_keys($myVenueIds, true);
 
         return $venues
-            ->map(function (Venue $venue) use ($myVenueLookup, $mediaService, $avatarPlaceholderUrl) {
+            ->map(function (Venue $venue) use ($myVenueLookup, $mediaService, $avatarPlaceholderUrl, $amenityIcons) {
                 $settings = $venue->settings;
                 $avatar = $venue->media->first();
                 $avatarUrl = $avatar ? $mediaService->toPublicUrl($avatar) : $avatarPlaceholderUrl;
@@ -126,6 +132,32 @@ class VenueCatalogService
                 if ($basePrice > 0) {
                     $commission = $isFixed ? max(0, $feeAmount) : (int) round($basePrice * max(0, $feePercent) / 100);
                 }
+
+                $sortedAmenities = $venue->amenities
+                    ? $venue->amenities->sortBy(fn ($amenity) => sprintf(
+                        '%d-%05d-%s',
+                        $amenity->is_custom ? 0 : 1,
+                        (int) ($amenity->sort_order ?? 0),
+                        $amenity->name
+                    ))
+                    : collect();
+
+                $amenityIds = $sortedAmenities
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
+
+                $amenities = $sortedAmenities
+                    ->take(10)
+                    ->map(fn ($amenity) => [
+                        'id' => $amenity->id,
+                        'name' => $amenity->name,
+                        'alias' => $amenity->alias,
+                        'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+                    ])
+                    ->values()
+                    ->all();
 
                 return [
                     'id' => $venue->id,
@@ -145,6 +177,8 @@ class VenueCatalogService
                     'supervisor_fee_percent' => $feePercent,
                     'supervisor_fee_amount_rub' => $feeAmount,
                     'price_with_fee_rub' => $basePrice > 0 ? ($basePrice + $commission) : 0,
+                    'amenities' => $amenities,
+                    'amenity_ids' => $amenityIds,
                 ];
             })
             ->values()

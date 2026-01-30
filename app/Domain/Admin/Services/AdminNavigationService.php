@@ -77,6 +77,10 @@ class AdminNavigationService
 
         if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)) {
             $systemItems[] = [
+                'label' => 'Площадки',
+                'href' => '/admin/venues',
+            ];
+            $systemItems[] = [
                 'label' => 'Настройки',
                 'href' => '/admin/settings',
             ];

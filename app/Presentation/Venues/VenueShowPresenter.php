@@ -8,6 +8,7 @@ use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Media\Models\Media;
 use App\Domain\Media\Services\MediaService;
+use App\Domain\Venues\Services\AmenityIconService;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
@@ -42,6 +43,7 @@ class VenueShowPresenter extends BasePresenter
         $address = $venue->latestAddress;
 
         $mediaService = app(MediaService::class);
+        $amenityIcons = app(AmenityIconService::class);
         $featuredMedia = $venue->media()
             ->where('is_featured', true)
             ->orderByDesc('id')
@@ -54,6 +56,19 @@ class VenueShowPresenter extends BasePresenter
             ])
             ->values()
             ->all();
+
+        $amenities = $venue->amenities
+            ? $venue->amenities
+                ->map(fn ($amenity) => [
+                    'id' => $amenity->id,
+                    'name' => $amenity->name,
+                    'alias' => $amenity->alias,
+                    'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+                    'description' => $amenity->pivot?->note,
+                ])
+                ->values()
+                ->all()
+            : [];
 
         $totalMediaCount = Media::query()
             ->where('mediable_type', $venue->getMorphClass())
@@ -118,6 +133,7 @@ class VenueShowPresenter extends BasePresenter
             'featuredMedia' => $featuredMedia,
             'featuredMediaCount' => $featuredMediaCount,
             'totalMediaCount' => $totalMediaCount,
+            'amenities' => $amenities,
         ];
     }
 }

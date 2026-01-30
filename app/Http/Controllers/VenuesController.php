@@ -33,15 +33,18 @@ use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Domain\Venues\Enums\VenueBookingMode;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
+use App\Domain\Venues\Models\Amenity;
 use App\Domain\Venues\Models\VenueSchedule;
 use App\Domain\Venues\Models\VenueScheduleException;
 use App\Domain\Venues\Models\VenueScheduleExceptionInterval;
 use App\Domain\Venues\Models\VenueScheduleInterval;
 use App\Domain\Venues\Services\VenueCatalogService;
+use App\Domain\Venues\Services\AmenityIconService;
 use App\Domain\Admin\Services\SiteAssetsService;
 use App\Domain\Venues\Services\VenueAboutDataBuilder;
 use App\Domain\Venues\UseCases\CreateVenue;
 use App\Domain\Venues\UseCases\UpdateVenue;
+use App\Domain\Venues\UseCases\UpdateVenueAmenities;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
 use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Users\Enums\UserStatus;
@@ -77,6 +80,20 @@ class VenuesController extends Controller
         $catalog = app(VenueCatalogService::class);
         $assets = $siteAssets->get();
         $catalogData = $catalog->getHallsList(null, $user, $assets['avatar_placeholder_url'] ?? null);
+        $amenityIcons = app(AmenityIconService::class);
+        $amenities = Amenity::query()
+            ->where('is_active', true)
+            ->orderBy('is_custom')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'alias', 'icon_path'])
+            ->map(fn (Amenity $amenity) => [
+                'id' => $amenity->id,
+                'name' => $amenity->name,
+                'alias' => $amenity->alias,
+                'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+            ])
+            ->all();
         $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present()['data'];
 
         return Inertia::render('Venues', [
@@ -86,6 +103,7 @@ class VenuesController extends Controller
             'activeTypeSlug' => $catalogData['activeTypeSlug'],
             'navigation' => $navigation,
             'types' => $types,
+            'amenities' => $amenities,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
             'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
@@ -104,6 +122,20 @@ class VenuesController extends Controller
         $types = app(VenueTypeOptionsPresenter::class)->present()['data'];
         $assets = $siteAssets->get();
         $catalogData = $catalog->getHallsList($type, $user, $assets['avatar_placeholder_url'] ?? null);
+        $amenityIcons = app(AmenityIconService::class);
+        $amenities = Amenity::query()
+            ->where('is_active', true)
+            ->orderBy('is_custom')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'alias', 'icon_path'])
+            ->map(fn (Amenity $amenity) => [
+                'id' => $amenity->id,
+                'name' => $amenity->name,
+                'alias' => $amenity->alias,
+                'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+            ])
+            ->all();
         $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
             'typeSlug' => $type,
         ])['data'];
@@ -119,6 +151,7 @@ class VenuesController extends Controller
             'activeTypeSlug' => $catalogData['activeTypeSlug'],
             'navigation' => $navigation,
             'types' => $types,
+            'amenities' => $amenities,
             'metros' => app(MetroOptionsPresenter::class)->present()['data'],
             'mapApiKey' => config('integrations.yandex.api_key'),
             'breadcrumbs' => $breadcrumbs,
@@ -137,6 +170,10 @@ class VenuesController extends Controller
             'venueType:id,name,plural_name,alias',
             'creator:id,login',
             'latestAddress.metro:id,name,line_name,line_color,city',
+            'amenities' => function ($query) {
+                $query->where('is_active', true)
+                    ->select(['amenities.id', 'amenities.name', 'amenities.alias', 'amenities.icon_path']);
+            },
             'media' => function ($query) {
                 $query->where('is_featured', true)
                     ->select(['id', 'mediable_id', 'mediable_type', 'title', 'description', 'disk', 'path', 'is_featured']);
@@ -862,7 +899,7 @@ class VenuesController extends Controller
         return back()->with('notice', 'Настройки супервайзера сохранены.');
     }
 
-    public function settings(Request $request, string $type, Venue $venue)
+    public function settings(Request $request, string $type, Venue $venue, AmenityIconService $amenityIcons)
     {
         $user = $request->user();
         if (!$user) {
@@ -913,6 +950,43 @@ class VenuesController extends Controller
             ]
         );
 
+        $standardAmenities = Amenity::query()
+            ->where('is_custom', false)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'alias', 'icon_path'])
+            ->map(fn (Amenity $amenity) => [
+                'id' => $amenity->id,
+                'name' => $amenity->name,
+                'alias' => $amenity->alias,
+                'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+            ])
+            ->all();
+
+        $customAmenities = Amenity::query()
+            ->where('is_custom', true)
+            ->where('venue_id', $venue->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'alias', 'icon_path'])
+            ->map(fn (Amenity $amenity) => [
+                'id' => $amenity->id,
+                'name' => $amenity->name,
+                'alias' => $amenity->alias,
+                'icon_url' => $amenityIcons->getUrl($amenity->icon_path),
+            ])
+            ->all();
+
+        $selectedAmenityIds = $venue->amenities()
+            ->pluck('amenities.id')
+            ->all();
+
+        $amenityNotes = $venue->venueAmenities()
+            ->whereNull('deleted_at')
+            ->get(['amenity_id', 'note'])
+            ->mapWithKeys(fn ($item) => [(int) $item->amenity_id => $item->note])
+            ->all();
+
         $paymentOrders = PaymentOrder::query()
             ->orderBy('label')
             ->get(['id', 'label'])
@@ -944,6 +1018,10 @@ class VenuesController extends Controller
                 'supervisor_fee_amount_rub' => $settings->supervisor_fee_amount_rub ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
                 'supervisor_fee_is_fixed' => $settings->supervisor_fee_is_fixed ?? VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
             ],
+            'amenities' => $standardAmenities,
+            'customAmenities' => $customAmenities,
+            'selectedAmenityIds' => $selectedAmenityIds,
+            'amenityNotes' => $amenityNotes,
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
             'canManageMedia' => $checker->can($user, PermissionCode::VenueMediaManage, $venue),
@@ -1054,7 +1132,7 @@ class VenuesController extends Controller
         ]);
     }
 
-    public function updateSettings(Request $request, string $type, Venue $venue)
+    public function updateSettings(Request $request, string $type, Venue $venue, UpdateVenueAmenities $updateAmenities)
     {
         $user = $request->user();
         if (!$user) {
@@ -1091,6 +1169,14 @@ class VenuesController extends Controller
             'pending_review_is_minutes' => ['nullable', 'boolean'],
             'pending_before_start_is_minutes' => ['nullable', 'boolean'],
             'pending_warning_is_minutes' => ['nullable', 'boolean'],
+                        'amenity_ids' => ['nullable', 'array'],
+                        'amenity_ids.*' => ['integer', 'exists:amenities,id'],
+                        'custom_amenities' => ['nullable', 'array'],
+                        'custom_amenities.*' => ['string', 'max:60'],
+                        'custom_amenities_removed' => ['nullable', 'array'],
+                        'custom_amenities_removed.*' => ['integer', 'exists:amenities,id'],
+                        'amenity_notes' => ['nullable', 'array'],
+                        'amenity_notes.*' => ['nullable', 'string', 'max:2000'],
         ],
         [
             'booking_lead_time_minutes.required' => 'Укажите допустимое время до начала бронирования.',
@@ -1114,6 +1200,8 @@ class VenuesController extends Controller
             'pending_before_start_minutes.numeric' => 'Срок автоотмены до начала должен быть числом.',
             'pending_warning_minutes.required' => 'Укажите срок предупреждения автоотмены.',
             'pending_warning_minutes.numeric' => 'Срок предупреждения автоотмены должен быть числом.',
+                        'custom_amenities.*.max' => 'Название опции не должно превышать 60 символов.',
+            'amenity_notes.*.max' => 'Описание опции не должно превышать 2000 символов.',
         ]
     );
 
@@ -1189,7 +1277,50 @@ class VenuesController extends Controller
             ]
         );
 
+        $amenityIds = array_map('intval', $data['amenity_ids'] ?? []);
+        $customAmenities = array_values(array_filter($data['custom_amenities'] ?? [], 'is_string'));
+        $removedCustomIds = array_map('intval', $data['custom_amenities_removed'] ?? []);
+
+        $notes = array_filter($data['amenity_notes'] ?? [], static fn ($value) => $value !== null);
+
+        $updateAmenities->execute($user, $venue, $amenityIds, $customAmenities, $removedCustomIds, $notes);
+
         return back()->with('notice', 'Настройки площадки обновлены.');
+    }
+
+    public function uploadCustomAmenityIcon(Request $request, string $type, Venue $venue, Amenity $amenity, AmenityIconService $icons)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        if (!$amenity->is_custom || $amenity->venue_id !== $venue->id) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'icon' => ['required', 'file', 'mimes:svg,png,jpg,jpeg,webp', 'max:2048'],
+        ], [
+            'icon.required' => 'Выберите файл иконки.',
+            'icon.mimes' => 'Поддерживаются форматы svg, png, jpg, webp.',
+            'icon.max' => 'Размер иконки не должен превышать 2 МБ.',
+        ]);
+
+        $icons->upload($amenity, $data['icon'], $user);
+
+        return back()->with('notice', 'Иконка обновлена.');
     }
 
     

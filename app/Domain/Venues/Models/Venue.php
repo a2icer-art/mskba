@@ -7,11 +7,14 @@ use App\Domain\Addresses\Models\Address;
 use App\Domain\Media\Models\Media;
 use App\Domain\Venues\Builders\VenueQueryBuilder;
 use App\Domain\Venues\Enums\VenueStatus;
+use App\Domain\Venues\Models\Amenity;
+use App\Domain\Venues\Models\VenueAmenity;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -80,6 +83,18 @@ class Venue extends Model
     public function media(): MorphMany
     {
         return $this->morphMany(Media::class, 'mediable');
+    }
+
+    public function amenities(): BelongsToMany
+    {
+        return $this->belongsToMany(Amenity::class, 'venue_amenities')
+            ->withPivot(['note', 'created_by', 'updated_by', 'deleted_by', 'deleted_at'])
+            ->wherePivotNull('deleted_at');
+    }
+
+    public function venueAmenities(): HasMany
+    {
+        return $this->hasMany(VenueAmenity::class);
     }
 
     public function creator(): BelongsTo

@@ -36,6 +36,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    amenities: {
+        type: Array,
+        default: () => [],
+    },
     mapApiKey: {
         type: String,
         default: '',
@@ -88,6 +92,7 @@ let venueSuggestTimer = null;
 let venueSuggestRequestId = 0;
 const myVenuesOnly = ref(false);
 const groupByType = ref(false);
+const amenityFilterIds = ref([]);
 const mapOpen = ref(false);
 const mapTarget = ref(null);
 const mapRef = ref(null);
@@ -123,6 +128,7 @@ const statusOptions = [
     { value: 'blocked', label: 'Заблокированные' },
 ];
 
+const amenityOptions = computed(() => props.amenities ?? []);
 const availableTypes = computed(() => props.types ?? []);
 const activeTypeOption = computed(() => availableTypes.value.find((type) => type.alias === props.activeType) ?? null);
 const addButtonLabel = computed(() => {
@@ -337,6 +343,7 @@ const clearVenueSelection = () => {
 
 const filtered = computed(() => {
     const searchNeedle = normalized(venueQuery.value);
+    const selectedAmenityIds = amenityFilterIds.value.map((id) => Number(id));
 
     return props.venues.filter((hall) => {
         if (props.activeType && hall.type?.alias !== props.activeType) {
@@ -364,6 +371,17 @@ const filtered = computed(() => {
             }
         }
 
+        if (selectedAmenityIds.length) {
+            const hallAmenityIds = (hall.amenity_ids ?? hall.amenities?.map((amenity) => amenity.id) ?? []).map((id) =>
+                Number(id)
+            );
+            const hallAmenitySet = new Set(hallAmenityIds);
+            const hasAllAmenities = selectedAmenityIds.every((amenityId) => hallAmenitySet.has(amenityId));
+            if (!hasAllAmenities) {
+                return false;
+            }
+        }
+
         return true;
     });
 });
@@ -382,7 +400,7 @@ const sorted = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / perPage)));
 
-watch([statusFilter, venueQuery, venueFilterId, myVenuesOnly, groupByType], () => {
+watch([statusFilter, venueQuery, venueFilterId, myVenuesOnly, groupByType, amenityFilterIds], () => {
     pageIndex.value = 1;
 });
 
@@ -653,6 +671,34 @@ const applyAddressSuggestion = (suggestion) => {
                                 />
                                 Мои площадки
                             </label>
+                            <div v-if="amenityOptions.length" class="pt-1">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                    Удобства
+                                </div>
+                                <div class="mt-2 flex flex-col gap-2">
+                                    <label
+                                        v-for="amenity in amenityOptions"
+                                        :key="amenity.id"
+                                        class="flex items-center gap-2 text-sm text-slate-700"
+                                    >
+                                        <input
+                                            v-model="amenityFilterIds"
+                                            class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                            type="checkbox"
+                                            :value="amenity.id"
+                                        />
+                                        <span class="flex items-center gap-2">
+                                            <img
+                                                v-if="amenity.icon_url"
+                                                :src="amenity.icon_url"
+                                                alt=""
+                                                class="h-5 w-5 rounded-full border border-slate-200 bg-white p-0.5"
+                                            />
+                                            <span>{{ amenity.name }}</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </details>
                 </MainSidebar>
@@ -764,6 +810,17 @@ const applyAddressSuggestion = (suggestion) => {
                                                     ></span>
                                                 </span>
                                                 <span>{{ formatMetroLabel(hall.metro) }}</span>
+                                            </div>
+                                            <div v-if="hall.amenities?.length" class="mt-3 flex flex-wrap gap-2">
+                                                <template v-for="amenity in hall.amenities" :key="amenity.id">
+                                                    <img
+                                                        v-if="amenity.icon_url"
+                                                        :src="amenity.icon_url"
+                                                        :alt="amenity.name"
+                                                        :title="amenity.name"
+                                                        class="h-6 w-6 rounded-full border border-slate-200 bg-white p-1"
+                                                    />
+                                                </template>
                                             </div>
                                         </div>
                                     </div>

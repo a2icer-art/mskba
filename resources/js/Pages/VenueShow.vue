@@ -65,6 +65,10 @@ const props = defineProps({
         type: Number,
         default: 0,
     },
+    amenities: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const page = usePage();
@@ -175,6 +179,7 @@ watch(
 );
 
 const hasGallery = computed(() => (props.featuredMedia?.length ?? 0) > 0);
+const hasAmenities = computed(() => (props.amenities?.length ?? 0) > 0);
 const showAllMediaLink = computed(() => (props.totalMediaCount ?? 0) > (props.featuredMediaCount ?? 0));
 const mediaAllUrl = computed(() => {
     if (!props.activeTypeSlug || !props.venue?.alias) {
@@ -210,12 +215,13 @@ const prevLightbox = () => {
 };
 const baseAnchorSections = [
     { id: 'address', label: 'Адрес' },
+    { id: 'amenities', label: 'Опции' },
     { id: 'schedule', label: 'Расписание' },
     { id: 'posts', label: 'Посты' },
     { id: 'reviews', label: 'Отзывы' },
 ];
 const anchorSections = computed(() => {
-    const sections = [...baseAnchorSections];
+    const sections = baseAnchorSections.filter((section) => section.id !== 'amenities' || hasAmenities.value);
     if (hasGallery.value) {
         sections.unshift({ id: 'gallery', label: 'Галерея' });
     }
@@ -866,6 +872,41 @@ const submitModerationRequest = () => {
                                     >
                                         Маршрут
                                     </a>
+                                </div>
+                            </section>
+
+                            <section
+                                v-if="hasAmenities"
+                                id="amenities"
+                                :ref="setSectionRef('amenities')"
+                                class="scroll-mt-24 space-y-4"
+                            >
+                                <div class="flex items-center justify-between gap-3">
+                                    <h2 class="text-lg font-semibold text-slate-900">Опции площадки</h2>
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-400">Удобства</span>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div
+                                        v-for="amenity in amenities"
+                                        :key="amenity.id"
+                                        class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                                    >
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+                                            <img
+                                                v-if="amenity.icon_url"
+                                                :src="amenity.icon_url"
+                                                :alt="amenity.name"
+                                                class="h-6 w-6 object-contain"
+                                            />
+                                            <span v-else class="text-[10px] text-slate-400">нет</span>
+                                        </div>
+                                        <div class="space-y-1">
+                                            <span class="text-sm font-semibold text-slate-700">{{ amenity.name }}</span>
+                                            <p v-if="amenity.description" class="text-xs text-slate-600">
+                                                {{ amenity.description }}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
