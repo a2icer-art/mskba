@@ -133,7 +133,15 @@ class VenuesController extends Controller
             ->visibleFor($user)
             ->whereKey($venue->id)
             ->firstOrFail();
-        $venue->load(['venueType:id,name,plural_name,alias', 'creator:id,login', 'latestAddress.metro:id,name,line_name,line_color,city']);
+        $venue->load([
+            'venueType:id,name,plural_name,alias',
+            'creator:id,login',
+            'latestAddress.metro:id,name,line_name,line_color,city',
+            'media' => function ($query) {
+                $query->where('is_featured', true)
+                    ->select(['id', 'mediable_id', 'mediable_type', 'title', 'description', 'disk', 'path', 'is_featured']);
+            },
+        ]);
 
         $data = app(VenueShowPresenter::class)->present([
             'user' => $user,
@@ -1018,6 +1026,31 @@ class VenuesController extends Controller
             'activeHref' => "/venues/{$type}/{$venue->alias}/admin/media",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function mediaPublic(Request $request, string $type, Venue $venue)
+    {
+        $venue = Venue::query()
+            ->visibleFor($request->user())
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Медиа',
+        ])['data'];
+
+        return Inertia::render('VenueMediaPublic', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'breadcrumbs' => $breadcrumbs,
+            'activeTypeSlug' => $type,
         ]);
     }
 

@@ -6,6 +6,8 @@ use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Venues\Models\Venue;
+use App\Domain\Media\Models\Media;
+use App\Domain\Media\Services\MediaService;
 use App\Domain\Venues\Services\VenueEditPolicy;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
@@ -38,6 +40,31 @@ class VenueShowPresenter extends BasePresenter
             ->first(['status', 'submitted_at', 'reviewed_at', 'reject_reason']);
 
         $address = $venue->latestAddress;
+
+        $mediaService = app(MediaService::class);
+        $featuredMedia = $venue->media()
+            ->where('is_featured', true)
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'description', 'disk', 'path', 'is_featured'])
+            ->map(fn ($media) => [
+                'id' => $media->id,
+                'title' => $media->title,
+                'description' => $media->description,
+                'url' => $media->path ? $mediaService->toPublicUrl($media) : null,
+            ])
+            ->values()
+            ->all();
+
+        $totalMediaCount = Media::query()
+            ->where('mediable_type', $venue->getMorphClass())
+            ->where('mediable_id', $venue->id)
+            ->count();
+
+        $featuredMediaCount = Media::query()
+            ->where('mediable_type', $venue->getMorphClass())
+            ->where('mediable_id', $venue->id)
+            ->where('is_featured', true)
+            ->count();
 
         return [
             'venue' => [
@@ -88,6 +115,9 @@ class VenueShowPresenter extends BasePresenter
             'editableFields' => $editableFields,
             'canEdit' => (bool) ($isOwner || $canEditByPermission),
             'canSubmitModeration' => $canSubmitModeration,
+            'featuredMedia' => $featuredMedia,
+            'featuredMediaCount' => $featuredMediaCount,
+            'totalMediaCount' => $totalMediaCount,
         ];
     }
 }

@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import EventCreateModal from '../Components/EventCreateModal.vue';
@@ -52,6 +52,18 @@ const props = defineProps({
     breadcrumbs: {
         type: Array,
         default: () => [],
+    },
+    featuredMedia: {
+        type: Array,
+        default: () => [],
+    },
+    featuredMediaCount: {
+        type: Number,
+        default: 0,
+    },
+    totalMediaCount: {
+        type: Number,
+        default: 0,
     },
 });
 
@@ -162,13 +174,54 @@ watch(
     }
 );
 
-const anchorSections = [
+const hasGallery = computed(() => (props.featuredMedia?.length ?? 0) > 0);
+const showAllMediaLink = computed(() => (props.totalMediaCount ?? 0) > (props.featuredMediaCount ?? 0));
+const mediaAllUrl = computed(() => {
+    if (!props.activeTypeSlug || !props.venue?.alias) {
+        return '';
+    }
+    return `/venues/${props.activeTypeSlug}/${props.venue.alias}/media`;
+});
+const lightboxOpen = ref(false);
+const lightboxIndex = ref(0);
+const lightboxItem = computed(() => props.featuredMedia?.[lightboxIndex.value] ?? null);
+
+const openLightbox = (index) => {
+    lightboxIndex.value = index;
+    lightboxOpen.value = true;
+    document.body.style.overflow = 'hidden';
+};
+
+const closeLightbox = () => {
+    lightboxOpen.value = false;
+    document.body.style.overflow = '';
+};
+
+const nextLightbox = () => {
+    const count = props.featuredMedia?.length ?? 0;
+    if (!count) return;
+    lightboxIndex.value = (lightboxIndex.value + 1) % count;
+};
+
+const prevLightbox = () => {
+    const count = props.featuredMedia?.length ?? 0;
+    if (!count) return;
+    lightboxIndex.value = (lightboxIndex.value - 1 + count) % count;
+};
+const baseAnchorSections = [
     { id: 'address', label: 'Адрес' },
     { id: 'schedule', label: 'Расписание' },
     { id: 'posts', label: 'Посты' },
     { id: 'reviews', label: 'Отзывы' },
 ];
-const activeSectionId = ref('address');
+const anchorSections = computed(() => {
+    const sections = [...baseAnchorSections];
+    if (hasGallery.value) {
+        sections.unshift({ id: 'gallery', label: 'Галерея' });
+    }
+    return sections;
+});
+const activeSectionId = ref(anchorSections.value[0]?.id ?? 'address');
 const sectionRefs = ref({});
 const setSectionRef = (id) => (element) => {
     if (element) {
@@ -222,9 +275,9 @@ const updateActiveSection = () => {
         if (anchorNavHeight.value > 0) {
             isAnchorSticky.value = window.scrollY >= stickyThreshold;
         }
-        let current = anchorSections[0]?.id ?? '';
+        let current = anchorSections.value[0]?.id ?? '';
         const offset = headerOffset.value + anchorNavHeight.value + 24;
-        anchorSections.forEach((section) => {
+        anchorSections.value.forEach((section) => {
             const element = sectionRefs.value[section.id];
             if (!element) {
                 return;
@@ -239,6 +292,17 @@ const updateActiveSection = () => {
         }
     });
 };
+
+watch(
+    () => anchorSections.value.map((section) => section.id).join(','),
+    () => {
+        activeSectionId.value = anchorSections.value[0]?.id ?? 'address';
+        nextTick(() => {
+            refreshAnchorMetrics();
+            updateActiveSection();
+        });
+    }
+);
 
 onMounted(() => {
     nextTick(() => {
@@ -259,6 +323,7 @@ onBeforeUnmount(() => {
         window.cancelAnimationFrame(scrollFrame);
         scrollFrame = null;
     }
+    document.body.style.overflow = '';
 });
 
 const selectedDay = ref(null);
@@ -684,6 +749,9 @@ const submitModerationRequest = () => {
                                 <span class="font-semibold">{{ ratingValue }}</span>
                                 <span v-if="ratingCount !== null" class="text-slate-500">({{ ratingCount }} отзывов)</span>
                             </div>
+                            <p v-if="venue?.commentary" class="mt-2 text-sm text-slate-600">
+                                {{ venue.commentary }}
+                            </p>
                         </div>
                         <button
                             v-if="canEdit"
@@ -727,7 +795,49 @@ const submitModerationRequest = () => {
                         </div>
 
                         <div class="mt-6 space-y-10">
-                            <section :id="anchorSections[0].id" :ref="setSectionRef('address')" class="scroll-mt-24 space-y-4">
+                            <section
+                                v-if="hasGallery"
+                                id="gallery"
+                                :ref="setSectionRef('gallery')"
+                                class="scroll-mt-24 space-y-4"
+                            >
+                                <div class="flex items-center justify-between gap-3">
+                                    <h2 class="text-lg font-semibold text-slate-900">Галерея</h2>
+                                    <Link
+                                        v-if="showAllMediaLink"
+                                        :href="mediaAllUrl"
+                                        class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500 transition hover:text-slate-900"
+                                    >
+                                        Смотреть все
+                                    </Link>
+                                </div>
+                                <div class="flex gap-4 overflow-x-auto pb-2">
+                                    <div
+                                        v-for="item in featuredMedia"
+                                        :key="item.id"
+                                        class="min-w-full flex-shrink-0 sm:min-w-[calc(50%-0.5rem)] lg:min-w-[calc(33.333%-0.666rem)]"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-left transition hover:shadow-md"
+                                            @click="openLightbox(featuredMedia.findIndex((media) => media.id === item.id))"
+                                        >
+                                            <img
+                                                v-if="item.url"
+                                                :src="item.url"
+                                                :alt="item.title || ''"
+                                                class="h-56 w-full object-cover"
+                                            />
+                                            <div v-if="item.title || item.description" class="space-y-1 px-4 py-3">
+                                                <p v-if="item.title" class="text-sm font-semibold text-slate-900">{{ item.title }}</p>
+                                                <p v-if="item.description" class="text-xs text-slate-600">{{ item.description }}</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section id="address" :ref="setSectionRef('address')" class="scroll-mt-24 space-y-4">
                                 <div class="flex items-center justify-between gap-3">
                                     <h2 class="text-lg font-semibold text-slate-900">Адрес</h2>
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-400">Карта</span>
@@ -1284,5 +1394,52 @@ const submitModerationRequest = () => {
             :initial-mode="authMode"
             @close="showAuthModal = false"
         />
+
+        <teleport to="body">
+            <div
+                v-if="lightboxOpen"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4"
+                @click.self="closeLightbox"
+            >
+                <div class="relative w-full max-w-4xl">
+                    <button
+                        type="button"
+                        class="absolute right-2 top-2 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-slate-700"
+                        @click="closeLightbox"
+                    >
+                        Закрыть
+                    </button>
+                    <div class="overflow-hidden rounded-3xl bg-white">
+                        <img
+                            v-if="lightboxItem?.url"
+                            :src="lightboxItem.url"
+                            :alt="lightboxItem?.title || ''"
+                            class="max-h-[80vh] w-full object-contain"
+                        />
+                        <div v-if="lightboxItem?.title || lightboxItem?.description" class="space-y-1 px-6 py-4">
+                            <p v-if="lightboxItem?.title" class="text-base font-semibold text-slate-900">{{ lightboxItem.title }}</p>
+                            <p v-if="lightboxItem?.description" class="text-sm text-slate-600">{{ lightboxItem.description }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-sm text-white">
+                        <button
+                            type="button"
+                            class="rounded-full bg-white/10 px-4 py-2 text-white"
+                            @click.stop="prevLightbox"
+                        >
+                            Назад
+                        </button>
+                        <div>{{ lightboxIndex + 1 }} / {{ featuredMedia.length }}</div>
+                        <button
+                            type="button"
+                            class="rounded-full bg-white/10 px-4 py-2 text-white"
+                            @click.stop="nextLightbox"
+                        >
+                            Вперёд
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </teleport>
     </div>
 </template>

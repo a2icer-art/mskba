@@ -31,6 +31,11 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/media', function () {
+    return Inertia::render('MediaPublic', [
+        'appName' => config('app.name'),
+    ]);
+})->name('media.index');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
@@ -180,6 +185,8 @@ Route::prefix('venues')->group(function () {
     Route::get('/{type}/{venue}/admin/media', [VenuesController::class, 'media'])
         ->middleware('auth')
         ->name('venues.media');
+    Route::get('/{type}/{venue}/media', [VenuesController::class, 'mediaPublic'])
+        ->name('venues.media.public');
     Route::post('/{type}/{venue}/media', [MediaController::class, 'store'])
         ->middleware('auth')
         ->name('venues.media.store');
