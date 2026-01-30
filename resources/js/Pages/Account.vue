@@ -332,7 +332,7 @@ const openTelegramLink = (link) => {
     if (!link) {
         return;
     }
-    window.location.href = link;
+    window.open(link, '_blank', 'noopener');
 };
 const applyTelegramFlash = (payload) => {
     if (!payload || !payload.contact_id || !payload.link) {
