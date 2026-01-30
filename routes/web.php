@@ -23,6 +23,7 @@ use App\Http\Controllers\Integrations\VenueSuggestController;
 use App\Http\Controllers\Integrations\TelegramWebhookController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\VenuesController;
+use App\Http\Controllers\MediaController;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Broadcast;
@@ -176,6 +177,24 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/settings', [VenuesController::class, 'updateSettings'])
         ->middleware('auth')
         ->name('venues.settings.update');
+    Route::get('/{type}/{venue}/admin/media', [VenuesController::class, 'media'])
+        ->middleware('auth')
+        ->name('venues.media');
+    Route::post('/{type}/{venue}/media', [MediaController::class, 'store'])
+        ->middleware('auth')
+        ->name('venues.media.store');
+    Route::patch('/{type}/{venue}/media/{media}', [MediaController::class, 'update'])
+        ->middleware('auth')
+        ->name('venues.media.update');
+    Route::delete('/{type}/{venue}/media/{media}', [MediaController::class, 'destroy'])
+        ->middleware('auth')
+        ->name('venues.media.destroy');
+    Route::post('/{type}/{venue}/media/{media}/restore', [MediaController::class, 'restore'])
+        ->middleware('auth')
+        ->name('venues.media.restore');
+    Route::delete('/{type}/{venue}/media/{media}/force', [MediaController::class, 'forceDestroy'])
+        ->middleware('auth')
+        ->name('venues.media.force_destroy');
     Route::get('/{type}', [VenuesController::class, 'type'])->name('venues.type');
 });
 
@@ -321,7 +340,7 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
 Route::fallback(function (Request $request) {
     return Inertia::render('Error', [
         'status' => 404,
-        'message' => 'РЎС‚СЂР°РЅРёС†Р° РЅРµ РЅР°Р№РґРµРЅР°.',
+        'message' => 'Страница не найдена.',
         'appName' => config('app.name'),
     ])->toResponse($request)->setStatusCode(404);
 });

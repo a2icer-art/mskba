@@ -4,6 +4,7 @@ namespace App\Domain\Venues\Models;
 
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Addresses\Models\Address;
+use App\Domain\Media\Models\Media;
 use App\Domain\Venues\Builders\VenueQueryBuilder;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Venue extends Model
@@ -73,6 +75,11 @@ class Venue extends Model
     public function settings(): HasOne
     {
         return $this->hasOne(VenueSettings::class);
+    }
+
+    public function media(): MorphMany
+    {
+        return $this->morphMany(Media::class, 'mediable');
     }
 
     public function creator(): BelongsTo

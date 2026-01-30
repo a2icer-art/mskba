@@ -294,7 +294,18 @@ const submit = () => {
                     :title="navigation.title"
                     :data="navigationData"
                     :active-href="activeHref"
-                />
+                >
+                    <template #default>
+                        <div v-if="page.props.canManageMedia" class="pt-4">
+                            <a :href="`/venues/${activeTypeSlug}/${venue.alias}/admin/media`" class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.5A1.5 1.5 0 0016.5 6H12V5a2 2 0 00-2-2H4z" />
+                                </svg>
+                                <span>Медиа</span>
+                            </a>
+                        </div>
+                    </template>
+                </MainSidebar>
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />

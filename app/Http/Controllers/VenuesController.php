@@ -8,6 +8,8 @@ use App\Domain\Contracts\Models\Contract;
 use App\Domain\Contracts\Services\ContractManager;
 use App\Domain\Contracts\Services\ContractNotificationService;
 use App\Domain\Contracts\UseCases\SubmitVenueContractModerationRequest;
+use App\Domain\Media\Models\Media;
+use App\Domain\Media\Services\MediaService;
 use App\Domain\Moderation\Enums\ModerationEntityType;
 use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Moderation\Models\ModerationRequest;
@@ -931,7 +933,84 @@ class VenuesController extends Controller
             ],
             'paymentOrderOptions' => $paymentOrders,
             'navigation' => $navigation,
+            'canManageMedia' => $checker->can($user, PermissionCode::VenueMediaManage, $venue),
             'activeHref' => "/venues/{$type}/{$venue->alias}/admin/settings",
+            'activeTypeSlug' => $type,
+            'breadcrumbs' => $breadcrumbs,
+        ]);
+    }
+
+    public function media(Request $request, string $type, Venue $venue, MediaService $mediaService)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        $canManageMedia = $checker->can($user, PermissionCode::VenueMediaManage, $venue);
+        if (!$isAdmin && !$canManageMedia) {
+            abort(403);
+        }
+
+        $navigation = app(VenueSidebarPresenter::class)->present([
+            'title' => 'Площадки',
+            'typeSlug' => $type,
+            'venue' => $venue,
+            'user' => $user,
+        ]);
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Медиа',
+        ])['data'];
+
+        $mediaItems = $venue->media()
+            ->withTrashed()
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Media $media) use ($mediaService) {
+                return [
+                    'id' => $media->getKey(),
+                    'title' => $media->title,
+                    'description' => $media->description,
+                    'is_avatar' => (bool) $media->is_avatar,
+                    'is_featured' => (bool) $media->is_featured,
+                    'collection' => $media->collection,
+                    'path' => $media->path,
+                    'size' => $media->size,
+                    'mime' => $media->mime,
+                    'url' => $media->path ? $mediaService->toPublicUrl($media) : null,
+                    'created_at' => $media->created_at?->toDateTimeString(),
+                    'deleted_at' => $media->deleted_at?->toDateTimeString(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $mediaBaseUrl = "/venues/{$type}/{$venue->alias}/media";
+
+        return Inertia::render('VenueMedia', [
+            'appName' => config('app.name'),
+            'venue' => [
+                'id' => $venue->id,
+                'name' => $venue->name,
+                'alias' => $venue->alias,
+            ],
+            'media' => $mediaItems,
+            'mediaUrls' => [
+                'upload' => $mediaBaseUrl,
+                'base' => $mediaBaseUrl,
+            ],
+            'navigation' => $navigation,
+            'canManageMedia' => $canManageMedia,
+            'activeHref' => "/venues/{$type}/{$venue->alias}/admin/media",
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
         ]);

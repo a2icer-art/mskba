@@ -61,6 +61,8 @@ class VenueSidebarPresenter extends BasePresenter
         $canManageSettings = $this->canManageSettings($user, $venue);
         $canViewSupervisor = $this->canViewSupervisor($user, $venue);
         $canManageSchedule = $this->canManageSchedule($user, $venue);
+        $checker = app(PermissionChecker::class);
+        $canManageMedia = $checker->can($user, PermissionCode::VenueMediaManage, $venue);
 
         if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor || $canManageSchedule) {
             $adminItems = [];
@@ -92,6 +94,12 @@ class VenueSidebarPresenter extends BasePresenter
                 $adminItems[] = [
                     'label' => 'Настройки',
                     'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/settings",
+                ];
+            }
+            if ($canManageMedia) {
+                $adminItems[] = [
+                    'label' => 'Медиа',
+                    'href' => "/venues/{$typeSlug}/{$venue->alias}/admin/media",
                 ];
             }
 
