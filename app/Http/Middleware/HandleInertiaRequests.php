@@ -91,6 +91,7 @@ class HandleInertiaRequests extends Middleware
                 'notice' => session('notice'),
                 'error' => session('error'),
                 'info' => session('info'),
+                'telegram_verification' => session('telegram_verification'),
             ],
         ];
     }

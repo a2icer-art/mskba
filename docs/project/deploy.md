@@ -275,3 +275,11 @@ Reverb — сервер веб-сокетов Laravel. Он держит это 
 3) Если есть проблемы — откат:
    - revert в `main` или
    - `git reset --hard <commit>` на сервере (только если понимаешь последствия).
+
+### Telegram webhook (prod)
+Если используется подтверждение Telegram, webhook у бота один и должен указывать на prod.
+После деплоя на prod выполните:
+- `curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" -d "url=https://mskba.ru/telegram/webhook" -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"`
+
+Проверить текущий webhook:
+- `curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"`

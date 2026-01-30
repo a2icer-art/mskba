@@ -7,6 +7,7 @@ use App\Domain\Users\Models\UserContact;
 use App\Domain\Users\Services\ContactVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AccountContactsController extends Controller
 {
@@ -15,6 +16,12 @@ class AccountContactsController extends Controller
         $user = $request->user();
         $typeValues = array_map(fn (ContactType $type) => $type->value, ContactType::cases());
         $type = $request->input('type');
+
+        $value = (string) $request->input('value');
+        if ($type === ContactType::Telegram->value) {
+            $value = $this->normalizeTelegramValue($value);
+            $request->merge(['value' => $value]);
+        }
 
         $rules = [
             'type' => ['required', Rule::in($typeValues)],
@@ -60,6 +67,12 @@ class AccountContactsController extends Controller
             return back()->withErrors([
                 'contact' => 'Подтвержденный контакт нельзя редактировать.',
             ]);
+        }
+
+        $value = (string) $request->input('value');
+        if ($contact->type === ContactType::Telegram) {
+            $value = $this->normalizeTelegramValue($value);
+            $request->merge(['value' => $value]);
         }
 
         $rules = [
@@ -176,6 +189,16 @@ class AccountContactsController extends Controller
             return back();
         }
 
+        if ($contact->type === ContactType::Telegram) {
+            $payload = app(ContactVerificationService::class)->requestTelegramLink($user, $contact);
+            session()->flash('telegram_verification', [
+                'contact_id' => $contact->id,
+                'link' => $payload['link'],
+                'expires_at' => $payload['expires_at']?->toDateTimeString(),
+            ]);
+            return back();
+        }
+
         app(ContactVerificationService::class)->requestCode($user, $contact);
 
         return back();
@@ -193,6 +216,12 @@ class AccountContactsController extends Controller
             return back();
         }
 
+        if ($contact->type === ContactType::Telegram) {
+            throw ValidationException::withMessages([
+                'code' => 'Подтверждение Telegram выполняется через бота.',
+            ]);
+        }
+
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:20'],
         ]);
@@ -200,5 +229,23 @@ class AccountContactsController extends Controller
         app(ContactVerificationService::class)->verifyCode($user, $contact, $validated['code']);
 
         return back();
+    }
+
+    private function normalizeTelegramValue(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return $value;
+        }
+
+        $value = ltrim($value, '@');
+
+        if (preg_match('/^\d+$/', $value)) {
+            return $value;
+        }
+
+        $value = strtolower($value);
+
+        return '@' . $value;
     }
 }

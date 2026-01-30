@@ -19,9 +19,11 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\Integrations\UserSuggestController;
 use App\Http\Controllers\Integrations\VenueSuggestController;
+use App\Http\Controllers\Integrations\TelegramWebhookController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\VenuesController;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,6 +34,9 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 Route::post('/register', [AuthController::class, 'register'])->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::post('/telegram/webhook', TelegramWebhookController::class)
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('telegram.webhook');
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
 

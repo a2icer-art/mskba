@@ -31,10 +31,15 @@
   - Неподтвержденные контакты удаляются физически, подтвержденные — не удаляются.
 - `ContactVerification` (app/Domain/Users/Models/ContactVerification)
   - Одноразовые коды подтверждения контактов (TTL, попытки, verified_at).
+  - Telegram подтверждается через одноразовый токен (token_hash) и deep-link на бота.
 - `ContactDeliveryResolver` (app/Domain/Users/Infrastructure/ContactDeliveryResolver)
   - Роутер каналов доставки кода подтверждения по типу контакта.
 - `ContactDelivery` (app/Domain/Users/Contracts/ContactDelivery)
   - Контракт отправки одноразового кода через конкретный канал.
+- `TelegramWebhookService` (app/Domain/Users/Services/TelegramWebhookService)
+  - Обрабатывает webhook Telegram и подтверждает контакт по токену.
+- `TelegramBotClient` (app/Domain/Users/Infrastructure/TelegramBotClient)
+  - Клиент для отправки сообщений и callback-ответов через Telegram Bot API.
 - `Role` (app/Domain/Users/Models/Role)
   - Роли доступа (admin/moderator/editor).
 - `UserRole` (app/Domain/Users/Models/UserRole)

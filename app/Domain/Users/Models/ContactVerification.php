@@ -19,6 +19,7 @@ class ContactVerification extends Model
         'user_id',
         'contact_id',
         'code',
+        'token_hash',
         'expires_at',
         'sent_at',
         'attempts',

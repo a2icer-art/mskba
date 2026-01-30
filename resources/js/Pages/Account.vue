@@ -1,6 +1,6 @@
 ﻿<script setup>
-import { computed, ref, nextTick, watch } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref, nextTick, watch, onBeforeUnmount } from 'vue';
+import { useForm, usePage, router } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -298,28 +298,92 @@ const verificationMessages = ref({});
 const verificationCountdowns = ref({});
 const verificationCountdownTimers = new Map();
 const verificationOverrides = ref({});
+const telegramLinks = ref({});
+let telegramPoller = null;
 
 const isEditingAny = computed(() => editingEmailId.value !== null || editingContactId.value !== null);
 const canAddEmail = computed(() => !isEditingAny.value);
 const canAddContact = computed(() => !isEditingAny.value);
 const formatContactDate = (value) => formatDate(value);
-const confirmButtonLabel = (contactId) => {
-    const hasVerification = verificationOpen.value[contactId] || Boolean(getVerificationState(contactId));
+const isTelegramContact = (contact) => contact?.type === 'telegram';
+const confirmButtonLabel = (contact) => {
+    const contactId = contact?.id;
+    const hasVerification = Boolean(contactId) && (verificationOpen.value[contactId] || Boolean(getVerificationState(contactId)));
+    if (isTelegramContact(contact)) {
+        return hasVerification ? 'Получить новую ссылку' : 'Подтвердить';
+    }
     if (hasVerification) {
         return 'Запросить новый код';
     }
     return 'Подтвердить';
 };
-const shouldShowVerificationInput = (contactId) => {
-    if (!verificationOpen.value[contactId]) {
+const shouldShowVerificationInput = (contact) => {
+    if (isTelegramContact(contact)) {
         return false;
     }
 
-    return true;
+    return Boolean(contact?.id && verificationOpen.value[contact.id]);
 };
 const verificationStateMap = computed(() => props.contactVerifications ?? {});
 const getVerificationState = (contactId) =>
     verificationOverrides.value[contactId] ?? verificationStateMap.value[contactId] ?? null;
+const telegramFlash = computed(() => page.props?.flash?.telegram_verification ?? null);
+const openTelegramLink = (link) => {
+    if (!link) {
+        return;
+    }
+    window.location.href = link;
+};
+const applyTelegramFlash = (payload) => {
+    if (!payload || !payload.contact_id || !payload.link) {
+        return;
+    }
+
+    telegramLinks.value = {
+        ...telegramLinks.value,
+        [payload.contact_id]: payload.link,
+    };
+    verificationMessages.value = {
+        ...verificationMessages.value,
+        [payload.contact_id]: 'Откройте Telegram и нажмите «Подтвердить» в чате.',
+    };
+    verificationError.value = {
+        ...verificationError.value,
+        [payload.contact_id]: false,
+    };
+    verificationOpen.value = {
+        ...verificationOpen.value,
+        [payload.contact_id]: true,
+    };
+
+    nextTick(() => {
+        openTelegramLink(payload.link);
+    });
+};
+const startTelegramPolling = () => {
+    if (telegramPoller) {
+        return;
+    }
+
+    telegramPoller = setInterval(() => {
+        router.reload({
+            only: ['contacts', 'contactVerifications'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }, 8000);
+};
+const stopTelegramPolling = () => {
+    if (!telegramPoller) {
+        return;
+    }
+
+    clearInterval(telegramPoller);
+    telegramPoller = null;
+};
+const pendingTelegramIds = computed(() => props.contacts
+    .filter((contact) => isTelegramContact(contact) && !contact.confirmed_at && getVerificationState(contact.id))
+    .map((contact) => contact.id));
 const hasAttemptsExceeded = (contactId) => {
     const state = getVerificationState(contactId);
     if (!state) {
@@ -468,6 +532,32 @@ watch(
     { immediate: true, deep: true }
 );
 
+watch(
+    () => telegramFlash.value,
+    (payload) => {
+        if (payload) {
+            applyTelegramFlash(payload);
+        }
+    },
+    { immediate: true }
+);
+
+watch(
+    () => pendingTelegramIds.value,
+    (ids) => {
+        if (ids.length > 0) {
+            startTelegramPolling();
+        } else {
+            stopTelegramPolling();
+        }
+    },
+    { immediate: true }
+);
+
+onBeforeUnmount(() => {
+    stopTelegramPolling();
+});
+
 const startEmailEdit = (email) => {
     if (email.confirmed_at) {
         return;
@@ -523,7 +613,7 @@ const addContact = () => {
 };
 
 const requestVerificationCode = (contact, errorMap) => {
-    if (isVerificationBlocked(contact.id)) {
+    if (!isTelegramContact(contact) && isVerificationBlocked(contact.id)) {
         setVerificationCountdown(contact.id, getVerificationWaitSeconds(contact.id));
         errorMap.value = {
             ...errorMap.value,
@@ -553,6 +643,14 @@ const requestVerificationCode = (contact, errorMap) => {
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
+            if (isTelegramContact(contact)) {
+                const payload = telegramFlash.value;
+                if (payload && payload.contact_id === contact.id) {
+                    applyTelegramFlash(payload);
+                }
+                return;
+            }
+
             verificationOpen.value = {
                 ...verificationOpen.value,
                 [contact.id]: true,
@@ -609,6 +707,10 @@ const requestVerificationCode = (contact, errorMap) => {
 };
 
 const submitVerificationCode = (contact, errorMap) => {
+    if (isTelegramContact(contact)) {
+        return;
+    }
+
     errorMap.value = {
         ...errorMap.value,
         [contact.id]: '',
@@ -1130,7 +1232,7 @@ const logout = () => {
                                             :disabled="verificationPending[email.id] || isEditingAny"
                                             @click="requestVerificationCode(email, emailErrors)"
                                         >
-                                            {{ confirmButtonLabel(email.id) }}
+                                            {{ confirmButtonLabel(email) }}
                                         </button>
                                         <button
                                             v-if="!email.confirmed_at && editingEmailId !== email.id"
@@ -1144,7 +1246,7 @@ const logout = () => {
                                     </div>
                                 </div>
 
-                                <div v-if="shouldShowVerificationInput(email.id) && !email.confirmed_at" class="space-y-2">
+                                <div v-if="shouldShowVerificationInput(email) && !email.confirmed_at" class="space-y-2">
                                     <div class="flex flex-wrap items-center gap-3">
                                         <input
                                             v-model="verificationCodes[email.id]"
@@ -1265,7 +1367,7 @@ const logout = () => {
                                             :disabled="verificationPending[contact.id] || isEditingAny"
                                             @click="requestVerificationCode(contact, contactErrors)"
                                         >
-                                            {{ confirmButtonLabel(contact.id) }}
+                                            {{ confirmButtonLabel(contact) }}
                                         </button>
                                         <button
                                             v-if="!contact.confirmed_at && editingContactId !== contact.id"
@@ -1279,7 +1381,27 @@ const logout = () => {
                                     </div>
                                 </div>
 
-                                <div v-if="shouldShowVerificationInput(contact.id) && !contact.confirmed_at" class="space-y-2">
+                                <div v-if="isTelegramContact(contact) && !contact.confirmed_at" class="space-y-2">
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                        Подтверждение Telegram выполняется через бота.
+                                    </div>
+                                    <div v-if="verificationMessages[contact.id]" class="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                        {{ verificationMessages[contact.id] }}
+                                    </div>
+                                    <div v-else-if="verificationCountdowns[contact.id]" class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        Подождите {{ formatCountdown(verificationCountdowns[contact.id]) }}
+                                    </div>
+                                    <button
+                                        v-if="telegramLinks[contact.id]"
+                                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                        type="button"
+                                        @click="openTelegramLink(telegramLinks[contact.id])"
+                                    >
+                                        Открыть бота
+                                    </button>
+                                </div>
+
+                                <div v-if="shouldShowVerificationInput(contact) && !contact.confirmed_at" class="space-y-2">
                                     <div class="flex flex-wrap items-center gap-3">
                                         <input
                                             v-model="verificationCodes[contact.id]"
@@ -1371,6 +1493,11 @@ const logout = () => {
                             </div>
                             <div v-else-if="newContactNotice" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                                 {{ newContactNotice }}
+                            </div>
+                            <div v-else-if="newContactForm.type === 'telegram'" class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                Укажите Telegram username в формате <span class="font-semibold">@username</span>
+                                (можно без @ — добавим автоматически). Для подтверждения нажмите «Подтвердить» и
+                                перейдите в чат с ботом, затем нажмите «Подтвердить» в Telegram.
                             </div>
                             <p v-if="!canAddContact" class="text-xs text-slate-500">
                                 Сначала сохраните или отмените текущую правку контакта.

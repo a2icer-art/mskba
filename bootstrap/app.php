@@ -56,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
                         'notice' => session('notice'),
                         'error' => session('error'),
                         'info' => session('info'),
+                        'telegram_verification' => session('telegram_verification'),
                     ],
                 ];
             }
