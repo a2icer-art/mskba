@@ -13,6 +13,7 @@ use App\Http\Controllers\AdminContractsModerationController;
 use App\Http\Controllers\AdminLogsController;
 use App\Http\Controllers\AdminSeoController;
 use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\AdminUsersController;
 use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\HomeController;
@@ -228,6 +229,16 @@ Route::middleware(['auth', 'can:seo.manage', 'confirmed.role:10'])->prefix('admi
     Route::patch('/seo/settings', [AdminSeoController::class, 'updateMetaSettings'])->name('admin.seo.settings');
 });
 
+Route::middleware(['auth', 'can:admin.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
+    Route::get('/users', [AdminUsersController::class, 'index'])->name('admin.users');
+    Route::post('/users/{user}/contacts/{contact}/reset-confirmation', [AdminUsersController::class, 'resetContactConfirmation'])
+        ->name('admin.users.contacts.reset');
+    Route::post('/users/{user}/roles', [AdminUsersController::class, 'updateRoles'])
+        ->name('admin.users.roles.update');
+    Route::post('/users/{user}/participant-roles', [AdminUsersController::class, 'updateParticipantRoles'])
+        ->name('admin.users.participant-roles.update');
+});
+
 Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('admin');
     Route::get('/users-moderation', [AdminUsersModerationController::class, 'index'])
@@ -310,7 +321,7 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
 Route::fallback(function (Request $request) {
     return Inertia::render('Error', [
         'status' => 404,
-        'message' => 'Страница не найдена.',
+        'message' => 'РЎС‚СЂР°РЅРёС†Р° РЅРµ РЅР°Р№РґРµРЅР°.',
         'appName' => config('app.name'),
     ])->toResponse($request)->setStatusCode(404);
 });

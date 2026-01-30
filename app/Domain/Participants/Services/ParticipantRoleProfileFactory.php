@@ -37,4 +37,22 @@ class ParticipantRoleProfileFactory
             'updated_by' => $userId,
         ]);
     }
+
+    public function deleteForAlias(string $alias, int $assignmentId, int $userId): void
+    {
+        $modelClass = self::ALIAS_MAP[$alias] ?? null;
+        if ($modelClass === null) {
+            return;
+        }
+
+        $modelClass::query()
+            ->where('participant_role_assignment_id', $assignmentId)
+            ->update([
+                'deleted_by' => $userId,
+            ]);
+
+        $modelClass::query()
+            ->where('participant_role_assignment_id', $assignmentId)
+            ->delete();
+    }
 }
