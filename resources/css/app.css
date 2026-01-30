@@ -152,6 +152,10 @@
         pointer-events: none;
     }
 
+    main {
+        min-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px) - 30px);
+    }
+
     .page-content-wrapper {
         overflow: auto;
     }

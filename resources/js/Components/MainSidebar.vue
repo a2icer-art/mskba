@@ -76,6 +76,7 @@ const sidebarRef = ref(null);
 const sidebarHeight = ref(0);
 const sidebarLeft = ref(0);
 const sidebarWidth = ref(0);
+const maxSidebarHeight = ref(0);
 const sidebarInitialOffset = ref(0);
 const topOffset = ref(0);
 const gapOffset = 12;
@@ -86,8 +87,15 @@ const updateSidebarMetrics = () => {
         return;
     }
     const rect = wrapperRef.value.getBoundingClientRect();
+    const mainElement = wrapperRef.value.closest?.('main');
+    const mainRect = mainElement?.getBoundingClientRect?.();
+    const maxHeight = (mainRect?.height ?? rect.height) - 45;
+    maxSidebarHeight.value = maxHeight > 0 ? Math.floor(maxHeight) : 0;
     const sidebarRect = sidebarRef.value.getBoundingClientRect();
-    sidebarHeight.value = sidebarRect.height || 0;
+    sidebarHeight.value = Math.min(
+        sidebarRect.height || 0,
+        maxSidebarHeight.value > 0 ? maxSidebarHeight.value : sidebarRect.height || 0
+    );
     sidebarLeft.value = rect.left || 0;
     sidebarWidth.value = rect.width || 0;
     if (!isFixed.value) {
@@ -107,6 +115,17 @@ const updateSidebarFixed = () => {
     topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
     isFixed.value = window.scrollY >= sidebarInitialOffset.value - topOffset.value;
 };
+
+const sidebarStyle = computed(() => {
+    if (!maxSidebarHeight.value) {
+        return {};
+    }
+
+    return {
+        maxHeight: `${maxSidebarHeight.value}px`,
+        overflowY: 'auto',
+    };
+});
 
 onMounted(() => {
     nextTick(() => {
@@ -138,8 +157,9 @@ onBeforeUnmount(() => {
                           top: `${topOffset}px`,
                           left: `${sidebarLeft}px`,
                           width: `${sidebarWidth}px`,
+                          ...sidebarStyle,
                       }
-                    : {}
+                    : sidebarStyle
             "
         >
             <p v-if="title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ title }}</p>
