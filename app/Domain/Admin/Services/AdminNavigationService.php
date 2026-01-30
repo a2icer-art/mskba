@@ -18,9 +18,17 @@ class AdminNavigationService
     public function getMenuGroups(User $user): array
     {
         $groups = [];
+        $userItems = [];
         $moderationItems = [];
         $systemItems = [];
         $contentItems = [];
+
+        if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)) {
+            $userItems[] = [
+                'label' => 'Пользователи',
+                'href' => '/admin/users',
+            ];
+        }
 
         if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
             $moderationItems[] = [
@@ -60,6 +68,13 @@ class AdminNavigationService
             $contentItems[] = [
                 'label' => 'SEO',
                 'href' => '/admin/seo',
+            ];
+        }
+
+        if ($userItems !== []) {
+            $groups[] = [
+                'title' => 'Пользователи',
+                'items' => $userItems,
             ];
         }
 
