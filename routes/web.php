@@ -54,7 +54,7 @@ Route::middleware('auth')->prefix('account')->group(function () {
         ->name('account.settings.notifications');
     Route::patch('/settings/notifications', [AccountNotificationsController::class, 'update'])
         ->name('account.settings.notifications.update');
-    Route::get('/roles/{assignment}', [AccountController::class, 'role'])->name('account.roles.show');
+    Route::get('/roles/{alias}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');
     Route::patch('/profile', [AccountProfileController::class, 'update'])->name('account.profile.update');

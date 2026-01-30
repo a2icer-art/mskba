@@ -35,15 +35,23 @@ class AccountController extends Controller
         return $this->renderAccount($request, 'balance');
     }
 
-    public function role(Request $request, ParticipantRoleAssignment $assignment)
+    public function role(Request $request, string $alias)
     {
         $user = $request->user();
 
-        if ($assignment->user_id !== $user->id || $assignment->status !== ParticipantRoleAssignmentStatus::Confirmed) {
+        $assignment = ParticipantRoleAssignment::query()
+            ->where('user_id', $user->id)
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed)
+            ->whereHas('role', fn ($q) => $q->where('alias', $alias))
+            ->whereNull('context_type')
+            ->whereNull('context_id')
+            ->first();
+
+        if (!$assignment) {
             abort(404);
         }
 
-        return $this->renderAccount($request, 'role-' . $assignment->id);
+        return $this->renderAccount($request, 'role-' . $alias);
     }
 
     private function renderAccount(Request $request, string $activeTab)

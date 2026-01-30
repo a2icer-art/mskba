@@ -24,10 +24,11 @@ class AccountNavigationPresenter extends NavigationPresenter
 
         $roles = $ctx['participantRoles'] ?? [];
         foreach ($roles as $role) {
+            $alias = $role['alias'] ?? $role['id'];
             $mainItems[] = [
-                'key' => 'role-' . $role['id'],
+                'key' => 'role-' . $alias,
                 'label' => $role['label'],
-                'href' => '/account/roles/' . $role['id'],
+                'href' => '/account/roles/' . $alias,
             ];
         }
 
