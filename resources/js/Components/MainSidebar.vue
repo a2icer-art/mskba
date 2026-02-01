@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -71,104 +71,12 @@ const formatBadge = (value) => {
     return String(value);
 };
 
-const wrapperRef = ref(null);
-const sidebarRef = ref(null);
-const sidebarHeight = ref(0);
-const sidebarLeft = ref(0);
-const sidebarWidth = ref(0);
-const maxSidebarHeight = ref(0);
-const sidebarInitialOffset = ref(0);
-const topOffset = ref(0);
-const gapOffset = 12;
-const isFixed = ref(false);
-
-const resolveAvailableHeight = () => {
-    const footerElement = document.querySelector('footer');
-    const footerTop = footerElement?.getBoundingClientRect?.().top;
-    const viewportBottom = window.innerHeight;
-    const effectiveBottom = Number.isFinite(footerTop) ? Math.min(footerTop, viewportBottom) : viewportBottom;
-    const bottomOffset = 30;
-    const availableHeight = effectiveBottom - topOffset.value - bottomOffset;
-    return availableHeight > 0 ? Math.floor(availableHeight) : 0;
-};
-
-const updateSidebarMetrics = () => {
-    if (!sidebarRef.value || !wrapperRef.value) {
-        return;
-    }
-    const rect = wrapperRef.value.getBoundingClientRect();
-    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
-    const parsedOffset = parseInt(cssOffset, 10);
-    topOffset.value = (Number.isFinite(parsedOffset) ? parsedOffset : 0) + gapOffset;
-    maxSidebarHeight.value = resolveAvailableHeight();
-    const sidebarRect = sidebarRef.value.getBoundingClientRect();
-    sidebarHeight.value = Math.min(
-        sidebarRect.height || 0,
-        maxSidebarHeight.value > 0 ? maxSidebarHeight.value : sidebarRect.height || 0
-    );
-    sidebarLeft.value = rect.left || 0;
-    sidebarWidth.value = rect.width || 0;
-    if (!isFixed.value) {
-        sidebarInitialOffset.value = window.scrollY + rect.top;
-    }
-};
-
-const updateSidebarFixed = () => {
-    if (!sidebarRef.value) {
-        return;
-    }
-    const cssOffset = getComputedStyle(document.documentElement).getPropertyValue('--app-header-offset');
-    const parsed = parseInt(cssOffset, 10);
-    topOffset.value = (Number.isFinite(parsed) ? parsed : 0) + gapOffset;
-    maxSidebarHeight.value = resolveAvailableHeight();
-    isFixed.value = window.scrollY >= sidebarInitialOffset.value - topOffset.value;
-};
-
-const sidebarStyle = computed(() => {
-    if (!maxSidebarHeight.value) {
-        return {};
-    }
-
-    return {
-        maxHeight: `${maxSidebarHeight.value}px`,
-        overflowY: 'auto',
-    };
-});
-
-onMounted(() => {
-    nextTick(() => {
-        updateSidebarMetrics();
-        updateSidebarFixed();
-    });
-    window.addEventListener('resize', updateSidebarMetrics);
-    window.addEventListener('resize', updateSidebarFixed);
-    window.addEventListener('scroll', updateSidebarFixed, { passive: true });
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener('resize', updateSidebarMetrics);
-    window.removeEventListener('resize', updateSidebarFixed);
-    window.removeEventListener('scroll', updateSidebarFixed);
-});
 </script>
 
 <template>
-    <div v-if="hasItems" ref="wrapperRef" class="hidden sm:block">
-        <div v-if="isFixed" :style="{ height: `${sidebarHeight}px` }"></div>
+    <div v-if="hasItems" class="hidden sm:block">
         <aside
-            ref="sidebarRef"
-            class="self-start flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm"
-            :class="isFixed ? 'fixed z-30' : 'relative'"
-            :style="
-                isFixed
-                    ? {
-                          top: `${topOffset}px`,
-                          left: `${sidebarLeft}px`,
-                          width: `${sidebarWidth}px`,
-                          ...sidebarStyle,
-                      }
-                    : sidebarStyle
-            "
+            class="relative self-start flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 p-5 shadow-sm"
         >
             <div class="space-y-4">
                 <div v-for="group in groups" :key="group.title || group.items[0]?.href" class="space-y-3">
