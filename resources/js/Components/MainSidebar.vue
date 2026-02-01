@@ -170,7 +170,6 @@ onBeforeUnmount(() => {
                     : sidebarStyle
             "
         >
-            <p v-if="title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ title }}</p>
             <div class="space-y-4">
                 <div v-for="group in groups" :key="group.title || group.items[0]?.href" class="space-y-3">
                     <p v-if="group.title" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">

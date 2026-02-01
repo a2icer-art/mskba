@@ -21,17 +21,9 @@ class AdminNavigationService
     public function getMenuGroups(User $user): array
     {
         $groups = [];
-        $userItems = [];
         $moderationItems = [];
         $systemItems = [];
         $contentItems = [];
-
-        if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)) {
-            $userItems[] = [
-                'label' => 'Пользователи',
-                'href' => '/admin/users',
-            ];
-        }
 
         if ($this->permissionChecker->can($user, PermissionCode::ModerationAccess)) {
             // Counts of pending moderation requests
@@ -77,6 +69,10 @@ class AdminNavigationService
 
         if ($this->permissionChecker->can($user, PermissionCode::AdminAccess)) {
             $systemItems[] = [
+                'label' => 'Пользователи',
+                'href' => '/admin/users',
+            ];
+            $systemItems[] = [
                 'label' => 'Площадки',
                 'href' => '/admin/venues',
             ];
@@ -98,13 +94,6 @@ class AdminNavigationService
             $contentItems[] = [
                 'label' => 'SEO',
                 'href' => '/admin/seo',
-            ];
-        }
-
-        if ($userItems !== []) {
-            $groups[] = [
-                'title' => 'Пользователи',
-                'items' => $userItems,
             ];
         }
 

@@ -143,7 +143,6 @@ const sidebarGroups = computed(() => {
         }));
 });
 const hasSidebarItems = computed(() => sidebarGroups.value.length > 0);
-const sidebarTitleLabel = computed(() => props.sidebarTitle || page.props?.navigation?.title || 'Навигация');
 const formatSidebarBadge = (value) => {
     if (value === null || value === undefined || value === '') {
         return '';
@@ -297,12 +296,12 @@ onBeforeUnmount(() => {
                         </Link>
                         <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
                             <button
-                                class="flex w-full items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
+                                class="flex w-full items-center justify-end gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
                                 type="button"
+                                aria-label="Меню разделов"
                                 :aria-expanded="isSidebarOpen"
                                 @click="isSidebarOpen = !isSidebarOpen"
                             >
-                                <span>{{ sidebarTitleLabel }}</span>
                                 <span class="text-xs transition" :class="isSidebarOpen ? 'rotate-180' : 'rotate-0'">▾</span>
                             </button>
                             <div v-if="isSidebarOpen" class="mt-2 space-y-3">
@@ -410,12 +409,12 @@ onBeforeUnmount(() => {
             </Link>
             <div v-if="hasSidebarItems" class="mt-3 border-t border-slate-200/80 pt-3">
                 <button
-                    class="flex w-full items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
+                    class="flex w-full items-center justify-end gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
                     type="button"
+                    aria-label="Меню разделов"
                     :aria-expanded="isSidebarOpen"
                     @click="isSidebarOpen = !isSidebarOpen"
                 >
-                    <span>{{ sidebarTitleLabel }}</span>
                     <span class="text-xs transition" :class="isSidebarOpen ? 'rotate-180' : 'rotate-0'">▾</span>
                 </button>
                 <div v-if="isSidebarOpen" class="mt-2 space-y-3">
