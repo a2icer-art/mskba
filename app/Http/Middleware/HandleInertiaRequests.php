@@ -93,6 +93,9 @@ class HandleInertiaRequests extends Middleware
                 'info' => session('info'),
                 'telegram_verification' => session('telegram_verification'),
             ],
+            'session' => [
+                'lifetime' => (int) config('session.lifetime'),
+            ],
         ];
     }
 

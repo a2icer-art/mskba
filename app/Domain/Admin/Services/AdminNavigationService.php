@@ -81,6 +81,10 @@ class AdminNavigationService
                 'href' => '/admin/venues',
             ];
             $systemItems[] = [
+                'label' => 'События',
+                'href' => '/admin/events',
+            ];
+            $systemItems[] = [
                 'label' => 'Настройки',
                 'href' => '/admin/settings',
             ];

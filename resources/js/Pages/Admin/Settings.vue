@@ -24,10 +24,6 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    defaults: {
-        type: Object,
-        default: () => ({ lead_time_minutes: 15, min_duration_minutes: 15 }),
-    },
     contactDelivery: {
         type: Object,
         default: () => ({ email: { enabled: false, smtp: {} } }),
@@ -44,8 +40,6 @@ const page = usePage();
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionErrors = computed(() => page.props?.errors ?? {});
 const settingsFields = [
-    'lead_time_minutes',
-    'min_duration_minutes',
     'email_enabled',
     'smtp_host',
     'smtp_port',
@@ -66,8 +60,6 @@ const formErrorNotice = computed(() => {
 });
 
 const form = useForm({
-    lead_time_minutes: props.defaults?.lead_time_minutes ?? 15,
-    min_duration_minutes: props.defaults?.min_duration_minutes ?? 15,
     email_enabled: Boolean(props.contactDelivery?.email?.enabled ?? false),
     smtp_host: props.contactDelivery?.email?.smtp?.host ?? '',
     smtp_port: props.contactDelivery?.email?.smtp?.port ?? 587,
@@ -139,56 +131,6 @@ const submitAvatarPlaceholder = () => {
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
                     <h1 class="text-3xl font-semibold text-slate-900">Настройки</h1>
-                    <p class="mt-2 text-sm text-slate-600">
-                        Дефолтные параметры времени событий.
-                    </p>
-
-                    <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-6">
-                        <form class="space-y-6" @submit.prevent="submit">
-                            <div class="grid gap-2">
-                                <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-                                    Допустимое время до начала события (мин.)
-                                </label>
-                                <input
-                                    v-model="form.lead_time_minutes"
-                                    type="number"
-                                    min="0"
-                                    max="1440"
-                                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                                />
-                                <p v-if="actionErrors.lead_time_minutes" class="text-xs text-rose-700">
-                                    {{ actionErrors.lead_time_minutes }}
-                                </p>
-                            </div>
-
-                            <div class="grid gap-2">
-                                <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-                                    Минимальная длительность события (мин.)
-                                </label>
-                                <input
-                                    v-model="form.min_duration_minutes"
-                                    type="number"
-                                    min="1"
-                                    max="1440"
-                                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                                />
-                                <p v-if="actionErrors.min_duration_minutes" class="text-xs text-rose-700">
-                                    {{ actionErrors.min_duration_minutes }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center justify-end gap-3">
-                                <button
-                                    type="submit"
-                                    class="rounded-full border border-slate-900 bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                                    :disabled="form.processing"
-                                >
-                                    Сохранить
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-6">
                         <h2 class="text-lg font-semibold text-slate-900">Заглушка аватара</h2>
                         <p class="mt-2 text-sm text-slate-600">

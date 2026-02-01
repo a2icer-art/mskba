@@ -12,6 +12,7 @@ use App\Domain\Users\Enums\ContactType;
 use App\Domain\Users\Enums\UserConfirmedBy;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Users\Models\UserContact;
+use App\Domain\Users\Models\UserProfile;
 use App\Domain\Users\Models\Role;
 use App\Models\User;
 use Database\Factories\RoleFactory;
@@ -22,7 +23,6 @@ use Database\Seeders\AmenitySeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -33,22 +33,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $commonUserState = [
-            'password' => Hash::make('123'),
+        $admin = $this->getOrCreateUser('admin', null, [
+            'password' => Hash::make('Ghjcnjgfhjkm26'),
             'status' => UserStatus::Confirmed,
             'confirmed_at' => now(),
-            'confirmed_by' => UserConfirmedBy::Admin,
-        ];
+            'confirmed_by' => UserConfirmedBy::Other,
+        ]);
+        $moderator = $this->getOrCreateUser('moderator', $admin->id, [
+            'password' => Hash::make('Ghjcnjgfhjkm26m0d3r'),
+            'status' => UserStatus::Unconfirmed,
+        ]);
+        $editor = $this->getOrCreateUser('editor', $admin->id, [
+            'password' => Hash::make('Ghjcnjgfhjkm263d!t'),
+            'status' => UserStatus::Unconfirmed,
+        ]);
 
-        $admin = $this->getOrCreateUser('admin', null, $commonUserState);
-        $moderator = $this->getOrCreateUser('moderator', $admin->id, $commonUserState);
-        $editor = $this->getOrCreateUser('editor', $admin->id, $commonUserState);
-        $supereditor = $this->getOrCreateUser('supereditor', $admin->id, $commonUserState);
-
-        $this->seedUserContact($admin, 'admin@example.com', $admin->id);
-        $this->seedUserContact($moderator, 'moderator@example.com', $admin->id);
-        $this->seedUserContact($editor, 'editor@example.com', $admin->id);
-        $this->seedUserContact($supereditor, 'supereditor@example.com', $admin->id);
+        $this->seedUserContact($admin, 'admin@mskba.ru', $admin->id);
 
         $roles = [
             'admin' => $this->getOrCreateRole('admin', 40, $admin->id),
@@ -59,17 +59,11 @@ class DatabaseSeeder extends Seeder
 
         $admin->roles()->sync([
             $roles['admin']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
-            $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
         $moderator->roles()->sync([
             $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
-            $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
         $editor->roles()->sync([
-            $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
-        ]);
-        $supereditor->roles()->sync([
-            $roles['moderator']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
             $roles['editor']->id => ['created_by' => $admin->id, 'updated_by' => $admin->id],
         ]);
 
@@ -169,9 +163,25 @@ class DatabaseSeeder extends Seeder
 
         if ($createdBy) {
             $data['created_by'] = $createdBy;
+            $data['updated_by'] = $createdBy;
         }
 
-        return User::factory()->withProfile()->create($data);
+        $user = User::query()->create($data);
+
+        if (!$createdBy) {
+            $user->update([
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        }
+
+        UserProfile::query()->create([
+            'user_id' => $user->id,
+            'created_by' => $createdBy ?? $user->id,
+            'updated_by' => $createdBy ?? $user->id,
+        ]);
+
+        return $user;
     }
 
     private function getOrCreateRole(string $alias, int $level, int $createdBy): Role

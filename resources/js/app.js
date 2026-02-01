@@ -6,6 +6,34 @@ import 'primeicons/primeicons.css';
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { initSessionKeepAlive } from './Composables/useSessionKeepAlive';
+
+const resolvePageFromDom = () => {
+    const el = document.getElementById('app');
+    if (!el) {
+        return null;
+    }
+    const raw = el.dataset.page;
+    if (!raw) {
+        return null;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+const keepAlive = initSessionKeepAlive();
+const applyKeepAlive = (page) => {
+    const lifetimeMinutes = page?.props?.session?.lifetime ?? 0;
+    const isAuthenticated = Boolean(page?.props?.auth?.user);
+    keepAlive.update({ authenticated: isAuthenticated, lifetimeMinutes });
+};
+
+document.addEventListener('inertia:success', (event) => {
+    applyKeepAlive(event.detail?.page);
+});
 
 createInertiaApp({
     resolve: (name) =>
@@ -144,5 +172,7 @@ createInertiaApp({
                 },
             })
             .mount(el);
+
+        applyKeepAlive(resolvePageFromDom());
     },
 });

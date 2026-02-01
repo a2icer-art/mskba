@@ -10,6 +10,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
 use App\Http\Controllers\AdminContractsModerationController;
+use App\Http\Controllers\AdminEventsController;
 use App\Http\Controllers\AdminLogsController;
 use App\Http\Controllers\AdminSeoController;
 use App\Http\Controllers\AdminSettingsController;
@@ -45,6 +46,9 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::post('/telegram/webhook', TelegramWebhookController::class)
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('telegram.webhook');
+Route::get('/session/ping', function () {
+    return response()->noContent();
+})->middleware('auth')->name('session.ping');
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
 
@@ -343,6 +347,12 @@ Route::middleware(['auth', 'can:moderation.access', 'confirmed.role:10'])->prefi
     Route::post('/settings/test-email', [AdminSettingsController::class, 'testEmail'])
         ->middleware('can:admin.access')
         ->name('admin.settings.test-email');
+    Route::get('/events', [AdminEventsController::class, 'index'])
+        ->middleware('can:admin.access')
+        ->name('admin.events');
+    Route::patch('/events', [AdminEventsController::class, 'update'])
+        ->middleware('can:admin.access')
+        ->name('admin.events.update');
     Route::get('/balances', [AdminBalancesController::class, 'index'])
         ->middleware('can:admin.access')
         ->name('admin.balances');
