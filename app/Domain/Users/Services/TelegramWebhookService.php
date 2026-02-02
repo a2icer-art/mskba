@@ -8,9 +8,11 @@ use Illuminate\Support\Str;
 class TelegramWebhookService
 {
     private const CONFIRM_PREFIX = 'confirm:';
+    private const LOGIN_PREFIX = 'login_';
 
     public function __construct(
         private readonly ContactVerificationService $verificationService,
+        private readonly TelegramLoginService $loginService,
         private readonly TelegramBotClient $botClient
     ) {
     }
@@ -29,12 +31,22 @@ class TelegramWebhookService
     private function handleMessage(array $message): void
     {
         $text = trim((string) ($message['text'] ?? ''));
-        if ($text === '' || !Str::startsWith($text, '/start')) {
+        if ($text === '') {
+            return;
+        }
+
+        if (Str::startsWith($text, '/account')) {
+            $this->handleAccountCommand($message);
+            return;
+        }
+
+        if (!Str::startsWith($text, '/start')) {
             return;
         }
 
         $token = trim((string) preg_replace('/^\/start\s*/u', '', $text));
         $chatId = $message['chat']['id'] ?? null;
+        $username = $message['from']['username'] ?? null;
 
         if (!$chatId) {
             return;
@@ -42,6 +54,37 @@ class TelegramWebhookService
 
         if ($token === '') {
             $this->botClient->sendMessage($chatId, 'Нужна ссылка для подтверждения. Запросите её на сайте.');
+            return;
+        }
+
+        if (Str::startsWith($token, self::LOGIN_PREFIX)) {
+            $loginToken = substr($token, strlen(self::LOGIN_PREFIX));
+            $result = $this->loginService->confirmLoginToken(
+                $loginToken,
+                is_string($username) ? $username : null,
+                (string) $chatId
+            );
+
+            if (!$result['success']) {
+                $this->botClient->sendMessage($chatId, $result['message']);
+                return;
+            }
+
+            $replyMarkup = [];
+            if (!empty($result['site_link'])) {
+                $replyMarkup = [
+                    'inline_keyboard' => [
+                        [
+                            [
+                                'text' => 'Войти на сайт',
+                                'url' => $result['site_link'],
+                            ],
+                        ],
+                    ],
+                ];
+            }
+
+            $this->botClient->sendMessage($chatId, $result['message'], $replyMarkup);
             return;
         }
 
@@ -66,6 +109,21 @@ class TelegramWebhookService
             $chatId,
             'Нажмите кнопку ниже, чтобы подтвердить контакт на сайте.',
             $replyMarkup
+        );
+    }
+
+    private function handleAccountCommand(array $message): void
+    {
+        $chatId = $message['chat']['id'] ?? null;
+        $username = $message['from']['username'] ?? null;
+
+        if (!$chatId) {
+            return;
+        }
+
+        $this->loginService->handleAccountCommand(
+            (string) $chatId,
+            is_string($username) ? $username : null
         );
     }
 

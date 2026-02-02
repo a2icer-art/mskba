@@ -18,6 +18,7 @@ use App\Http\Controllers\AdminUsersController;
 use App\Http\Controllers\AdminUsersModerationController;
 use App\Http\Controllers\AdminVenuesModerationController;
 use App\Http\Controllers\AdminVenuesController;
+use App\Http\Controllers\AuthTelegramController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Integrations\AddressSuggestController;
 use App\Http\Controllers\Integrations\UserSuggestController;
@@ -43,6 +44,8 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 Route::post('/register', [AuthController::class, 'register'])->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::post('/auth/telegram/token', [AuthTelegramController::class, 'createToken'])->name('auth.telegram.token');
+Route::get('/auth/telegram/complete', [AuthTelegramController::class, 'complete'])->name('auth.telegram.complete');
 Route::post('/telegram/webhook', TelegramWebhookController::class)
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('telegram.webhook');

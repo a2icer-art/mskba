@@ -32,6 +32,11 @@
 - `ContactVerification` (app/Domain/Users/Models/ContactVerification)
   - Одноразовые коды подтверждения контактов (TTL, попытки, verified_at).
   - Telegram подтверждается через одноразовый токен (token_hash) и deep-link на бота.
+- `TelegramLoginToken` (app/Domain/Users/Models/TelegramLoginToken)
+  - Одноразовый токен входа через Telegram-бота (TTL, confirmed_at, used_at, session_id).
+- `TelegramLoginService` (app/Domain/Users/Services/TelegramLoginService)
+  - Генерация токена для входа, подтверждение в боте, автосоздание пользователя и привязка Telegram-контакта.
+  - Команда бота `/account` показывает логин и (если аккаунт создан автоматически) пароль.
 - `ContactDeliveryResolver` (app/Domain/Users/Infrastructure/ContactDeliveryResolver)
   - Роутер каналов доставки кода подтверждения по типу контакта.
 - `ContactDelivery` (app/Domain/Users/Contracts/ContactDelivery)

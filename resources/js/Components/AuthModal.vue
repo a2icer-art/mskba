@@ -49,6 +49,8 @@ const loginError = computed(() => {
     return loginForm.errors.login || loginForm.errors.password || page.props.errors?.login;
 });
 const infoNotice = computed(() => page.props.flash?.info || '');
+const telegramError = ref('');
+const telegramLoading = ref(false);
 
 const registerError = computed(() => {
     return (
@@ -80,6 +82,45 @@ const submitRegister = () => {
             emit('close');
         },
     });
+};
+
+const getCsrfToken = () => {
+    const token = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
+    return token || '';
+};
+
+const requestTelegramLogin = async () => {
+    telegramError.value = '';
+    telegramLoading.value = true;
+
+    try {
+        const response = await fetch('/auth/telegram/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+            },
+            body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            telegramError.value = data?.errors?.telegram?.[0] || 'Не удалось получить ссылку Telegram.';
+            return;
+        }
+
+        const data = await response.json();
+        if (!data?.link) {
+            telegramError.value = 'Не удалось получить ссылку Telegram.';
+            return;
+        }
+
+        window.location.href = data.link;
+    } catch (error) {
+        telegramError.value = 'Не удалось получить ссылку Telegram.';
+    } finally {
+        telegramLoading.value = false;
+    }
 };
 </script>
 
@@ -162,6 +203,24 @@ const submitRegister = () => {
                     <div v-if="loginError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                         {{ loginError }}
                     </div>
+
+                    <div class="space-y-2">
+                        <button
+                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                            type="button"
+                            :disabled="telegramLoading"
+                            @click="requestTelegramLogin"
+                        >
+                            Войти через Telegram
+                        </button>
+                        <p class="text-xs text-slate-500">Откроется чат с ботом для подтверждения входа.</p>
+                        <div
+                            v-if="telegramError"
+                            class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+                        >
+                            {{ telegramError }}
+                        </div>
+                    </div>
                 </form>
 
                 <form
@@ -241,4 +300,3 @@ const submitRegister = () => {
         </div>
     </div>
 </template>
-
