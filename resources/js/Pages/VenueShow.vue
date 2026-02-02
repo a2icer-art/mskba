@@ -344,14 +344,14 @@ onBeforeUnmount(() => {
 });
 
 const selectedDay = ref(null);
-const allowDayPicker = ref(false);
+const headerBookingFlow = ref(false);
 const dayPickerValue = ref('');
 const showDayBookingForm = ref(false);
 const dayLoading = ref(false);
 const dayError = ref('');
 const openDayDetails = (day) => {
-    allowDayPicker.value = false;
-    dayPickerValue.value = day.date || '';
+    headerBookingFlow.value = false;
+    dayPickerValue.value = '';
     selectedDay.value = {
         date: day.date,
         is_today: day.is_today,
@@ -369,7 +369,7 @@ const openDayDetails = (day) => {
 const openHeaderDayDetails = () => {
     const today = new Date();
     const todayString = today.toISOString().slice(0, 10);
-    allowDayPicker.value = true;
+    headerBookingFlow.value = true;
     dayPickerValue.value = todayString;
     selectedDay.value = {
         date: todayString,
@@ -388,7 +388,7 @@ const openHeaderDayDetails = () => {
 const closeDayDetails = () => {
     selectedDay.value = null;
     showDayBookingForm.value = false;
-    allowDayPicker.value = false;
+    headerBookingFlow.value = false;
     dayPickerValue.value = '';
     createPrefill.value = {};
     dayLoading.value = false;
@@ -460,7 +460,7 @@ const fetchDayDetails = async (date) => {
 watch(
     () => dayPickerValue.value,
     (value) => {
-        if (!allowDayPicker.value) {
+        if (!headerBookingFlow.value) {
             return;
         }
         if (!value) {
@@ -1150,7 +1150,7 @@ const submitModerationRequest = () => {
                     </button>
                 </div>
                 <div ref="popupBodyRef" class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4" :class="{ loading: dayLoading }">
-                    <div v-if="allowDayPicker" class="mb-4">
+                    <div v-if="headerBookingFlow && !showDayBookingForm" class="mb-4">
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                             Дата
                             <input
