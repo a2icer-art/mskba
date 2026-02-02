@@ -759,7 +759,7 @@ class VenuesController extends Controller
                         $status === EventBookingStatus::Paid->value || $canConfirmPostpayment
                     ),
                     'can_cancel' => !$isPast && $canCancel && (in_array($status, [EventBookingStatus::Pending->value, EventBookingStatus::AwaitingPayment->value], true)
-                        || ($status === EventBookingStatus::Approved->value && $isAdmin)),
+                        || ($isAdmin && in_array($status, [EventBookingStatus::Approved->value, EventBookingStatus::Paid->value], true))),
                 ];
             });
 
@@ -1713,13 +1713,13 @@ class VenuesController extends Controller
             ]);
         }
 
-        if (!in_array($booking->status, [EventBookingStatus::Pending, EventBookingStatus::AwaitingPayment, EventBookingStatus::Approved], true)) {
+        if (!in_array($booking->status, [EventBookingStatus::Pending, EventBookingStatus::AwaitingPayment, EventBookingStatus::Approved, EventBookingStatus::Paid], true)) {
             return back()->withErrors([
                 'booking' => 'Отменить можно только активную заявку.',
             ]);
         }
 
-        if ($booking->status === EventBookingStatus::Approved) {
+        if (in_array($booking->status, [EventBookingStatus::Approved, EventBookingStatus::Paid], true)) {
             $isAdmin = $user->roles()->where('alias', 'admin')->exists();
             if (!$isAdmin) {
                 return back()->withErrors([
@@ -1740,12 +1740,20 @@ class VenuesController extends Controller
             'moderated_at' => now(),
         ]);
 
-        Payment::query()
+        $payment = Payment::query()
             ->where('payable_type', $booking->getMorphClass())
             ->where('payable_id', $booking->id)
-            ->update([
-                'status' => PaymentStatus::Cancelled,
+            ->first();
+
+        if ($payment) {
+            $nextPaymentStatus = $payment->status === PaymentStatus::Paid
+                ? PaymentStatus::Refunded
+                : PaymentStatus::Cancelled;
+            $payment->update([
+                'status' => $nextPaymentStatus,
+                'paid_at' => $nextPaymentStatus === PaymentStatus::Refunded ? $payment->paid_at : null,
             ]);
+        }
 
         app(BookingNotificationService::class)->notifyStatus($booking, EventBookingStatus::Cancelled, $user);
 
