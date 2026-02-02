@@ -12,6 +12,10 @@ defineProps({
 
 const page = usePage();
 const adminModerationBadge = computed(() => {
+    const counters = page.props?.adminCounters;
+    if (counters && Number.isFinite(Number(counters.moderation_pending))) {
+        return Number(counters.moderation_pending);
+    }
     const navigation = page.props?.navigation;
     if (!navigation || !Array.isArray(navigation.data)) {
         return '';

@@ -6,6 +6,9 @@ use App\Domain\Participants\Enums\ParticipantRoleStatus;
 use App\Domain\Participants\Models\ParticipantRole;
 use App\Domain\Admin\Services\SiteAssetsService;
 use App\Domain\Permissions\Models\Permission;
+use App\Domain\Permissions\Enums\PermissionCode;
+use App\Domain\Moderation\Models\ModerationRequest;
+use App\Domain\Moderation\Enums\ModerationStatus;
 use App\Domain\Seo\Services\PageMetaService;
 use App\Domain\Users\Enums\UserStatus;
 use App\Domain\Messages\Services\MessageCountersService;
@@ -83,6 +86,11 @@ class HandleInertiaRequests extends Middleware
                 : [
                     'unread_messages' => 0,
                 ],
+            'adminCounters' => $user && in_array(PermissionCode::ModerationAccess->value, $permissionCodes, true)
+                ? [
+                    'moderation_pending' => ModerationRequest::where('status', ModerationStatus::Pending->value)->count(),
+                ]
+                : null,
             'participantRoles' => ParticipantRole::query()
                 ->where('status', ParticipantRoleStatus::Confirmed)
                 ->orderBy('sort')
