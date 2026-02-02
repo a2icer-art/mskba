@@ -83,7 +83,6 @@ const moderationForm = useForm({});
 const moderationNotice = ref('');
 const moderationErrors = ref([]);
 const editOpen = ref(false);
-const showBookingModal = ref(false);
 const showConfirmModal = ref(false);
 const editNotice = ref('');
 const editAddressQuery = ref('');
@@ -130,12 +129,6 @@ const isVenueOnModeration = computed(() => props.venue?.status === 'moderation')
 const isVenueUnavailableForBooking = computed(() => props.venue?.status && props.venue?.status !== 'confirmed');
 const isUserAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
-const adminOverviewUrl = computed(() =>
-    props.activeTypeSlug && props.venue?.alias ? `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin` : ''
-);
-const bookingPrefill = computed(() => ({
-    venue: props.venue?.alias ?? '',
-}));
 const nonEditableItems = computed(() => {
     const addressFields = ['city', 'street', 'building', 'metro_id'];
     const labels = {
@@ -351,10 +344,14 @@ onBeforeUnmount(() => {
 });
 
 const selectedDay = ref(null);
+const allowDayPicker = ref(false);
+const dayPickerValue = ref('');
 const showDayBookingForm = ref(false);
 const dayLoading = ref(false);
 const dayError = ref('');
 const openDayDetails = (day) => {
+    allowDayPicker.value = false;
+    dayPickerValue.value = day.date || '';
     selectedDay.value = {
         date: day.date,
         is_today: day.is_today,
@@ -369,9 +366,30 @@ const openDayDetails = (day) => {
     showDayBookingForm.value = false;
     fetchDayDetails(day.date);
 };
+const openHeaderDayDetails = () => {
+    const today = new Date();
+    const todayString = today.toISOString().slice(0, 10);
+    allowDayPicker.value = true;
+    dayPickerValue.value = todayString;
+    selectedDay.value = {
+        date: todayString,
+        is_today: true,
+        is_closed: false,
+        is_closed_by_exception: false,
+        intervals: [],
+        bookings: [],
+        comment: null,
+    };
+    dayLoading.value = true;
+    dayError.value = '';
+    showDayBookingForm.value = false;
+    fetchDayDetails(todayString);
+};
 const closeDayDetails = () => {
     selectedDay.value = null;
     showDayBookingForm.value = false;
+    allowDayPicker.value = false;
+    dayPickerValue.value = '';
     createPrefill.value = {};
     dayLoading.value = false;
     dayError.value = '';
@@ -439,6 +457,33 @@ const fetchDayDetails = async (date) => {
         dayLoading.value = false;
     }
 };
+watch(
+    () => dayPickerValue.value,
+    (value) => {
+        if (!allowDayPicker.value) {
+            return;
+        }
+        if (!value) {
+            return;
+        }
+        if (selectedDay.value?.date === value) {
+            return;
+        }
+        selectedDay.value = {
+            date: value,
+            is_today: false,
+            is_closed: false,
+            is_closed_by_exception: false,
+            intervals: [],
+            bookings: [],
+            comment: null,
+        };
+        dayLoading.value = true;
+        dayError.value = '';
+        showDayBookingForm.value = false;
+        fetchDayDetails(value);
+    }
+);
 const openBookingFromDay = () => {
     if (!selectedDay.value) {
         return;
@@ -612,14 +657,6 @@ const closeEdit = () => {
     editAddressSuggestError.value = '';
 };
 
-const openBookingModal = () => {
-    showBookingModal.value = true;
-};
-
-const closeBookingModal = () => {
-    showBookingModal.value = false;
-};
-
 const openConfirmModal = () => {
     showConfirmModal.value = true;
 };
@@ -641,7 +678,7 @@ const handleBookingCta = () => {
         openConfirmModal();
         return;
     }
-    openBookingModal();
+    openHeaderDayDetails();
 };
 
 const submitEdit = () => {
@@ -1113,6 +1150,16 @@ const submitModerationRequest = () => {
                     </button>
                 </div>
                 <div ref="popupBodyRef" class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4" :class="{ loading: dayLoading }">
+                    <div v-if="allowDayPicker" class="mb-4">
+                        <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            Дата
+                            <input
+                                v-model="dayPickerValue"
+                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                type="date"
+                            />
+                        </label>
+                    </div>
                     <div v-if="dayError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                         {{ dayError }}
                     </div>
@@ -1384,12 +1431,6 @@ const submitModerationRequest = () => {
                 </form>
             </div>
         </div>
-
-        <EventCreateModal
-            :is-open="showBookingModal"
-            :prefill="bookingPrefill"
-            @close="closeBookingModal"
-        />
 
         <div
             v-if="showConfirmModal"
