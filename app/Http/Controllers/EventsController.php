@@ -13,6 +13,8 @@ use App\Domain\Events\Services\EventBookingService;
 use App\Domain\Events\Services\EventParticipantService;
 use App\Domain\Admin\Services\EventDefaultsService;
 use App\Domain\Participants\Enums\ParticipantRoleAssignmentStatus;
+use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Payments\Models\Payment;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Users\Enums\UserStatus;
@@ -770,7 +772,25 @@ class EventsController extends Controller
             ]);
         }
 
-        $event->delete();
+        DB::transaction(function () use ($event) {
+            $event->bookings()
+                ->with('payment')
+                ->get()
+                ->each(function ($booking) {
+                    $payment = $booking->payment;
+                    if ($payment) {
+                        $payment->update([
+                            'status' => PaymentStatus::Cancelled,
+                            'paid_at' => null,
+                            'payable_type' => null,
+                            'payable_id' => null,
+                        ]);
+                    }
+                    $booking->delete();
+                });
+
+            $event->delete();
+        });
 
         return redirect()->route('events.index')->with('notice', 'Событие удалено.');
     }
