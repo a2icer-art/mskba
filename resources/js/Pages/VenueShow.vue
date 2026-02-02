@@ -83,6 +83,8 @@ const moderationForm = useForm({});
 const moderationNotice = ref('');
 const moderationErrors = ref([]);
 const editOpen = ref(false);
+const showBookingModal = ref(false);
+const showConfirmModal = ref(false);
 const editNotice = ref('');
 const editAddressQuery = ref('');
 const editAddressSuggestions = ref([]);
@@ -126,6 +128,14 @@ const canSubmitModeration = computed(() => props.canSubmitModeration);
 const isVenueConfirmed = computed(() => props.venue?.status === 'confirmed');
 const isVenueOnModeration = computed(() => props.venue?.status === 'moderation');
 const isVenueUnavailableForBooking = computed(() => props.venue?.status && props.venue?.status !== 'confirmed');
+const isUserAuthenticated = computed(() => Boolean(page.props.auth?.user));
+const isUserConfirmed = computed(() => page.props.auth?.user?.status === 'confirmed');
+const adminOverviewUrl = computed(() =>
+    props.activeTypeSlug && props.venue?.alias ? `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin` : ''
+);
+const bookingPrefill = computed(() => ({
+    venue: props.venue?.alias ?? '',
+}));
 const nonEditableItems = computed(() => {
     const addressFields = ['city', 'street', 'building', 'metro_id'];
     const labels = {
@@ -597,6 +607,38 @@ const closeEdit = () => {
     editAddressSuggestError.value = '';
 };
 
+const openBookingModal = () => {
+    showBookingModal.value = true;
+};
+
+const closeBookingModal = () => {
+    showBookingModal.value = false;
+};
+
+const openConfirmModal = () => {
+    showConfirmModal.value = true;
+};
+
+const closeConfirmModal = () => {
+    showConfirmModal.value = false;
+};
+
+const handleBookingCta = () => {
+    if (isVenueUnavailableForBooking.value) {
+        return;
+    }
+    if (!isUserAuthenticated.value) {
+        authMode.value = 'login';
+        showAuthModal.value = true;
+        return;
+    }
+    if (!isUserConfirmed.value) {
+        openConfirmModal();
+        return;
+    }
+    openBookingModal();
+};
+
 const submitEdit = () => {
     editNotice.value = '';
     editForm.transform((data) => {
@@ -769,12 +811,12 @@ const submitModerationRequest = () => {
                             </p>
                         </div>
                         <button
-                            v-if="canEdit"
-                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
                             type="button"
-                            @click="openEdit"
+                            :disabled="isVenueUnavailableForBooking"
+                            @click="handleBookingCta"
                         >
-                            Редактировать
+                            Забронировать
                         </button>
                     </div>
 
@@ -1335,6 +1377,50 @@ const submitModerationRequest = () => {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <EventCreateModal
+            :is-open="showBookingModal"
+            :prefill="bookingPrefill"
+            @close="closeBookingModal"
+        />
+
+        <div
+            v-if="showConfirmModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+            @click.self="closeConfirmModal"
+        >
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Подтвердите аккаунт</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closeConfirmModal"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body px-6 pt-4 text-sm text-slate-600">
+                    Чтобы бронировать площадки, подтвердите свой аккаунт.
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <Link
+                        href="/account"
+                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                    >
+                        Перейти в аккаунт
+                    </Link>
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        @click="closeConfirmModal"
+                    >
+                        Закрыть
+                    </button>
+                </div>
             </div>
         </div>
 
