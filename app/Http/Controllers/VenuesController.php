@@ -2245,6 +2245,77 @@ class VenuesController extends Controller
             ->exists();
     }
 
+    private function canManageBookings(?\App\Models\User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueBookingConfirm, $venue)
+            || $checker->can($user, PermissionCode::VenueBookingCancel, $venue);
+    }
+
+    private function canManageSettings(?\App\Models\User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()
+            ->where('alias', 'admin')
+            ->exists();
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueSettingsManage, $venue)
+            || $checker->can($user, PermissionCode::VenueEdit, $venue)
+            || $checker->can($user, PermissionCode::VenueUpdate, $venue);
+    }
+
+    private function canViewSupervisor(?\App\Models\User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()
+            ->where('alias', 'admin')
+            ->exists();
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueSupervisorView, $venue);
+    }
+
+    private function canManageSchedule(?\App\Models\User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = $user->roles()
+            ->where('alias', 'admin')
+            ->exists();
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        $checker = app(PermissionChecker::class);
+
+        return $checker->can($user, PermissionCode::VenueScheduleManage, $venue);
+    }
+
     private function canViewContractRequests(array $contractModeration): bool
     {
         foreach (['owner', 'supervisor'] as $type) {
