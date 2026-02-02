@@ -35,7 +35,7 @@ class VenueSidebarPresenter extends BasePresenter
 
         $groups = [
             [
-                'title' => 'Общее',
+                'title' => 'Навигация',
                 'items' => [
                     [
                         'label' => 'О площадке',
