@@ -790,8 +790,8 @@ const submitModerationRequest = () => {
                                     : {}
                             "
                         >
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Навигация</p>
-                            <div class="mt-3 flex flex-wrap gap-2">
+                            <p v-if="!isAnchorSticky" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Навигация</p>
+                            <div :class="isAnchorSticky ? 'flex flex-wrap gap-2' : 'mt-3 flex flex-wrap gap-2'">
                                 <button
                                     v-for="section in anchorSections"
                                     :key="section.id"
