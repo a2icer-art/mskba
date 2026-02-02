@@ -2224,6 +2224,27 @@ class VenuesController extends Controller
             ->exists();
     }
 
+    private function canRequestContracts(?\App\Models\User $user, Venue $venue): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return ParticipantRoleAssignment::query()
+            ->where('user_id', $user->id)
+            ->where('status', ParticipantRoleAssignmentStatus::Confirmed->value)
+            ->whereHas('role', fn ($query) => $query->where('alias', 'venue-admin'))
+            ->where(function ($query) use ($venue) {
+                $query->whereNull('context_type')
+                    ->whereNull('context_id')
+                    ->orWhere(function ($subQuery) use ($venue) {
+                        $subQuery->where('context_type', $venue->getMorphClass())
+                            ->where('context_id', $venue->getKey());
+                    });
+            })
+            ->exists();
+    }
+
     private function canViewContractRequests(array $contractModeration): bool
     {
         foreach (['owner', 'supervisor'] as $type) {
