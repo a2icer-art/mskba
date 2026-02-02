@@ -439,7 +439,8 @@ const clearVenueSelection = () => {
                             {{ createForm.errors.event_type_id }}
                         </div>
 
-                        <div v-if="canSelectVenue" class="relative">
+                        <input v-if="hasPrefilledVenue" v-model="createForm.venue_id" type="hidden" />
+                        <div v-else-if="canSelectVenue" class="relative">
                             <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Площадка (опционально)
                                 <input
