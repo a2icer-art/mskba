@@ -87,6 +87,10 @@ class VenueSidebarPresenter extends BasePresenter
         $adminGroups = [];
         if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor || $canManageSchedule) {
             $adminItems = [];
+            $adminItems[] = [
+                'label' => 'Общее',
+                'href' => "/venues/{$typeSlug}/{$venue->alias}/admin",
+            ];
             if ($showContracts) {
                 $adminItems[] = [
                     'label' => 'Контракты',

@@ -120,6 +120,9 @@ Route::prefix('venues')->group(function () {
         ->name('venues.moderation.request');
     Route::get('/{type}/{venue}/schedule', [VenuesController::class, 'schedule'])
         ->name('venues.schedule');
+    Route::get('/{type}/{venue}/admin', [VenuesController::class, 'adminOverview'])
+        ->middleware('auth')
+        ->name('venues.admin');
     Route::get('/{type}/{venue}/admin/schedule', [VenuesController::class, 'adminSchedule'])
         ->middleware('auth')
         ->name('venues.schedule.admin');

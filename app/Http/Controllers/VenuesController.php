@@ -421,6 +421,50 @@ class VenuesController extends Controller
         );
     }
 
+    public function adminOverview(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+        $venue->load([
+            'venueType:id,name,plural_name,alias',
+            'creator:id,login',
+            'latestAddress.metro:id,name,line_name,line_color,city',
+        ]);
+
+        if (!$this->canViewVenueAdminOverview($user, $venue)) {
+            abort(403);
+        }
+
+        $data = app(VenueShowPresenter::class)->present([
+            'user' => $user,
+            'venue' => $venue,
+            'typeSlug' => $type,
+        ])['data'];
+
+        $breadcrumbs = app(VenueBreadcrumbsPresenter::class)->present([
+            'venue' => $venue,
+            'typeSlug' => $type,
+            'label' => 'Общее',
+        ])['data'];
+
+        return Inertia::render('VenueAdminOverview', array_merge(
+            $data,
+            [
+                'appName' => config('app.name'),
+                'breadcrumbs' => $breadcrumbs,
+                'activeHref' => "/venues/{$type}/{$venue->alias}/admin",
+                'activeTypeSlug' => $type,
+            ]
+        ));
+    }
+
     public function adminSchedule(Request $request, string $type, Venue $venue)
     {
         $user = $request->user();
@@ -552,7 +596,21 @@ class VenuesController extends Controller
             'activeHref' => $activeHref,
             'activeTypeSlug' => $type,
             'breadcrumbs' => $breadcrumbs,
-        ]);
+            ]);
+    }
+
+    private function canViewVenueAdminOverview(\App\Models\User $user, Venue $venue): bool
+    {
+        $canViewContracts = $this->canViewContracts($user, $venue);
+        $canRequestContracts = $this->canRequestContracts($user, $venue);
+        $isConfirmedUser = $user->status?->value === UserStatus::Confirmed->value;
+        $showContracts = $canViewContracts || $canRequestContracts || $isConfirmedUser;
+        $canManageBookings = $this->canManageBookings($user, $venue);
+        $canManageSettings = $this->canManageSettings($user, $venue);
+        $canViewSupervisor = $this->canViewSupervisor($user, $venue);
+        $canManageSchedule = $this->canManageSchedule($user, $venue);
+
+        return $showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor || $canManageSchedule;
     }
 
     public function bookings(Request $request, string $type, Venue $venue)
