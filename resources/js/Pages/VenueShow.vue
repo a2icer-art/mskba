@@ -75,7 +75,10 @@ const page = usePage();
 const showAuthModal = ref(false);
 const authMode = ref('login');
 const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const adminNavigationData = computed(() => props.navigation?.admin ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
+const hasAdminSidebar = computed(() => (adminNavigationData.value?.length ?? 0) > 0);
+const hasAnySidebar = computed(() => hasSidebar.value || hasAdminSidebar.value);
 const moderationForm = useForm({});
 const moderationNotice = ref('');
 const moderationErrors = ref([]);
@@ -735,13 +738,19 @@ const submitModerationRequest = () => {
                 @open-login="authMode = 'login'; showAuthModal = true"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
-                <MainSidebar
-                    v-if="hasSidebar"
-                    :title="navigation.title"
-                    :data="navigationData"
-                    :active-href="activeTypeSlug && venue?.alias ? `/venues/${activeTypeSlug}/${venue?.alias}` : ''"
-                />
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasAnySidebar }">
+                <div v-if="hasAnySidebar" class="flex flex-col gap-4">
+                    <MainSidebar
+                        v-if="hasSidebar"
+                        :data="navigationData"
+                        :active-href="activeTypeSlug && venue?.alias ? `/venues/${activeTypeSlug}/${venue?.alias}` : ''"
+                    />
+                    <MainSidebar
+                        v-if="hasAdminSidebar"
+                        :data="adminNavigationData"
+                        :active-href="activeTypeSlug && venue?.alias ? `/venues/${activeTypeSlug}/${venue?.alias}` : ''"
+                    />
+                </div>
 
                 <div ref="pageContentRef" class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />

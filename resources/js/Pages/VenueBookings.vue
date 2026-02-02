@@ -62,7 +62,10 @@ const page = usePage();
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.booking ?? '');
 const navigationData = computed(() => props.navigation?.data ?? props.navigation?.items ?? []);
+const adminNavigationData = computed(() => props.navigation?.admin ?? []);
 const hasSidebar = computed(() => (navigationData.value?.length ?? 0) > 0);
+const hasAdminSidebar = computed(() => (adminNavigationData.value?.length ?? 0) > 0);
+const hasAnySidebar = computed(() => hasSidebar.value || hasAdminSidebar.value);
 const statusFilter = ref(props.filters?.status || '');
 const statuses = [
     { value: '', label: 'Все' },
@@ -551,13 +554,19 @@ watch(
                 :login-label="$page.props.auth?.user?.login"
             />
 
-            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasSidebar }">
-                <MainSidebar
-                    v-if="hasSidebar"
-                    :title="navigation?.title"
-                    :data="navigationData"
-                    :active-href="activeHref"
-                />
+            <main class="grid gap-6" :class="{ 'lg:grid-cols-[280px_1fr]': hasAnySidebar }">
+                <div v-if="hasAnySidebar" class="flex flex-col gap-4">
+                    <MainSidebar
+                        v-if="hasSidebar"
+                        :data="navigationData"
+                        :active-href="activeHref"
+                    />
+                    <MainSidebar
+                        v-if="hasAdminSidebar"
+                        :data="adminNavigationData"
+                        :active-href="activeHref"
+                    />
+                </div>
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />

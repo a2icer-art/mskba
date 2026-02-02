@@ -16,12 +16,30 @@ use App\Presentation\BasePresenter;
 
 class VenueSidebarPresenter extends BasePresenter
 {
+    public function present(array $ctx = []): array
+    {
+        [$primaryGroups, $adminGroups] = $this->buildGroups($ctx);
+
+        return [
+            'title' => $this->resolveTitle($ctx),
+            'data' => $primaryGroups,
+            'admin' => $adminGroups,
+        ];
+    }
+
     protected function resolveTitle(array $ctx): string
     {
         return $ctx['title'] ?? 'Площадки';
     }
 
     protected function buildData(array $ctx): array
+    {
+        [$primaryGroups] = $this->buildGroups($ctx);
+
+        return $primaryGroups;
+    }
+
+    protected function buildGroups(array $ctx): array
     {
         $typeSlug = $ctx['typeSlug'] ?? '';
         /** @var Venue|null $venue */
@@ -30,10 +48,10 @@ class VenueSidebarPresenter extends BasePresenter
         $user = $ctx['user'] ?? null;
 
         if (!$typeSlug || !$venue) {
-            return [];
+            return [[], []];
         }
 
-        $groups = [
+        $primaryGroups = [
             [
                 'title' => 'Навигация',
                 'items' => [
@@ -66,6 +84,7 @@ class VenueSidebarPresenter extends BasePresenter
             ? $checker->can($user, PermissionCode::VenueMediaManage, $venue)
             : false;
 
+        $adminGroups = [];
         if ($showContracts || $canManageBookings || $canManageSettings || $canViewSupervisor || $canManageSchedule) {
             $adminItems = [];
             if ($showContracts) {
@@ -105,13 +124,13 @@ class VenueSidebarPresenter extends BasePresenter
                 ];
             }
 
-            $groups[] = [
+            $adminGroups[] = [
                 'title' => 'Администрация',
                 'items' => $adminItems,
             ];
         }
 
-        return $groups;
+        return [$primaryGroups, $adminGroups];
     }
 
     private function canViewContracts(?User $user, Venue $venue): bool
