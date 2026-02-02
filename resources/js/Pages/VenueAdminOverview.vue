@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -36,6 +36,10 @@ const props = defineProps({
         default: () => [],
     },
     canSubmitModeration: {
+        type: Boolean,
+        default: false,
+    },
+    canEdit: {
         type: Boolean,
         default: false,
     },
@@ -99,6 +103,9 @@ const formatMetroLabel = (metro) => {
     const line = metro.line_name ? ` (${metro.line_name})` : '';
     return `${name}${line}` || '—';
 };
+const editUrl = computed(() =>
+    props.activeTypeSlug && props.venue?.alias ? `/venues/${props.activeTypeSlug}/${props.venue.alias}?edit=1` : ''
+);
 </script>
 
 <template>
@@ -129,7 +136,16 @@ const formatMetroLabel = (metro) => {
 
                 <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-sm page-content-wrapper">
                     <Breadcrumbs :items="breadcrumbs" />
-                    <h1 class="text-3xl font-semibold text-slate-900">Общее</h1>
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <h1 class="text-3xl font-semibold text-slate-900">Общее</h1>
+                        <Link
+                            v-if="canEdit && editUrl"
+                            :href="editUrl"
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                        >
+                            Редактировать
+                        </Link>
+                    </div>
 
                     <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" :class="{ loading: moderationForm.processing }">
                         <div class="flex items-center justify-between gap-4">

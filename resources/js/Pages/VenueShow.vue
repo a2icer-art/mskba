@@ -332,6 +332,11 @@ onMounted(() => {
     window.addEventListener('scroll', updateActiveSection, { passive: true });
     window.addEventListener('resize', refreshAnchorMetrics);
     window.addEventListener('resize', updateHeaderOffset);
+
+    const search = new URLSearchParams(window.location.search);
+    if (canEdit.value && search.get('edit') === '1') {
+        openEdit();
+    }
 });
 
 onBeforeUnmount(() => {
