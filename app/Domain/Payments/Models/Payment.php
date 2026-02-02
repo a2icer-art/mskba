@@ -63,14 +63,19 @@ class Payment extends Model
                 return;
             }
 
-            $payment->payment_code = static::generateUniqueCode();
+            $payment->payment_code = static::generateUniqueCode($payment->payable_type);
         });
     }
 
-    private static function generateUniqueCode(): string
+    private static function generateUniqueCode(?string $payableType): string
     {
+        $prefix = match ($payableType) {
+            'App\\Domain\\Events\\Models\\EventBooking' => 'VBP',
+            default => '',
+        };
+
         do {
-            $code = Str::upper(Str::random(6));
+            $code = $prefix . Str::upper(Str::random(6));
         } while (self::query()->where('payment_code', $code)->exists());
 
         return $code;
