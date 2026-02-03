@@ -22,7 +22,6 @@ use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
-use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Venues\Enums\VenueStatus;
