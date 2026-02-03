@@ -75,7 +75,7 @@ const formErrorNotice = computed(() => {
     return 'Не удалось сохранить изменения. Проверьте значения.';
 });
 
-const selectedAmenityIds = ref([...(props.selectedAmenityIds ?? [])]);
+const selectedAmenityIds = ref((props.selectedAmenityIds ?? []).map((id) => Number(id)));
 const customAmenityDraft = ref('');
 const customAmenityItems = ref(
     (props.customAmenities ?? []).map((item) => ({

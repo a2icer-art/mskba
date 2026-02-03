@@ -1037,6 +1037,7 @@ class VenuesController extends Controller
 
         $selectedAmenityIds = $venue->amenities()
             ->pluck('amenities.id')
+            ->map(static fn ($id) => (int) $id)
             ->all();
 
         $amenityNotes = $venue->venueAmenities()
