@@ -169,6 +169,9 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/contracts/{contract}/payment-methods/{paymentMethod}', [VenuesController::class, 'updateContractPaymentMethod'])
         ->middleware('auth')
         ->name('venues.contracts.payment-methods.update');
+    Route::delete('/{type}/{venue}/admin/contracts/{contract}/payment-methods/{paymentMethod}', [VenuesController::class, 'destroyContractPaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.contracts.payment-methods.destroy');
     Route::post('/{type}/{venue}/admin/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
         ->middleware('auth')
         ->name('venues.contracts.revoke');
@@ -205,6 +208,9 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/settings/payment-methods/{paymentMethod}', [VenuesController::class, 'updateVenuePaymentMethod'])
         ->middleware('auth')
         ->name('venues.settings.payment-methods.update');
+    Route::delete('/{type}/{venue}/admin/settings/payment-methods/{paymentMethod}', [VenuesController::class, 'destroyVenuePaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.settings.payment-methods.destroy');
     Route::post('/{type}/{venue}/admin/settings/amenities/{amenity}/icon', [VenuesController::class, 'uploadCustomAmenityIcon'])
         ->middleware('auth')
         ->name('venues.settings.amenities.icon');

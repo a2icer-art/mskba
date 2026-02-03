@@ -22,6 +22,7 @@ use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Events\Enums\EventBookingModerationSource;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Models\EventBooking;
+use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Services\BookingPaymentExpiryService;
 use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Venues\Enums\VenueStatus;
@@ -1447,6 +1448,37 @@ class VenuesController extends Controller
         return back()->with('notice', 'Метод оплаты обновлён.');
     }
 
+    public function destroyVenuePaymentMethod(Request $request, string $type, Venue $venue, PaymentMethod $paymentMethod)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        $this->ensurePaymentMethodOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
+
+        if ($this->isPaymentMethodUsedInActiveBookings($venue, $paymentMethod->id)) {
+            return back()->withErrors([
+                'payment_method' => 'Метод используется в текущих бронированиях.',
+            ]);
+        }
+
+        $paymentMethod->delete();
+
+        return back()->with('notice', 'Метод оплаты удалён.');
+    }
+
     public function storeContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract)
     {
         $user = $request->user();
@@ -1493,6 +1525,32 @@ class VenuesController extends Controller
         $paymentMethod->update($data);
 
         return back()->with('notice', 'Метод оплаты обновлён.');
+    }
+
+    public function destroyContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract, PaymentMethod $paymentMethod)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureContractPaymentAccess($user, $venue, $contract);
+        $this->ensurePaymentMethodOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
+
+        if ($this->isPaymentMethodUsedInActiveBookings($venue, $paymentMethod->id)) {
+            return back()->withErrors([
+                'payment_method' => 'Метод используется в текущих бронированиях.',
+            ]);
+        }
+
+        $paymentMethod->delete();
+
+        return back()->with('notice', 'Метод оплаты удалён.');
     }
 
     private function validatePaymentMethod(Request $request): array
@@ -1547,6 +1605,22 @@ class VenuesController extends Controller
         if ($method->owner_type !== $ownerType || (int) $method->owner_id !== $ownerId) {
             abort(404);
         }
+    }
+
+    private function isPaymentMethodUsedInActiveBookings(Venue $venue, int $paymentMethodId): bool
+    {
+        $activeStatuses = [
+            EventBookingStatus::Pending->value,
+            EventBookingStatus::AwaitingPayment->value,
+            EventBookingStatus::Paid->value,
+            EventBookingStatus::Approved->value,
+        ];
+
+        return EventBooking::query()
+            ->where('venue_id', $venue->id)
+            ->whereIn('status', $activeStatuses)
+            ->whereJsonContains('payment_methods_snapshot', ['id' => $paymentMethodId])
+            ->exists();
     }
 
     private function ensureContractPaymentAccess(\App\Models\User $user, Venue $venue, Contract $contract): void

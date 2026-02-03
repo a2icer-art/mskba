@@ -94,6 +94,8 @@ const paymentMethodForm = useForm({
     is_active: true,
     sort_order: 0,
 });
+const deletePaymentMethodForm = useForm({});
+const paymentMethodError = computed(() => page.props?.errors?.payment_method ?? '');
 const formErrorNotice = computed(() => {
     if (!actionError.value || !Object.keys(actionError.value).length) {
         return '';
@@ -426,6 +428,22 @@ const submitPaymentMethod = () => {
     });
 };
 
+const deletePaymentMethod = (method) => {
+    if (!method?.id || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    if (!confirm('Удалить метод оплаты?')) {
+        return;
+    }
+    const url = `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/settings/payment-methods/${method.id}`;
+    deletePaymentMethodForm.delete(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            closePaymentMethod();
+        },
+    });
+};
+
 watch(
     () => paymentMethodForm.type,
     (value) => {
@@ -700,16 +718,28 @@ const uploadCustomIcon = (amenityId, file) => {
                                                     Статус: {{ method.is_active ? 'Активен' : 'Неактивен' }}
                                                 </p>
                                             </div>
-                                            <button
-                                                type="button"
-                                                class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
-                                                @click="openPaymentMethod(method)"
-                                            >
-                                                Редактировать
-                                            </button>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
+                                                    @click="openPaymentMethod(method)"
+                                                >
+                                                    Редактировать
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="rounded-full border border-rose-200 px-3 py-1 text-xs text-rose-700 transition hover:border-rose-300"
+                                                    @click="deletePaymentMethod(method)"
+                                                >
+                                                    Удалить
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <p v-else class="mt-3 text-sm text-slate-500">Методы оплаты не добавлены.</p>
+                                    <p v-if="paymentMethodError" class="mt-3 text-xs text-rose-700">
+                                        {{ paymentMethodError }}
+                                    </p>
                                 </div>
                                 <hr class="border-slate-200/80" />
                             </div>

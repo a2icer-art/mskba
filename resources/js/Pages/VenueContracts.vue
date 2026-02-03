@@ -116,6 +116,8 @@ const newPaymentMethodForm = useForm({
     is_active: true,
     sort_order: 0,
 });
+const deletePaymentMethodForm = useForm({});
+const paymentMethodError = computed(() => page.props?.errors?.payment_method ?? '');
 const revokeForm = useForm({});
 const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const actionError = computed(() => page.props?.errors?.contract ?? '');
@@ -307,6 +309,30 @@ const submitNewPaymentMethod = () => {
             newPaymentMethodForm.type = 'sbp';
             newPaymentMethodForm.is_active = true;
             newPaymentMethodForm.sort_order = 0;
+            refreshContractMethods();
+        },
+    });
+};
+
+const deleteContractPaymentMethod = (method) => {
+    if (!method?.id || !paymentMethodContract.value || !props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+    if (!confirm('Удалить метод оплаты?')) {
+        return;
+    }
+    const baseUrl = `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/contracts/${paymentMethodContract.value.id}/payment-methods`;
+    const url = `${baseUrl}/${method.id}`;
+
+    deletePaymentMethodForm.delete(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            if (activePaymentMethodId.value === method.id) {
+                activePaymentMethodId.value = null;
+                paymentMethodTarget.value = null;
+                paymentMethodForm.reset();
+                paymentMethodForm.clearErrors();
+            }
             refreshContractMethods();
         },
     });
@@ -863,13 +889,22 @@ const formatDate = (value) => {
                                             Статус: {{ method.is_active ? 'Активен' : 'Неактивен' }}
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
-                                        @click="togglePaymentMethodEditor(method)"
-                                    >
-                                        Редактировать
-                                    </button>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
+                                            @click="togglePaymentMethodEditor(method)"
+                                        >
+                                            Редактировать
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-rose-200 px-3 py-1 text-xs text-rose-700 transition hover:border-rose-300"
+                                            @click="deleteContractPaymentMethod(method)"
+                                        >
+                                            Удалить
+                                        </button>
+                                    </div>
                                     <div
                                         v-if="activePaymentMethodId === method.id"
                                         class="mt-3 w-full rounded-2xl border border-slate-200 bg-white p-3"
@@ -950,6 +985,9 @@ const formatDate = (value) => {
                                 </div>
                             </div>
                             <p v-else class="mt-3 text-sm text-slate-500">Методы оплаты не добавлены.</p>
+                            <p v-if="paymentMethodError" class="mt-3 text-xs text-rose-700">
+                                {{ paymentMethodError }}
+                            </p>
                         </div>
 
                         <div class="mt-4 border-t border-slate-200 pt-4">

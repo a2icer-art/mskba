@@ -25,5 +25,6 @@ return [
         App\Domain\Contracts\Models\Contract::class,
         App\Domain\Balances\Models\Balance::class,
         App\Domain\Balances\Models\BalanceTransaction::class,
+        App\Domain\Payments\Models\PaymentMethod::class,
     ],
 ];
