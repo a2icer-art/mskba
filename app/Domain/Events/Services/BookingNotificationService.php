@@ -53,6 +53,53 @@ class BookingNotificationService
         return $this->sendSystemMessage($booking, $title, $body, null, $notificationCode);
     }
 
+    public function notifyPaymentConfirmationRequested(
+        EventBooking $booking,
+        ?User $actor = null,
+        ?string $methodLabel = null
+    ): int {
+        $notificationCode = NotificationCode::BookingPaymentConfirmation->value;
+
+        $booking->loadMissing([
+            'event:id',
+            'venue:id,alias,venue_type_id',
+            'venue.venueType:id,alias',
+            'creator:id,login',
+            'payment:id,payment_code',
+            'paymentOrder:id,code',
+        ]);
+
+        $title = 'Запрос подтверждения оплаты бронирования';
+        $body = $methodLabel ? ('Метод оплаты: ' . $methodLabel) : null;
+
+        return $this->sendSystemMessage($booking, $title, $body, $actor, $notificationCode);
+    }
+
+    public function notifyPaymentConfirmationDecision(
+        EventBooking $booking,
+        bool $approved,
+        ?User $actor = null,
+        ?string $comment = null
+    ): int {
+        $notificationCode = NotificationCode::BookingPaymentConfirmation->value;
+
+        $booking->loadMissing([
+            'event:id',
+            'venue:id,alias,venue_type_id',
+            'venue.venueType:id,alias',
+            'creator:id,login',
+            'payment:id,payment_code',
+            'paymentOrder:id,code',
+        ]);
+
+        $title = $approved
+            ? 'Оплата бронирования подтверждена'
+            : 'Оплата бронирования отклонена';
+        $body = $comment ?: null;
+
+        return $this->sendSystemMessage($booking, $title, $body, $actor, $notificationCode);
+    }
+
     private function resolveBookingCode(EventBooking $booking): ?string
     {
         return $booking->payment?->payment_code

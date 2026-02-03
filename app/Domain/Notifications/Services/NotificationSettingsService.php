@@ -21,6 +21,10 @@ class NotificationSettingsService
                 'label' => 'Предупреждение о скорой отмене бронирования',
             ],
             [
+                'code' => NotificationCode::BookingPaymentConfirmation->value,
+                'label' => 'Подтверждение оплаты бронирования',
+            ],
+            [
                 'code' => NotificationCode::MessageCreated->value,
                 'label' => 'Новое личное сообщение',
             ],

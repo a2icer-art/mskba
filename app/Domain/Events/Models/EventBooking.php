@@ -4,6 +4,7 @@ namespace App\Domain\Events\Models;
 
 use App\Domain\Audit\Traits\Auditable;
 use App\Domain\Events\Enums\EventBookingModerationSource;
+use App\Domain\Events\Enums\EventBookingPaymentConfirmStatus;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
@@ -11,6 +12,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class EventBooking extends Model
@@ -31,6 +33,9 @@ class EventBooking extends Model
         'payment_recipient_label',
         'payment_methods_snapshot',
         'payment_due_at',
+        'payment_confirm_status',
+        'payment_confirmed_at',
+        'payment_last_confirmation_id',
         'moderation_comment',
         'moderation_source',
         'moderated_by',
@@ -48,6 +53,8 @@ class EventBooking extends Model
             'payment_methods_snapshot' => 'array',
             'status' => EventBookingStatus::class,
             'payment_due_at' => 'datetime',
+            'payment_confirm_status' => EventBookingPaymentConfirmStatus::class,
+            'payment_confirmed_at' => 'datetime',
             'moderation_source' => EventBookingModerationSource::class,
         ];
     }
@@ -70,6 +77,16 @@ class EventBooking extends Model
     public function payment(): MorphOne
     {
         return $this->morphOne(\App\Domain\Payments\Models\Payment::class, 'payable');
+    }
+
+    public function paymentConfirmations(): HasMany
+    {
+        return $this->hasMany(EventBookingPaymentConfirmation::class, 'event_booking_id');
+    }
+
+    public function lastPaymentConfirmation(): BelongsTo
+    {
+        return $this->belongsTo(EventBookingPaymentConfirmation::class, 'payment_last_confirmation_id');
     }
 
     public function creator(): BelongsTo

@@ -266,6 +266,15 @@ Route::delete('/events/{event}', [EventsController::class, 'destroy'])
 Route::post('/events/{event}/bookings', [EventsController::class, 'storeBooking'])
     ->middleware(['auth', 'can:venue.booking'])
     ->name('events.bookings.store');
+Route::post('/events/{event}/bookings/{booking}/payment-confirmations', [EventsController::class, 'requestPaymentConfirmation'])
+    ->middleware('auth')
+    ->name('events.bookings.payment-confirmations.store');
+Route::post('/events/{event}/bookings/{booking}/payment-confirmations/{confirmation}/approve', [EventsController::class, 'approvePaymentConfirmation'])
+    ->middleware('auth')
+    ->name('events.bookings.payment-confirmations.approve');
+Route::post('/events/{event}/bookings/{booking}/payment-confirmations/{confirmation}/reject', [EventsController::class, 'rejectPaymentConfirmation'])
+    ->middleware('auth')
+    ->name('events.bookings.payment-confirmations.reject');
 Route::post('/events/{event}/participants/invite', [EventsController::class, 'inviteParticipant'])
     ->middleware('auth')
     ->name('events.participants.invite');

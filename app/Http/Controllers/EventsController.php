@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Events\Enums\EventBookingPaymentConfirmStatus;
 use App\Domain\Events\Enums\EventBookingStatus;
 use App\Domain\Events\Enums\EventParticipantRole;
 use App\Domain\Events\Enums\EventParticipantStatus;
 use App\Domain\Events\Models\Event;
+use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Models\EventParticipant;
+use App\Domain\Events\Models\EventBookingPaymentConfirmation;
 use App\Domain\Events\Models\EventType;
 use App\Domain\Events\Services\BookingPaymentExpiryService;
+use App\Domain\Events\Services\EventBookingPaymentConfirmationService;
 use App\Domain\Events\Services\EventBookingService;
 use App\Domain\Events\Services\EventParticipantService;
 use App\Domain\Admin\Services\EventDefaultsService;
@@ -18,6 +22,7 @@ use App\Domain\Payments\Models\Payment;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Services\PermissionChecker;
 use App\Domain\Users\Enums\UserStatus;
+use App\Domain\Media\Services\MediaService;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Presentation\Breadcrumbs\EventBreadcrumbsPresenter;
@@ -282,6 +287,9 @@ class EventsController extends Controller
             'bookings.venue.venueType',
             'bookings.paymentOrder',
             'bookings.payment',
+            'bookings.lastPaymentConfirmation.evidenceMedia',
+            'bookings.lastPaymentConfirmation.requester',
+            'bookings.lastPaymentConfirmation.decider',
             'participants.user',
         ]);
 
@@ -410,24 +418,59 @@ class EventsController extends Controller
         $eventPayload['approved_booking_cost_minor'] = $approvedBookingCost;
 
         $bookings = $event->bookings
-            ->map(static function ($booking): array {
+            ->map(function ($booking) use ($user, $checker, $isAdmin, $event): array {
                 $snapshot = is_array($booking->payment_order_snapshot) ? $booking->payment_order_snapshot : [];
                 $paymentMeta = is_array($booking->payment?->meta) ? $booking->payment->meta : [];
+                $confirmation = $booking->lastPaymentConfirmation;
+                $mediaUrl = null;
+                if ($confirmation?->evidenceMedia) {
+                    $mediaUrl = app(MediaService::class)->toPublicUrl($confirmation->evidenceMedia);
+                }
+                $venue = $booking->venue;
+                $canConfirmPayment = $user && $venue
+                    ? ($isAdmin || $checker->can($user, PermissionCode::VenueBookingConfirm, $venue))
+                    : false;
+                $canRequestPayment = $user
+                    ? ($this->canEditEvent($user, $event) && $booking->status !== EventBookingStatus::Cancelled)
+                    : false;
+                $confirmStatus = $booking->payment_confirm_status?->value ?? EventBookingPaymentConfirmStatus::None->value;
+                if ($confirmStatus === EventBookingPaymentConfirmStatus::UserPaidPending->value
+                    || $confirmStatus === EventBookingPaymentConfirmStatus::AdminConfirmed->value) {
+                    $canRequestPayment = false;
+                }
+
                 return [
                     'id' => $booking->id,
-                  'status' => $booking->status?->value,
-                  'starts_at' => $booking->starts_at?->toDateTimeString(),
-                  'ends_at' => $booking->ends_at?->toDateTimeString(),
-                  'moderation_comment' => $booking->moderation_comment,
-                  'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
-                  'payment_code' => $booking->payment?->payment_code,
-                  'payment_amount_minor' => $booking->payment?->amount_minor,
-                  'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
-                  'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
-                  'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
-                  'payment_recipient_label' => $booking->payment_recipient_label,
-                  'payment_methods' => $booking->payment_methods_snapshot ?? [],
-                  'venue' => $booking->venue
+                    'status' => $booking->status?->value,
+                    'starts_at' => $booking->starts_at?->toDateTimeString(),
+                    'ends_at' => $booking->ends_at?->toDateTimeString(),
+                    'moderation_comment' => $booking->moderation_comment,
+                    'payment_order' => $snapshot['label'] ?? $booking->paymentOrder?->label,
+                    'payment_code' => $booking->payment?->payment_code,
+                    'payment_amount_minor' => $booking->payment?->amount_minor,
+                    'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
+                    'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
+                    'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
+                    'payment_confirm_status' => $confirmStatus,
+                    'payment_confirmed_at' => $booking->payment_confirmed_at?->toDateTimeString(),
+                    'payment_confirmation' => $confirmation
+                        ? [
+                            'id' => $confirmation->id,
+                            'status' => $confirmation->status?->value,
+                            'evidence_comment' => $confirmation->evidence_comment,
+                            'evidence_media_url' => $mediaUrl,
+                            'requested_by_user_id' => $confirmation->requested_by_user_id,
+                            'decided_by_user_id' => $confirmation->decided_by_user_id,
+                            'decided_at' => $confirmation->decided_at?->toDateTimeString(),
+                            'decision_comment' => $confirmation->decision_comment,
+                            'payment_method_snapshot' => $confirmation->payment_method_snapshot,
+                        ]
+                        : null,
+                    'payment_recipient_label' => $booking->payment_recipient_label,
+                    'payment_methods' => $booking->payment_methods_snapshot ?? [],
+                    'can_request_payment_confirmation' => $canRequestPayment,
+                    'can_decide_payment_confirmation' => $canConfirmPayment,
+                    'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,
                             'name' => $booking->venue->name,
@@ -473,6 +516,115 @@ class EventsController extends Controller
             'navigation' => app(EventNavigationPresenter::class)->present(),
             'activeTypeCode' => $event->type?->code ?? '',
         ]);
+    }
+
+    public function requestPaymentConfirmation(
+        Request $request,
+        Event $event,
+        EventBooking $booking,
+        EventBookingPaymentConfirmationService $service
+    ) {
+        $user = $request->user();
+        if (!$user || !$this->canEditEvent($user, $event)) {
+            abort(403);
+        }
+        $this->ensureEventNotExpired($event);
+
+        if ($booking->event_id !== $event->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'payment_method_id' => ['required', 'integer'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'evidence_media' => ['nullable', 'file', 'max:5120'],
+        ]);
+
+        $confirmation = $service->request(
+            $booking,
+            $user,
+            (int) $data['payment_method_id'],
+            $data['comment'] ?? null,
+            $request->file('evidence_media')
+        );
+
+        $methodLabel = is_array($confirmation->payment_method_snapshot)
+            ? ($confirmation->payment_method_snapshot['label'] ?? null)
+            : null;
+        app(\App\Domain\Events\Services\BookingNotificationService::class)
+            ->notifyPaymentConfirmationRequested($booking, $user, $methodLabel);
+
+        return back()->with('notice', 'Запрос на подтверждение оплаты отправлен.');
+    }
+
+    public function approvePaymentConfirmation(
+        Request $request,
+        Event $event,
+        EventBooking $booking,
+        EventBookingPaymentConfirmation $confirmation,
+        EventBookingPaymentConfirmationService $service
+    ) {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+        $this->ensureEventNotExpired($event);
+
+        if ($booking->event_id !== $event->id || $confirmation->event_booking_id !== $booking->id) {
+            abort(404);
+        }
+
+        $venue = $booking->venue;
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$venue || (!$isAdmin && !$checker->can($user, PermissionCode::VenueBookingConfirm, $venue))) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $service->decide($confirmation, $user, true, $data['comment'] ?? null);
+        app(\App\Domain\Events\Services\BookingNotificationService::class)
+            ->notifyPaymentConfirmationDecision($booking, true, $user, $data['comment'] ?? null);
+
+        return back()->with('notice', 'Оплата подтверждена.');
+    }
+
+    public function rejectPaymentConfirmation(
+        Request $request,
+        Event $event,
+        EventBooking $booking,
+        EventBookingPaymentConfirmation $confirmation,
+        EventBookingPaymentConfirmationService $service
+    ) {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+        $this->ensureEventNotExpired($event);
+
+        if ($booking->event_id !== $event->id || $confirmation->event_booking_id !== $booking->id) {
+            abort(404);
+        }
+
+        $venue = $booking->venue;
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$venue || (!$isAdmin && !$checker->can($user, PermissionCode::VenueBookingConfirm, $venue))) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $service->decide($confirmation, $user, false, $data['comment'] ?? null);
+        app(\App\Domain\Events\Services\BookingNotificationService::class)
+            ->notifyPaymentConfirmationDecision($booking, false, $user, $data['comment'] ?? null);
+
+        return back()->with('notice', 'Оплата отклонена.');
     }
 
     public function update(Request $request, Event $event)

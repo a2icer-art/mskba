@@ -27,6 +27,7 @@ class VenueSettings extends Model
     public const DEFAULT_PENDING_REVIEW_MINUTES = 120;
     public const DEFAULT_PENDING_BEFORE_START_MINUTES = 120;
     public const DEFAULT_PENDING_WARNING_MINUTES = 30;
+    public const DEFAULT_PAYMENT_CONFIRMATION_BEFORE_START_MINUTES = 0;
     public const DEFAULT_SUPERVISOR_FEE_PERCENT = 0;
     public const DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB = 0;
     public const DEFAULT_SUPERVISOR_FEE_IS_FIXED = false;
@@ -44,6 +45,7 @@ class VenueSettings extends Model
         'pending_review_minutes',
         'pending_before_start_minutes',
         'pending_warning_minutes',
+        'payment_confirmation_before_start_minutes',
         'supervisor_fee_percent',
         'supervisor_fee_amount_rub',
         'supervisor_fee_is_fixed',
@@ -63,6 +65,7 @@ class VenueSettings extends Model
             'pending_review_minutes' => 'integer',
             'pending_before_start_minutes' => 'integer',
             'pending_warning_minutes' => 'integer',
+            'payment_confirmation_before_start_minutes' => 'integer',
             'supervisor_fee_percent' => 'integer',
             'supervisor_fee_amount_rub' => 'integer',
             'supervisor_fee_is_fixed' => 'boolean',

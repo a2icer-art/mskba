@@ -188,6 +188,7 @@ class EventBookingService
             'pending_review_minutes' => VenueSettings::DEFAULT_PENDING_REVIEW_MINUTES,
             'pending_before_start_minutes' => VenueSettings::DEFAULT_PENDING_BEFORE_START_MINUTES,
             'pending_warning_minutes' => VenueSettings::DEFAULT_PENDING_WARNING_MINUTES,
+            'payment_confirmation_before_start_minutes' => VenueSettings::DEFAULT_PAYMENT_CONFIRMATION_BEFORE_START_MINUTES,
             'supervisor_fee_percent' => VenueSettings::DEFAULT_SUPERVISOR_FEE_PERCENT,
             'supervisor_fee_amount_rub' => VenueSettings::DEFAULT_SUPERVISOR_FEE_AMOUNT_RUB,
             'supervisor_fee_is_fixed' => VenueSettings::DEFAULT_SUPERVISOR_FEE_IS_FIXED,
