@@ -8,6 +8,7 @@ use App\Domain\Messages\Models\Conversation;
 use App\Domain\Messages\Models\Message;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class MessageRealtimeService
 {
@@ -27,7 +28,16 @@ class MessageRealtimeService
             if (!$user) {
                 continue;
             }
-            event(new UserMessageCreated($user, $message));
+            try {
+                event(new UserMessageCreated($user, $message));
+            } catch (\Throwable $error) {
+                Log::warning('Message broadcast failed.', [
+                    'conversation_id' => $conversation->id,
+                    'message_id' => $message->id,
+                    'user_id' => $user->id,
+                    'error' => $error->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -41,7 +51,16 @@ class MessageRealtimeService
             if (!$user) {
                 continue;
             }
-            event(new UserConversationRead($user, $conversation, $reader, $timestamp));
+            try {
+                event(new UserConversationRead($user, $conversation, $reader, $timestamp));
+            } catch (\Throwable $error) {
+                Log::warning('Conversation read broadcast failed.', [
+                    'conversation_id' => $conversation->id,
+                    'reader_id' => $reader->id,
+                    'user_id' => $user->id,
+                    'error' => $error->getMessage(),
+                ]);
+            }
         }
     }
 }
