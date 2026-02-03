@@ -85,6 +85,11 @@ class Venue extends Model
         return $this->morphMany(Media::class, 'mediable');
     }
 
+    public function paymentMethods(): MorphMany
+    {
+        return $this->morphMany(\App\Domain\Payments\Models\PaymentMethod::class, 'owner');
+    }
+
     public function amenities(): BelongsToMany
     {
         return $this->belongsToMany(Amenity::class, 'venue_amenities')

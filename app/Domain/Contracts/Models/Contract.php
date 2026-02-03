@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Contract extends Model
@@ -51,5 +52,10 @@ class Contract extends Model
     public function entity(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function paymentMethods(): MorphMany
+    {
+        return $this->morphMany(\App\Domain\Payments\Models\PaymentMethod::class, 'owner');
     }
 }

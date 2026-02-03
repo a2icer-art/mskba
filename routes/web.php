@@ -163,6 +163,12 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/contracts/{contract}/permissions', [VenuesController::class, 'updateContractPermissions'])
         ->middleware('auth')
         ->name('venues.contracts.permissions.update');
+    Route::post('/{type}/{venue}/admin/contracts/{contract}/payment-methods', [VenuesController::class, 'storeContractPaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.contracts.payment-methods.store');
+    Route::patch('/{type}/{venue}/admin/contracts/{contract}/payment-methods/{paymentMethod}', [VenuesController::class, 'updateContractPaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.contracts.payment-methods.update');
     Route::post('/{type}/{venue}/admin/contracts/{contract}/revoke', [VenuesController::class, 'revokeContract'])
         ->middleware('auth')
         ->name('venues.contracts.revoke');
@@ -193,6 +199,12 @@ Route::prefix('venues')->group(function () {
     Route::patch('/{type}/{venue}/admin/settings', [VenuesController::class, 'updateSettings'])
         ->middleware('auth')
         ->name('venues.settings.update');
+    Route::post('/{type}/{venue}/admin/settings/payment-methods', [VenuesController::class, 'storeVenuePaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.settings.payment-methods.store');
+    Route::patch('/{type}/{venue}/admin/settings/payment-methods/{paymentMethod}', [VenuesController::class, 'updateVenuePaymentMethod'])
+        ->middleware('auth')
+        ->name('venues.settings.payment-methods.update');
     Route::post('/{type}/{venue}/admin/settings/amenities/{amenity}/icon', [VenuesController::class, 'uploadCustomAmenityIcon'])
         ->middleware('auth')
         ->name('venues.settings.amenities.icon');

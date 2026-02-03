@@ -40,6 +40,14 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    paymentRecipientSources: {
+        type: Array,
+        default: () => [],
+    },
+    paymentMethods: {
+        type: Array,
+        default: () => [],
+    },
     navigation: {
         type: Object,
         default: () => ({ title: 'Площадки', data: [] }),
@@ -68,6 +76,24 @@ const actionNotice = computed(() => page.props?.flash?.notice ?? '');
 const localNotice = ref('');
 const successNotice = computed(() => actionNotice.value || localNotice.value);
 const actionError = computed(() => page.props?.errors ?? {});
+const paymentMethodTypes = [
+    { value: 'sbp', label: 'СБП' },
+    { value: 'balance', label: 'Баланс' },
+    { value: 'acquiring', label: 'Эквайринг' },
+];
+const getPaymentMethodTypeLabel = (value) =>
+    paymentMethodTypes.find((item) => item.value === value)?.label || value;
+const paymentMethods = computed(() => props.paymentMethods ?? []);
+const paymentMethodOpen = ref(false);
+const paymentMethodTarget = ref(null);
+const paymentMethodForm = useForm({
+    type: 'sbp',
+    label: '',
+    phone: '',
+    display_name: '',
+    is_active: true,
+    sort_order: 0,
+});
 const formErrorNotice = computed(() => {
     if (!actionError.value || !Object.keys(actionError.value).length) {
         return '';
@@ -332,6 +358,7 @@ const form = useForm({
     rental_duration_minutes: props.settings?.rental_duration_minutes ?? 60,
     rental_price_rub: props.settings?.rental_price_rub ?? 0,
     payment_order_id: props.settings?.payment_order_id ?? '',
+    payment_recipient_source: props.settings?.payment_recipient_source ?? 'auto',
     booking_mode: props.settings?.booking_mode ?? 'instant',
     payment_wait_minutes: props.settings?.payment_wait_minutes ?? 60,
     pending_review_minutes: props.settings?.pending_review_minutes ?? 120,
@@ -354,6 +381,50 @@ const customIconForm = useForm({
     icon: null,
 });
 const customIconKeys = ref({});
+
+const openPaymentMethod = (method = null) => {
+    paymentMethodTarget.value = method;
+    paymentMethodForm.clearErrors();
+    if (method) {
+        paymentMethodForm.type = method.type || 'sbp';
+        paymentMethodForm.label = method.label || '';
+        paymentMethodForm.phone = method.phone || '';
+        paymentMethodForm.display_name = method.display_name || '';
+        paymentMethodForm.is_active = Boolean(method.is_active);
+        paymentMethodForm.sort_order = Number(method.sort_order || 0);
+    } else {
+        paymentMethodForm.reset();
+        paymentMethodForm.type = 'sbp';
+        paymentMethodForm.is_active = true;
+        paymentMethodForm.sort_order = 0;
+    }
+    paymentMethodOpen.value = true;
+};
+
+const closePaymentMethod = () => {
+    paymentMethodOpen.value = false;
+    paymentMethodTarget.value = null;
+    paymentMethodForm.reset();
+    paymentMethodForm.clearErrors();
+};
+
+const submitPaymentMethod = () => {
+    if (!props.venue?.alias || !props.activeTypeSlug) {
+        return;
+    }
+
+    const baseUrl = `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/settings/payment-methods`;
+    const targetId = paymentMethodTarget.value?.id;
+    const method = targetId ? 'patch' : 'post';
+    const url = targetId ? `${baseUrl}/${targetId}` : baseUrl;
+
+    paymentMethodForm[method](url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            closePaymentMethod();
+        },
+    });
+};
 
 const submit = () => {
     localNotice.value = '';
@@ -507,7 +578,7 @@ const uploadCustomIcon = (amenityId, file) => {
                                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
                                     Оплата и режим
                                 </p>
-                                <div class="grid gap-4 md:grid-cols-2">
+                                <div class="grid gap-4 md:grid-cols-3">
                                     <div class="grid gap-2">
                                         <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
                                             Порядок оплаты
@@ -522,6 +593,23 @@ const uploadCustomIcon = (amenityId, file) => {
                                         </select>
                                         <p v-if="actionError.payment_order_id" class="text-xs text-rose-700">
                                             {{ actionError.payment_order_id }}
+                                        </p>
+                                    </div>
+
+                                    <div class="grid gap-2">
+                                        <label class="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                            Получатель оплаты
+                                        </label>
+                                        <select
+                                            v-model="form.payment_recipient_source"
+                                            class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                        >
+                                            <option v-for="option in paymentRecipientSources" :key="option.value" :value="option.value">
+                                                {{ option.label }}
+                                            </option>
+                                        </select>
+                                        <p v-if="actionError.payment_recipient_source" class="text-xs text-rose-700">
+                                            {{ actionError.payment_recipient_source }}
                                         </p>
                                     </div>
 
@@ -568,6 +656,50 @@ const uploadCustomIcon = (amenityId, file) => {
                                             {{ actionError.payment_wait_minutes }}
                                         </p>
                                     </div>
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">Методы оплаты площадки</p>
+                                            <p class="text-xs text-slate-500">Используются как фолбэк, если нет активных контрактов.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                            @click="openPaymentMethod()"
+                                        >
+                                            Добавить метод
+                                        </button>
+                                    </div>
+                                    <div v-if="paymentMethods.length" class="mt-4 grid gap-3">
+                                        <div
+                                            v-for="method in paymentMethods"
+                                            :key="method.id"
+                                            class="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                                        >
+                                            <div>
+                                                <p class="text-sm font-semibold text-slate-900">
+                                                    {{ method.label }}
+                                                    <span class="text-xs text-slate-500">({{ getPaymentMethodTypeLabel(method.type) }})</span>
+                                                </p>
+                                                <p v-if="method.type === 'sbp'" class="text-xs text-slate-500">
+                                                    {{ method.phone }} · {{ method.display_name }}
+                                                </p>
+                                                <p class="text-xs text-slate-400">
+                                                    Статус: {{ method.is_active ? 'Активен' : 'Неактивен' }}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
+                                                @click="openPaymentMethod(method)"
+                                            >
+                                                Редактировать
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p v-else class="mt-3 text-sm text-slate-500">Методы оплаты не добавлены.</p>
                                 </div>
                                 <hr class="border-slate-200/80" />
                             </div>
@@ -872,6 +1004,119 @@ const uploadCustomIcon = (amenityId, file) => {
             </main>
 
             <MainFooter :app-name="appName" />
+        </div>
+
+        <div
+            v-if="paymentMethodOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+        >
+            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <form :class="{ loading: paymentMethodForm.processing }" @submit.prevent="submitPaymentMethod">
+                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-900">
+                            {{ paymentMethodTarget ? 'Редактировать метод оплаты' : 'Добавить метод оплаты' }}
+                        </h2>
+                        <button
+                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                            type="button"
+                            aria-label="Закрыть"
+                            @click="closePaymentMethod"
+                        >
+                            x
+                        </button>
+                    </div>
+                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                        <div class="grid gap-3">
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Тип
+                                <select
+                                    v-model="paymentMethodForm.type"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <option v-for="option in paymentMethodTypes" :key="option.value" :value="option.value">
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </label>
+                            <div v-if="paymentMethodForm.errors.type" class="text-xs text-rose-700">
+                                {{ paymentMethodForm.errors.type }}
+                            </div>
+
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Название
+                                <input
+                                    v-model="paymentMethodForm.label"
+                                    type="text"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    placeholder="Например, СБП"
+                                />
+                            </label>
+                            <div v-if="paymentMethodForm.errors.label" class="text-xs text-rose-700">
+                                {{ paymentMethodForm.errors.label }}
+                            </div>
+
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Телефон для СБП
+                                <input
+                                    v-model="paymentMethodForm.phone"
+                                    type="text"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    placeholder="+7 900 000-00-00"
+                                />
+                            </label>
+                            <div v-if="paymentMethodForm.errors.phone" class="text-xs text-rose-700">
+                                {{ paymentMethodForm.errors.phone }}
+                            </div>
+
+                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                Отображаемое имя
+                                <input
+                                    v-model="paymentMethodForm.display_name"
+                                    type="text"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    placeholder="Иванов И. И."
+                                />
+                            </label>
+                            <div v-if="paymentMethodForm.errors.display_name" class="text-xs text-rose-700">
+                                {{ paymentMethodForm.errors.display_name }}
+                            </div>
+
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Порядок
+                                    <input
+                                        v-model.number="paymentMethodForm.sort_order"
+                                        type="number"
+                                        min="0"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                    />
+                                </label>
+                                <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    <input v-model="paymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                                    <span>Активен</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                        <button
+                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                            type="button"
+                            :disabled="paymentMethodForm.processing"
+                            @click="closePaymentMethod"
+                        >
+                            Закрыть
+                        </button>
+                        <button
+                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                            type="submit"
+                            :disabled="paymentMethodForm.processing"
+                        >
+                            Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div

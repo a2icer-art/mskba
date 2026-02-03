@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
 use App\Domain\Payments\Models\Payment;
+use App\Domain\Payments\Services\PaymentRecipientResolver;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Domain\Venues\Enums\VenueStatus;
@@ -34,6 +35,14 @@ class EventBookingService
             'status' => EventBookingStatus::Pending,
             'moderation_source' => EventBookingModerationSource::Manual,
             'created_by' => $createdBy,
+        ]);
+
+        $recipient = app(PaymentRecipientResolver::class)->resolveForVenue($venue);
+        $booking->update([
+            'payment_recipient_type' => $recipient['recipient_type'],
+            'payment_recipient_id' => $recipient['recipient_id'],
+            'payment_recipient_label' => $recipient['recipient_label'],
+            'payment_methods_snapshot' => $recipient['methods'],
         ]);
 
         $this->createInitialPayment($booking, $venue, $createdBy);

@@ -425,6 +425,8 @@ class EventsController extends Controller
                   'payment_total_amount_minor' => $paymentMeta['total_amount_minor'] ?? null,
                   'payment_partial_amount_minor' => $paymentMeta['partial_amount_minor'] ?? null,
                   'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
+                  'payment_recipient_label' => $booking->payment_recipient_label,
+                  'payment_methods' => $booking->payment_methods_snapshot ?? [],
                   'venue' => $booking->venue
                         ? [
                             'id' => $booking->venue->id,

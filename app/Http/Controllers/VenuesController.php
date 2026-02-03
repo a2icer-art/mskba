@@ -27,12 +27,15 @@ use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
+use App\Domain\Payments\Enums\PaymentMethodType;
 use App\Domain\Payments\Models\Payment;
+use App\Domain\Payments\Models\PaymentMethod;
 use App\Domain\Payments\Models\PaymentOrder;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Domain\Venues\Enums\VenueBookingMode;
 use App\Domain\Venues\Enums\VenuePaymentOrder;
+use App\Domain\Venues\Enums\VenuePaymentRecipientSource;
 use App\Domain\Venues\Models\Amenity;
 use App\Domain\Venues\Models\VenueSchedule;
 use App\Domain\Venues\Models\VenueScheduleException;
@@ -322,11 +325,23 @@ class VenuesController extends Controller
             ? Contract::query()
                 ->where('entity_type', $venue->getMorphClass())
                 ->where('entity_id', $venue->getKey())
-                ->with(['user:id,login', 'permissions:id,code,label'])
+                ->with(['user:id,login', 'permissions:id,code,label', 'paymentMethods'])
                 ->orderByDesc('created_at')
                 ->get()
                 ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId): array {
                     $contractUserId = $contract->user?->id;
+                    $canManagePaymentMethods = $this->canManageContractPaymentMethods($user, $venue, $contract);
+                    $paymentMethods = [];
+
+                    if (in_array($contract->contract_type?->value, [ContractType::Owner->value, ContractType::Supervisor->value], true)) {
+                        $paymentMethods = $contract->paymentMethods
+                            ->sortBy(function (PaymentMethod $method): array {
+                                return [(int) $method->sort_order, (int) $method->id];
+                            })
+                            ->map(fn (PaymentMethod $method) => $this->formatPaymentMethod($method))
+                            ->values()
+                            ->all();
+                    }
 
                     return [
                         'id' => $contract->id,
@@ -342,6 +357,8 @@ class VenuesController extends Controller
                         'is_current_user' => $currentUserId !== null && $contractUserId === $currentUserId,
                         'can_revoke' => $manager->canRevoke($user, $contract, $venue),
                         'can_update_permissions' => $manager->canUpdatePermissions($user, $contract, $venue),
+                        'can_manage_payment_methods' => $canManagePaymentMethods,
+                        'payment_methods' => $paymentMethods,
                         'user' => $contract->user
                             ? [
                                 'id' => $contract->user->id,
@@ -635,6 +652,7 @@ class VenuesController extends Controller
                 'booking_lead_time_minutes' => VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
                 'booking_min_interval_minutes' => VenueSettings::DEFAULT_BOOKING_MIN_INTERVAL_MINUTES,
                 'payment_order_id' => $defaultPaymentOrderId,
+                'payment_recipient_source' => VenueSettings::DEFAULT_PAYMENT_RECIPIENT_SOURCE->value,
                 'rental_duration_minutes' => VenueSettings::DEFAULT_RENTAL_DURATION_MINUTES,
                 'rental_price_rub' => VenueSettings::DEFAULT_RENTAL_PRICE_RUB,
                 'booking_mode' => VenueSettings::DEFAULT_BOOKING_MODE->value,
@@ -1054,6 +1072,24 @@ class VenuesController extends Controller
                 'label' => $order->label,
             ])
             ->all();
+        $venuePaymentMethods = $venue->paymentMethods()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (PaymentMethod $method) => $this->formatPaymentMethod($method))
+            ->all();
+        $paymentRecipientSources = array_map(
+            static fn (VenuePaymentRecipientSource $source) => [
+                'value' => $source->value,
+                'label' => match ($source) {
+                    VenuePaymentRecipientSource::Auto => 'Авто',
+                    VenuePaymentRecipientSource::Supervisor => 'Супервайзер',
+                    VenuePaymentRecipientSource::Owner => 'Владелец',
+                    VenuePaymentRecipientSource::Venue => 'Площадка',
+                },
+            ],
+            VenuePaymentRecipientSource::cases()
+        );
 
         return Inertia::render('VenueSettings', [
             'appName' => config('app.name'),
@@ -1066,6 +1102,7 @@ class VenuesController extends Controller
                 'booking_lead_time_minutes' => $settings->booking_lead_time_minutes,
                 'booking_min_interval_minutes' => $settings->booking_min_interval_minutes,
                 'payment_order_id' => $settings->payment_order_id,
+                'payment_recipient_source' => $settings->payment_recipient_source?->value ?? VenueSettings::DEFAULT_PAYMENT_RECIPIENT_SOURCE->value,
                 'rental_duration_minutes' => $settings->rental_duration_minutes,
                 'rental_price_rub' => $settings->rental_price_rub,
                 'booking_mode' => $settings->booking_mode?->value ?? VenueSettings::DEFAULT_BOOKING_MODE->value,
@@ -1082,6 +1119,8 @@ class VenuesController extends Controller
             'selectedAmenityIds' => $selectedAmenityIds,
             'amenityNotes' => $amenityNotes,
             'paymentOrderOptions' => $paymentOrders,
+            'paymentRecipientSources' => $paymentRecipientSources,
+            'paymentMethods' => $venuePaymentMethods,
             'navigation' => $navigation,
             'canManageMedia' => $checker->can($user, PermissionCode::VenueMediaManage, $venue),
             'activeHref' => "/venues/{$type}/{$venue->alias}/admin/settings",
@@ -1216,6 +1255,7 @@ class VenuesController extends Controller
             'rental_duration_minutes' => ['required', 'numeric', 'min:0'],
             'rental_price_rub' => ['required', 'integer', 'min:0'],
             'payment_order_id' => ['required', 'integer', 'exists:payment_orders,id'],
+            'payment_recipient_source' => ['required', 'string', 'in:auto,supervisor,owner,venue'],
             'booking_mode' => ['required', 'string', 'in:instant,approval_required'],
             'payment_wait_minutes' => ['required', 'numeric', 'min:0'],
             'pending_review_minutes' => ['required', 'numeric', 'min:0'],
@@ -1249,6 +1289,8 @@ class VenuesController extends Controller
             'rental_price_rub.min' => 'Стоимость аренды не может быть отрицательной.',
             'payment_order_id.required' => 'Выберите порядок оплаты.',
             'payment_order_id.exists' => 'Выберите корректный порядок оплаты.',
+            'payment_recipient_source.required' => 'Укажите получателя оплаты.',
+            'payment_recipient_source.in' => 'Выберите корректный источник оплаты.',
             'booking_mode.required' => 'Выберите режим бронирования.',
             'booking_mode.in' => 'Выберите корректный режим бронирования.',
             'payment_wait_minutes.required' => 'Укажите срок ожидания оплаты.',
@@ -1326,6 +1368,7 @@ class VenuesController extends Controller
                 'booking_lead_time_minutes' => $data['booking_lead_time_minutes'],
                 'booking_min_interval_minutes' => $data['booking_min_interval_minutes'],
                 'payment_order_id' => $data['payment_order_id'],
+                'payment_recipient_source' => $data['payment_recipient_source'],
                 'rental_duration_minutes' => $data['rental_duration_minutes'],
                 'rental_price_rub' => $data['rental_price_rub'],
                 'booking_mode' => $data['booking_mode'],
@@ -1345,6 +1388,210 @@ class VenuesController extends Controller
         $updateAmenities->execute($user, $venue, $amenityIds, $customAmenities, $removedCustomIds, $notes);
 
         return back()->with('notice', 'Настройки площадки обновлены.');
+    }
+
+    public function storeVenuePaymentMethod(Request $request, string $type, Venue $venue)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        $data = $this->validatePaymentMethod($request);
+        $data['owner_type'] = $venue->getMorphClass();
+        $data['owner_id'] = $venue->id;
+        $data['created_by'] = $user->id;
+        $data['updated_by'] = $user->id;
+
+        PaymentMethod::query()->create($data);
+
+        return back()->with('notice', 'Метод оплаты добавлен.');
+    }
+
+    public function updateVenuePaymentMethod(Request $request, string $type, Venue $venue, PaymentMethod $paymentMethod)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        if (!$isAdmin && !$checker->can($user, PermissionCode::VenueUpdate, $venue)) {
+            abort(403);
+        }
+
+        $this->ensurePaymentMethodOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
+
+        $data = $this->validatePaymentMethod($request);
+        $data['updated_by'] = $user->id;
+
+        $paymentMethod->update($data);
+
+        return back()->with('notice', 'Метод оплаты обновлён.');
+    }
+
+    public function storeContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureContractPaymentAccess($user, $venue, $contract);
+
+        $data = $this->validatePaymentMethod($request);
+        $data['owner_type'] = $contract->getMorphClass();
+        $data['owner_id'] = $contract->id;
+        $data['created_by'] = $user->id;
+        $data['updated_by'] = $user->id;
+
+        PaymentMethod::query()->create($data);
+
+        return back()->with('notice', 'Метод оплаты добавлен.');
+    }
+
+    public function updateContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract, PaymentMethod $paymentMethod)
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403);
+        }
+
+        $venue = Venue::query()
+            ->visibleFor($user)
+            ->whereKey($venue->id)
+            ->firstOrFail();
+
+        $this->ensureContractPaymentAccess($user, $venue, $contract);
+        $this->ensurePaymentMethodOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
+
+        $data = $this->validatePaymentMethod($request);
+        $data['updated_by'] = $user->id;
+
+        $paymentMethod->update($data);
+
+        return back()->with('notice', 'Метод оплаты обновлён.');
+    }
+
+    private function validatePaymentMethod(Request $request): array
+    {
+        $data = $request->validate(
+            [
+                'type' => ['required', 'string', 'in:sbp,balance,acquiring'],
+                'label' => ['required', 'string', 'max:120'],
+                'phone' => ['nullable', 'string', 'max:32'],
+                'display_name' => ['nullable', 'string', 'max:120'],
+                'is_active' => ['required', 'boolean'],
+                'sort_order' => ['nullable', 'integer', 'min:0'],
+            ],
+            [
+                'type.required' => 'Укажите тип метода оплаты.',
+                'type.in' => 'Укажите корректный тип метода оплаты.',
+                'label.required' => 'Укажите название метода оплаты.',
+                'label.max' => 'Название не должно превышать 120 символов.',
+                'phone.max' => 'Телефон не должен превышать 32 символа.',
+                'display_name.max' => 'Имя не должно превышать 120 символов.',
+            ]
+        );
+
+        if ($data['type'] === PaymentMethodType::Sbp->value) {
+            if (empty($data['phone']) || empty($data['display_name'])) {
+                throw ValidationException::withMessages([
+                    'phone' => 'Для СБП укажите телефон и отображаемое имя.',
+                ]);
+            }
+        }
+
+        $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
+
+        return $data;
+    }
+
+    private function formatPaymentMethod(PaymentMethod $method): array
+    {
+        return [
+            'id' => $method->id,
+            'type' => $method->type?->value,
+            'label' => $method->label,
+            'phone' => $method->phone,
+            'display_name' => $method->display_name,
+            'is_active' => (bool) $method->is_active,
+            'sort_order' => (int) $method->sort_order,
+        ];
+    }
+
+    private function ensurePaymentMethodOwner(PaymentMethod $method, string $ownerType, int $ownerId): void
+    {
+        if ($method->owner_type !== $ownerType || (int) $method->owner_id !== $ownerId) {
+            abort(404);
+        }
+    }
+
+    private function ensureContractPaymentAccess(\App\Models\User $user, Venue $venue, Contract $contract): void
+    {
+        if ($contract->entity_type !== $venue->getMorphClass() || (int) $contract->entity_id !== (int) $venue->id) {
+            abort(404);
+        }
+
+        if (!in_array($contract->contract_type?->value, [ContractType::Owner->value, ContractType::Supervisor->value], true)) {
+            abort(403);
+        }
+
+        if ($contract->status?->value !== ContractStatus::Active->value) {
+            abort(403);
+        }
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+        $canManage = $this->canManageContractPaymentMethods($user, $venue, $contract) || $isAdmin;
+
+        if (!$canManage) {
+            abort(403);
+        }
+    }
+
+    private function canManageContractPaymentMethods(\App\Models\User $user, Venue $venue, Contract $contract): bool
+    {
+        if ($contract->entity_type !== $venue->getMorphClass() || (int) $contract->entity_id !== (int) $venue->id) {
+            return false;
+        }
+
+        if (!in_array($contract->contract_type?->value, [ContractType::Owner->value, ContractType::Supervisor->value], true)) {
+            return false;
+        }
+
+        if ($contract->status?->value !== ContractStatus::Active->value) {
+            return false;
+        }
+
+        $checker = app(PermissionChecker::class);
+        $isAdmin = $user->roles()->where('alias', 'admin')->exists();
+
+        return $contract->user_id === $user->id
+            || $checker->can($user, PermissionCode::ContractPermissionsUpdate, $venue)
+            || $isAdmin;
     }
 
     public function uploadCustomAmenityIcon(Request $request, string $type, Venue $venue, Amenity $amenity, AmenityIconService $icons)

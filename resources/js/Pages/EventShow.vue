@@ -865,6 +865,33 @@ const bookingClientError = computed(() => {
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Порядок оплаты</span>
                                     <p class="mt-1">{{ booking.payment_order }}</p>
                                 </div>
+                                <div v-if="booking.payment_recipient_label" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Получатель оплаты</span>
+                                    <p class="mt-1">{{ booking.payment_recipient_label }}</p>
+                                </div>
+                                <div v-if="booking.payment_methods?.length" class="mt-3 text-sm text-slate-700">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Методы оплаты</span>
+                                    <div class="mt-2 grid gap-2">
+                                        <div
+                                            v-for="method in booking.payment_methods"
+                                            :key="method.id || `${method.type}-${method.label}`"
+                                            class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                                        >
+                                            <p class="font-semibold text-slate-700">{{ method.label }}</p>
+                                            <p v-if="method.type === 'sbp'" class="mt-1 text-xs text-slate-500">
+                                                {{ method.phone }} · {{ method.display_name }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    v-else-if="booking.status === 'awaiting_payment'"
+                                    class="mt-3 text-sm text-rose-700"
+                                >
+                                    Оплата не настроена. Обратитесь к ответственному
+                                    {{ booking.payment_recipient_label ? `(${booking.payment_recipient_label})` : '' }}
+                                    или в техподдержку сайта.
+                                </div>
                                 <div v-if="booking.payment_code" class="mt-3 text-sm text-slate-700">
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
                                     <p class="mt-1">{{ booking.payment_code }}</p>
