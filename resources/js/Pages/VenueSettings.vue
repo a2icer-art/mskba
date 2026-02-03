@@ -426,6 +426,16 @@ const submitPaymentMethod = () => {
     });
 };
 
+watch(
+    () => paymentMethodForm.type,
+    (value) => {
+        if (value !== 'sbp') {
+            paymentMethodForm.phone = '';
+            paymentMethodForm.display_name = '';
+        }
+    }
+);
+
 const submit = () => {
     localNotice.value = '';
     const leadValue = Number(bookingLeadValue.value);
@@ -1048,54 +1058,45 @@ const uploadCustomIcon = (amenityId, file) => {
                                     v-model="paymentMethodForm.label"
                                     type="text"
                                     class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    placeholder="Например, СБП"
+                                    placeholder="Например, основной способ оплаты"
                                 />
                             </label>
                             <div v-if="paymentMethodForm.errors.label" class="text-xs text-rose-700">
                                 {{ paymentMethodForm.errors.label }}
                             </div>
 
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Телефон для СБП
-                                <input
-                                    v-model="paymentMethodForm.phone"
-                                    type="text"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    placeholder="+7 900 000-00-00"
-                                />
-                            </label>
-                            <div v-if="paymentMethodForm.errors.phone" class="text-xs text-rose-700">
-                                {{ paymentMethodForm.errors.phone }}
-                            </div>
-
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                Отображаемое имя
-                                <input
-                                    v-model="paymentMethodForm.display_name"
-                                    type="text"
-                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    placeholder="Иванов И. И."
-                                />
-                            </label>
-                            <div v-if="paymentMethodForm.errors.display_name" class="text-xs text-rose-700">
-                                {{ paymentMethodForm.errors.display_name }}
-                            </div>
-
-                            <div class="grid gap-3 md:grid-cols-2">
+                            <template v-if="paymentMethodForm.type === 'sbp'">
                                 <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                    Порядок
+                                    Телефон для СБП
                                     <input
-                                        v-model.number="paymentMethodForm.sort_order"
-                                        type="number"
-                                        min="0"
+                                        v-model="paymentMethodForm.phone"
+                                        type="text"
                                         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        placeholder="+7 900 000-00-00"
                                     />
                                 </label>
-                                <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                    <input v-model="paymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                                    <span>Активен</span>
+                                <div v-if="paymentMethodForm.errors.phone" class="text-xs text-rose-700">
+                                    {{ paymentMethodForm.errors.phone }}
+                                </div>
+
+                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    Отображаемое имя
+                                    <input
+                                        v-model="paymentMethodForm.display_name"
+                                        type="text"
+                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        placeholder="Иванов И. И."
+                                    />
                                 </label>
-                            </div>
+                                <div v-if="paymentMethodForm.errors.display_name" class="text-xs text-rose-700">
+                                    {{ paymentMethodForm.errors.display_name }}
+                                </div>
+                            </template>
+
+                            <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <input v-model="paymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                                <span>Активен</span>
+                            </label>
                         </div>
                     </div>
                     <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">

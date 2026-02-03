@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { computed, ref, watch } from 'vue';
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import Breadcrumbs from '../Components/Breadcrumbs.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
@@ -99,7 +99,16 @@ const getPaymentMethodTypeLabel = (value) =>
 const paymentMethodOpen = ref(false);
 const paymentMethodContract = ref(null);
 const paymentMethodTarget = ref(null);
+const activePaymentMethodId = ref(null);
 const paymentMethodForm = useForm({
+    type: 'sbp',
+    label: '',
+    phone: '',
+    display_name: '',
+    is_active: true,
+    sort_order: 0,
+});
+const newPaymentMethodForm = useForm({
     type: 'sbp',
     label: '',
     phone: '',
@@ -218,10 +227,15 @@ const openEdit = (contract) => {
 const openPaymentMethods = (contract) => {
     paymentMethodContract.value = contract;
     paymentMethodTarget.value = null;
+    activePaymentMethodId.value = null;
     paymentMethodForm.reset();
     paymentMethodForm.type = 'sbp';
     paymentMethodForm.is_active = true;
     paymentMethodForm.sort_order = 0;
+    newPaymentMethodForm.reset();
+    newPaymentMethodForm.type = 'sbp';
+    newPaymentMethodForm.is_active = true;
+    newPaymentMethodForm.sort_order = 0;
     paymentMethodOpen.value = true;
 };
 
@@ -229,42 +243,111 @@ const closePaymentMethods = () => {
     paymentMethodOpen.value = false;
     paymentMethodContract.value = null;
     paymentMethodTarget.value = null;
+    activePaymentMethodId.value = null;
     paymentMethodForm.reset();
     paymentMethodForm.clearErrors();
+    newPaymentMethodForm.reset();
+    newPaymentMethodForm.clearErrors();
 };
 
-const editPaymentMethod = (method = null) => {
-    paymentMethodTarget.value = method && method.id ? method : null;
+const togglePaymentMethodEditor = (method) => {
+    if (!method?.id) {
+        return;
+    }
+    if (activePaymentMethodId.value === method.id) {
+        activePaymentMethodId.value = null;
+        paymentMethodTarget.value = null;
+        paymentMethodForm.reset();
+        paymentMethodForm.clearErrors();
+        return;
+    }
+    activePaymentMethodId.value = method.id;
+    paymentMethodTarget.value = method;
     paymentMethodForm.clearErrors();
-    paymentMethodForm.type = method?.type || 'sbp';
-    paymentMethodForm.label = method?.label || '';
-    paymentMethodForm.phone = method?.phone || '';
-    paymentMethodForm.display_name = method?.display_name || '';
-    paymentMethodForm.is_active = method ? Boolean(method.is_active) : true;
-    paymentMethodForm.sort_order = Number(method?.sort_order || 0);
+    paymentMethodForm.type = method.type || 'sbp';
+    paymentMethodForm.label = method.label || '';
+    paymentMethodForm.phone = method.phone || '';
+    paymentMethodForm.display_name = method.display_name || '';
+    paymentMethodForm.is_active = Boolean(method.is_active);
+    paymentMethodForm.sort_order = Number(method.sort_order || 0);
 };
 
 const submitPaymentMethod = () => {
+    if (!paymentMethodContract.value || !props.venue?.alias || !props.activeTypeSlug || !paymentMethodTarget.value) {
+        return;
+    }
+
+    const baseUrl = `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/contracts/${paymentMethodContract.value.id}/payment-methods`;
+    const targetId = paymentMethodTarget.value.id;
+    const url = `${baseUrl}/${targetId}`;
+
+    paymentMethodForm.patch(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            paymentMethodTarget.value = null;
+            activePaymentMethodId.value = null;
+            paymentMethodForm.reset();
+            paymentMethodForm.clearErrors();
+            refreshContractMethods();
+        },
+    });
+};
+
+const submitNewPaymentMethod = () => {
     if (!paymentMethodContract.value || !props.venue?.alias || !props.activeTypeSlug) {
         return;
     }
 
     const baseUrl = `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/contracts/${paymentMethodContract.value.id}/payment-methods`;
-    const targetId = paymentMethodTarget.value?.id;
-    const method = targetId ? 'patch' : 'post';
-    const url = targetId ? `${baseUrl}/${targetId}` : baseUrl;
 
-    paymentMethodForm[method](url, {
+    newPaymentMethodForm.post(baseUrl, {
         preserveScroll: true,
         onSuccess: () => {
-            paymentMethodTarget.value = null;
-            paymentMethodForm.reset();
-            paymentMethodForm.type = 'sbp';
-            paymentMethodForm.is_active = true;
-            paymentMethodForm.sort_order = 0;
+            newPaymentMethodForm.reset();
+            newPaymentMethodForm.type = 'sbp';
+            newPaymentMethodForm.is_active = true;
+            newPaymentMethodForm.sort_order = 0;
+            refreshContractMethods();
         },
     });
 };
+
+const refreshContractMethods = () => {
+    const contractId = paymentMethodContract.value?.id;
+    if (!contractId) {
+        return;
+    }
+    router.reload({
+        only: ['contracts'],
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: (page) => {
+            const updated = page?.props?.contracts?.find((item) => item.id === contractId);
+            if (updated) {
+                paymentMethodContract.value = updated;
+            }
+        },
+    });
+};
+
+watch(
+    () => paymentMethodForm.type,
+    (value) => {
+        if (value !== 'sbp') {
+            paymentMethodForm.phone = '';
+            paymentMethodForm.display_name = '';
+        }
+    }
+);
+watch(
+    () => newPaymentMethodForm.type,
+    (value) => {
+        if (value !== 'sbp') {
+            newPaymentMethodForm.phone = '';
+            newPaymentMethodForm.display_name = '';
+        }
+    }
+);
 
 watch(
     () => assignForm.contract_type,
@@ -742,7 +825,7 @@ const formatDate = (value) => {
 
         <div v-if="paymentMethodOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-xl">
-                <form :class="{ loading: paymentMethodForm.processing }" @submit.prevent="submitPaymentMethod">
+                <form :class="{ loading: paymentMethodForm.processing || newPaymentMethodForm.processing }" @submit.prevent>
                     <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <div>
                             <h2 class="text-lg font-semibold text-slate-900">Методы оплаты контракта</h2>
@@ -761,13 +844,6 @@ const formatDate = (value) => {
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div class="flex items-center justify-between gap-3">
                                 <p class="text-sm font-semibold text-slate-900">Список методов</p>
-                                <button
-                                    type="button"
-                                    class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                                    @click="editPaymentMethod()"
-                                >
-                                    Новый метод
-                                </button>
                             </div>
                             <div v-if="paymentMethodContract?.payment_methods?.length" class="mt-3 grid gap-3">
                                 <div
@@ -790,10 +866,87 @@ const formatDate = (value) => {
                                     <button
                                         type="button"
                                         class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300"
-                                        @click="editPaymentMethod(method)"
+                                        @click="togglePaymentMethodEditor(method)"
                                     >
                                         Редактировать
                                     </button>
+                                    <div
+                                        v-if="activePaymentMethodId === method.id"
+                                        class="mt-3 w-full rounded-2xl border border-slate-200 bg-white p-3"
+                                    >
+                                        <div class="grid gap-3">
+                                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                Тип
+                                                <select
+                                                    v-model="paymentMethodForm.type"
+                                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                                >
+                                                    <option v-for="option in paymentMethodTypes" :key="option.value" :value="option.value">
+                                                        {{ option.label }}
+                                                    </option>
+                                                </select>
+                                            </label>
+                                            <div v-if="paymentMethodForm.errors.type" class="text-xs text-rose-700">
+                                                {{ paymentMethodForm.errors.type }}
+                                            </div>
+
+                                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                Название
+                                                <input
+                                                    v-model="paymentMethodForm.label"
+                                                    type="text"
+                                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                                    placeholder="Например, основной способ оплаты"
+                                                />
+                                            </label>
+                                            <div v-if="paymentMethodForm.errors.label" class="text-xs text-rose-700">
+                                                {{ paymentMethodForm.errors.label }}
+                                            </div>
+
+                                            <template v-if="paymentMethodForm.type === 'sbp'">
+                                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                    Телефон для СБП
+                                                    <input
+                                                        v-model="paymentMethodForm.phone"
+                                                        type="text"
+                                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                                        placeholder="+7 900 000-00-00"
+                                                    />
+                                                </label>
+                                                <div v-if="paymentMethodForm.errors.phone" class="text-xs text-rose-700">
+                                                    {{ paymentMethodForm.errors.phone }}
+                                                </div>
+
+                                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                    Отображаемое имя
+                                                    <input
+                                                        v-model="paymentMethodForm.display_name"
+                                                        type="text"
+                                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                                        placeholder="Иванов И. И."
+                                                    />
+                                                </label>
+                                                <div v-if="paymentMethodForm.errors.display_name" class="text-xs text-rose-700">
+                                                    {{ paymentMethodForm.errors.display_name }}
+                                                </div>
+                                            </template>
+
+                                            <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                <input v-model="paymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                                                <span>Активен</span>
+                                            </label>
+                                            <div class="flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                                                    :disabled="paymentMethodForm.processing"
+                                                    @click="submitPaymentMethod"
+                                                >
+                                                    Сохранить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <p v-else class="mt-3 text-sm text-slate-500">Методы оплаты не добавлены.</p>
@@ -801,13 +954,13 @@ const formatDate = (value) => {
 
                         <div class="mt-4 border-t border-slate-200 pt-4">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                {{ paymentMethodTarget?.id ? 'Редактирование' : 'Добавление' }}
+                                Добавление
                             </p>
                             <div class="mt-3 grid gap-3">
                                 <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Тип
                                     <select
-                                        v-model="paymentMethodForm.type"
+                                        v-model="newPaymentMethodForm.type"
                                         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
                                     >
                                         <option v-for="option in paymentMethodTypes" :key="option.value" :value="option.value">
@@ -815,63 +968,64 @@ const formatDate = (value) => {
                                         </option>
                                     </select>
                                 </label>
-                                <div v-if="paymentMethodForm.errors.type" class="text-xs text-rose-700">
-                                    {{ paymentMethodForm.errors.type }}
+                                <div v-if="newPaymentMethodForm.errors.type" class="text-xs text-rose-700">
+                                    {{ newPaymentMethodForm.errors.type }}
                                 </div>
 
                                 <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Название
                                     <input
-                                        v-model="paymentMethodForm.label"
+                                        v-model="newPaymentMethodForm.label"
                                         type="text"
                                         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        placeholder="Например, СБП"
+                                        placeholder="Например, основной способ оплаты"
                                     />
                                 </label>
-                                <div v-if="paymentMethodForm.errors.label" class="text-xs text-rose-700">
-                                    {{ paymentMethodForm.errors.label }}
+                                <div v-if="newPaymentMethodForm.errors.label" class="text-xs text-rose-700">
+                                    {{ newPaymentMethodForm.errors.label }}
                                 </div>
 
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                    Телефон для СБП
-                                    <input
-                                        v-model="paymentMethodForm.phone"
-                                        type="text"
-                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        placeholder="+7 900 000-00-00"
-                                    />
-                                </label>
-                                <div v-if="paymentMethodForm.errors.phone" class="text-xs text-rose-700">
-                                    {{ paymentMethodForm.errors.phone }}
-                                </div>
-
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                    Отображаемое имя
-                                    <input
-                                        v-model="paymentMethodForm.display_name"
-                                        type="text"
-                                        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        placeholder="Иванов И. И."
-                                    />
-                                </label>
-                                <div v-if="paymentMethodForm.errors.display_name" class="text-xs text-rose-700">
-                                    {{ paymentMethodForm.errors.display_name }}
-                                </div>
-
-                                <div class="grid gap-3 md:grid-cols-2">
+                                <template v-if="newPaymentMethodForm.type === 'sbp'">
                                     <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                        Порядок
+                                        Телефон для СБП
                                         <input
-                                            v-model.number="paymentMethodForm.sort_order"
-                                            type="number"
-                                            min="0"
+                                            v-model="newPaymentMethodForm.phone"
+                                            type="text"
                                             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                            placeholder="+7 900 000-00-00"
                                         />
                                     </label>
-                                    <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
-                                        <input v-model="paymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                                        <span>Активен</span>
+                                    <div v-if="newPaymentMethodForm.errors.phone" class="text-xs text-rose-700">
+                                        {{ newPaymentMethodForm.errors.phone }}
+                                    </div>
+
+                                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                        Отображаемое имя
+                                        <input
+                                            v-model="newPaymentMethodForm.display_name"
+                                            type="text"
+                                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                            placeholder="Иванов И. И."
+                                        />
                                     </label>
+                                    <div v-if="newPaymentMethodForm.errors.display_name" class="text-xs text-rose-700">
+                                        {{ newPaymentMethodForm.errors.display_name }}
+                                    </div>
+                                </template>
+
+                                <label class="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                    <input v-model="newPaymentMethodForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                                    <span>Активен</span>
+                                </label>
+                                <div class="flex justify-end">
+                                    <button
+                                        type="button"
+                                        class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                                        :disabled="newPaymentMethodForm.processing"
+                                        @click="submitNewPaymentMethod"
+                                    >
+                                        Добавить
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -884,13 +1038,6 @@ const formatDate = (value) => {
                             @click="closePaymentMethods"
                         >
                             Закрыть
-                        </button>
-                        <button
-                            class="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                            type="submit"
-                            :disabled="paymentMethodForm.processing"
-                        >
-                            Сохранить
                         </button>
                     </div>
                 </form>
