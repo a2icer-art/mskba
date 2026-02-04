@@ -997,7 +997,7 @@ watch(
                             type="submit"
                             :disabled="awaitPaymentForm.processing"
                         >
-                            Сохранить
+                            Принять
                         </button>
                     </div>
                 </form>

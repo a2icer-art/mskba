@@ -156,6 +156,13 @@ const bookingStatusLabel = (status) => {
     return 'Ожидает';
 };
 
+const shouldShowPaymentDetails = (booking) => {
+    if (!booking) {
+        return false;
+    }
+    return ['awaiting_payment', 'paid', 'approved'].includes(booking.status);
+};
+
 const formatAmount = (value) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
         return '—';
@@ -1084,117 +1091,112 @@ const isPaymentConfirmDisabled = computed(() => {
                                     <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Комментарий</span>
                                     <p class="mt-1">{{ booking.moderation_comment }}</p>
                                 </div>
-                                <div v-if="booking.payment_order" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Порядок оплаты</span>
-                                    <p class="mt-1">{{ booking.payment_order }}</p>
-                                </div>
-                                <div v-if="booking.payment_recipient_label" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Получатель оплаты</span>
-                                    <p class="mt-1">{{ booking.payment_recipient_label }}</p>
-                                </div>
-                                <!-- Список методов выше дублируется выбором ниже -->
-                                <div
-                                    v-else-if="booking.status === 'awaiting_payment'"
-                                    class="mt-3 text-sm text-rose-700"
-                                >
-                                    Оплата не настроена. Обратитесь к ответственному
-                                    {{ booking.payment_recipient_label ? `(${booking.payment_recipient_label})` : '' }}
-                                    или в техподдержку сайта.
-                                </div>
-                                <div v-if="booking.payment_methods?.length" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
-                                        {{ isPaymentOverdue(booking) ? 'Метод оплаты' : 'Выбор метода оплаты' }}
-                                    </span>
-                                    <div class="mt-2 grid gap-2">
-                                        <template v-if="isPaymentOverdue(booking)">
-                                            <div class="text-sm text-slate-700">
-                                                <p class="mt-1">
-                                                    {{ methodTypeLabel(selectedMethodForBooking(booking)?.type) }}
-                                                    — {{ selectedMethodForBooking(booking)?.label || '—' }}
-                                                </p>
-                                            </div>
-                                        </template>
-                                        <select
-                                            v-else
-                                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                            :value="getSelectedMethodId(booking)"
-                                            :disabled="!booking.can_request_payment_confirmation"
-                                            @change="setSelectedMethodId(booking, $event.target.value)"
-                                        >
-                                            <option
-                                                v-for="method in booking.payment_methods"
-                                                :key="method.id || `${method.type}-${method.label}`"
-                                                :value="method.id"
+                                <div v-if="shouldShowPaymentDetails(booking)">
+                                    <div v-if="booking.payment_order" class="mt-3 text-sm text-slate-700">
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Порядок оплаты</span>
+                                        <p class="mt-1">{{ booking.payment_order }}</p>
+                                    </div>
+                                    <div v-if="booking.payment_methods?.length" class="mt-3 text-sm text-slate-700">
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
+                                            {{ isPaymentOverdue(booking) ? 'Метод оплаты' : 'Выбор метода оплаты' }}
+                                        </span>
+                                        <div class="mt-2 grid gap-2">
+                                            <template v-if="isPaymentOverdue(booking)">
+                                                <div class="text-sm text-slate-700">
+                                                    <p class="mt-1">
+                                                        {{ methodTypeLabel(selectedMethodForBooking(booking)?.type) }}
+                                                        — {{ selectedMethodForBooking(booking)?.label || '—' }}
+                                                    </p>
+                                                </div>
+                                            </template>
+                                            <select
+                                                v-else
+                                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                                :value="getSelectedMethodId(booking)"
+                                                :disabled="!booking.can_request_payment_confirmation"
+                                                @change="setSelectedMethodId(booking, $event.target.value)"
                                             >
-                                                {{ methodTypeLabel(method.type) }} — {{ method.label }}
-                                            </option>
-                                        </select>
-                                        <p
-                                            v-if="selectedMethodForBooking(booking) && !isMethodSupported(selectedMethodForBooking(booking))"
-                                            class="text-xs text-rose-700"
-                                        >
-                                            Способ не поддерживается. Выберите другой метод.
+                                                <option
+                                                    v-for="method in booking.payment_methods"
+                                                    :key="method.id || `${method.type}-${method.label}`"
+                                                    :value="method.id"
+                                                >
+                                                    {{ methodTypeLabel(method.type) }} — {{ method.label }}
+                                                </option>
+                                            </select>
+                                            <p
+                                                v-if="selectedMethodForBooking(booking) && !isMethodSupported(selectedMethodForBooking(booking))"
+                                                class="text-xs text-rose-700"
+                                            >
+                                                Способ не поддерживается. Выберите другой метод.
+                                            </p>
+                                        </div>
+                                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                                            <button
+                                                v-if="booking.can_request_payment_confirmation"
+                                                class="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                                                type="button"
+                                                :disabled="!isMethodSupported(selectedMethodForBooking(booking))"
+                                                @click="openPaymentConfirm(booking)"
+                                            >
+                                                Оплатить
+                                            </button>
+                                            <p v-else class="text-xs text-slate-500">
+                                                {{ organizerPaymentNotice(booking) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-if="booking.status === 'awaiting_payment' && !booking.payment_methods?.length"
+                                        class="mt-3 text-sm text-rose-700"
+                                    >
+                                        Оплата не настроена. Обратитесь к ответственному или в техподдержку сайта.
+                                    </div>
+                                    <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Подтверждение оплаты</span>
+                                            <span class="font-semibold">{{ paymentConfirmCardStatusLabel(booking) }}</span>
+                                        </div>
+                                        <div v-if="booking.payment_confirmation" class="mt-2 text-xs text-slate-500">
+                                            <p v-if="booking.payment_confirmation.payment_method_snapshot?.label" class="mt-1">
+                                                Метод: {{ booking.payment_confirmation.payment_method_snapshot.label }}
+                                            </p>
+                                            <p v-if="booking.payment_confirmation.evidence_comment" class="mt-1 text-slate-600">
+                                                Комментарий: {{ booking.payment_confirmation.evidence_comment }}
+                                            </p>
+                                            <p v-if="isPaymentOverdue(booking)" class="mt-1 text-rose-700">
+                                                Срок оплаты истёк. Подтверждение недоступно.
+                                            </p>
+                                            <a
+                                                v-if="booking.payment_confirmation.evidence_media_url"
+                                                class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-700 underline decoration-dotted hover:text-slate-900"
+                                                :href="booking.payment_confirmation.evidence_media_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                Смотреть скриншот
+                                            </a>
+                                            <p v-if="booking.payment_confirmation.decision_comment" class="mt-1 text-slate-600">
+                                                Комментарий администратора: {{ booking.payment_confirmation.decision_comment }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div v-if="booking.payment_code" class="mt-3 text-sm text-slate-700">
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
+                                        <p class="mt-1">{{ booking.payment_code }}</p>
+                                    </div>
+                                    <div v-if="resolvePaymentAmount(booking)" class="mt-3 text-sm text-slate-700">
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
+                                            {{ paymentAmountLabel(booking) }}
+                                        </span>
+                                        <p class="mt-1">{{ formatAmount(resolvePaymentAmount(booking)) }}</p>
+                                    </div>
+                                    <div v-if="booking.status === 'awaiting_payment'" class="mt-3 text-sm text-slate-700">
+                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Оплатить до</span>
+                                        <p class="mt-1">
+                                            {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'Бессрочно' }}
                                         </p>
                                     </div>
-                                    <div class="mt-3 flex flex-wrap items-center gap-2">
-                                        <button
-                                            v-if="booking.can_request_payment_confirmation"
-                                            class="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                                            type="button"
-                                            :disabled="!isMethodSupported(selectedMethodForBooking(booking))"
-                                            @click="openPaymentConfirm(booking)"
-                                        >
-                                            Оплатить
-                                        </button>
-                                        <p v-else class="text-xs text-slate-500">
-                                            {{ organizerPaymentNotice(booking) }}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Подтверждение оплаты</span>
-                                        <span class="font-semibold">{{ paymentConfirmCardStatusLabel(booking) }}</span>
-                                    </div>
-                                    <div v-if="booking.payment_confirmation" class="mt-2 text-xs text-slate-500">
-                                        <p v-if="booking.payment_confirmation.payment_method_snapshot?.label" class="mt-1">
-                                            Метод: {{ booking.payment_confirmation.payment_method_snapshot.label }}
-                                        </p>
-                                        <p v-if="booking.payment_confirmation.evidence_comment" class="mt-1 text-slate-600">
-                                            Комментарий: {{ booking.payment_confirmation.evidence_comment }}
-                                        </p>
-                                        <p v-if="isPaymentOverdue(booking)" class="mt-1 text-rose-700">
-                                            Срок оплаты истёк. Подтверждение недоступно.
-                                        </p>
-                                        <a
-                                            v-if="booking.payment_confirmation.evidence_media_url"
-                                            class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-700 underline decoration-dotted hover:text-slate-900"
-                                            :href="booking.payment_confirmation.evidence_media_url"
-                                            target="_blank"
-                                            rel="noopener"
-                                        >
-                                            Смотреть скриншот
-                                        </a>
-                                        <p v-if="booking.payment_confirmation.decision_comment" class="mt-1 text-slate-600">
-                                            Комментарий администратора: {{ booking.payment_confirmation.decision_comment }}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div v-if="booking.payment_code" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Платеж №</span>
-                                    <p class="mt-1">{{ booking.payment_code }}</p>
-                                </div>
-                                <div v-if="resolvePaymentAmount(booking)" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
-                                        {{ paymentAmountLabel(booking) }}
-                                    </span>
-                                    <p class="mt-1">{{ formatAmount(resolvePaymentAmount(booking)) }}</p>
-                                </div>
-                                <div v-if="booking.status === 'awaiting_payment'" class="mt-3 text-sm text-slate-700">
-                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Оплатить до</span>
-                                    <p class="mt-1">
-                                        {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'Бессрочно' }}
-                                    </p>
                                 </div>
                             </div>
                         </div>

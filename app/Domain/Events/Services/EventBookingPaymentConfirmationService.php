@@ -111,7 +111,7 @@ class EventBookingPaymentConfirmationService
             $comment = null;
         }
 
-        DB::transaction(function () use ($confirmation, $user, $approved, $comment): void {
+        DB::transaction(function () use ($confirmation, $user, $approved, $comment, $booking): void {
             $confirmation->update([
                 'status' => $approved
                     ? EventBookingPaymentConfirmationStatus::Approved

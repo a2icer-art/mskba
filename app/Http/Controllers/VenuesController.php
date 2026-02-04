@@ -31,6 +31,7 @@ use App\Domain\Payments\Enums\PaymentMethodType;
 use App\Domain\Payments\Models\Payment;
 use App\Domain\Payments\Models\PaymentMethod;
 use App\Domain\Payments\Models\PaymentOrder;
+use App\Domain\Payments\Services\PaymentRecipientResolver;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Domain\Venues\Enums\VenueBookingMode;
@@ -1897,11 +1898,17 @@ class VenuesController extends Controller
             ? EventBookingStatus::Pending
             : EventBookingStatus::AwaitingPayment;
 
+        $recipient = app(PaymentRecipientResolver::class)->resolveForVenue($venue);
+
         $booking->update([
             'status' => $nextStatus,
             'payment_order_id' => $paymentOrder?->id,
             'payment_order_snapshot' => $snapshot,
             'payment_due_at' => $paymentDueAt,
+            'payment_recipient_type' => $recipient['recipient_type'],
+            'payment_recipient_id' => $recipient['recipient_id'],
+            'payment_recipient_label' => $recipient['recipient_label'],
+            'payment_methods_snapshot' => $recipient['methods'],
             'moderation_comment' => $data['comment'] ?? null,
             'moderation_source' => EventBookingModerationSource::Manual,
             'moderated_by' => $user->id,
