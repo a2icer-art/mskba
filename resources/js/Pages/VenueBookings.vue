@@ -144,6 +144,14 @@ const paymentConfirmStatusLabel = (status) => {
     }
     return 'Не запрошено';
 };
+const isPaymentConfirmationRequested = (booking) => {
+    if (booking?.payment_confirmation) {
+        return true;
+    }
+    const status = booking?.payment_confirm_status;
+    return Boolean(status && status !== 'none');
+};
+const canShowPaymentDetails = (booking) => ['awaiting_payment', 'paid', 'approved'].includes(booking?.status);
 const moderationSourceLabel = (source) => {
     if (source === 'auto') {
         return 'Автоматически';
@@ -384,9 +392,9 @@ const triggerPartialSwapHighlight = () => {
 const confirmOpen = ref(false);
 const cancelOpen = ref(false);
 const awaitPaymentOpen = ref(false);
-const paidOpen = ref(false);
+const infoOpen = ref(false);
 const activeBooking = ref(null);
-const hasModalOpen = computed(() => confirmOpen.value || cancelOpen.value || awaitPaymentOpen.value || paidOpen.value);
+const hasModalOpen = computed(() => confirmOpen.value || cancelOpen.value || awaitPaymentOpen.value || infoOpen.value);
 const confirmForm = useForm({ comment: '' });
 const cancelForm = useForm({ comment: '' });
 const awaitPaymentForm = useForm({
@@ -396,7 +404,6 @@ const awaitPaymentForm = useForm({
     payment_wait_is_minutes: null,
     partial_amount_minor: null,
 });
-const paidForm = useForm({ comment: '' });
 const paymentDecisionOpen = ref(false);
 const paymentDecisionBooking = ref(null);
 const paymentDecisionMode = ref('approve');
@@ -465,18 +472,14 @@ const closeAwaitPayment = () => {
     awaitPaymentForm.clearErrors();
 };
 
-const openPaid = (booking) => {
+const openInfo = (booking) => {
     activeBooking.value = booking;
-    paidForm.reset('comment');
-    paidForm.clearErrors();
-    paidOpen.value = true;
+    infoOpen.value = true;
 };
 
-const closePaid = () => {
-    paidOpen.value = false;
+const closeInfo = () => {
+    infoOpen.value = false;
     activeBooking.value = null;
-    paidForm.reset('comment');
-    paidForm.clearErrors();
 };
 
 const openPaymentDecision = (booking, mode) => {
@@ -535,14 +538,12 @@ const submitAwaitPayment = () => {
     );
 };
 
-const submitPaid = () => {
-    if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
+const openBookingView = (booking) => {
+    if (booking?.can_await_payment && !canShowPaymentDetails(booking)) {
+        openAwaitPayment(booking);
         return;
     }
-    paidForm.post(
-        `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/mark-paid`,
-        { preserveScroll: true, onSuccess: closePaid }
-    );
+    openInfo(booking);
 };
 
 const submitPaymentDecision = () => {
@@ -694,21 +695,21 @@ watch(
                                     >
                                         {{ statusLabel(booking.status) }}
                                     </span>
-                                    <span v-if="booking.payment_order" class="text-xs text-slate-500">
+                                    <span v-if="canShowPaymentDetails(booking) && booking.payment_order" class="text-xs text-slate-500">
                                         Порядок оплаты: {{ booking.payment_order }}
                                     </span>
-                                    <span v-if="booking.payment_code" class="text-xs text-slate-500">
+                                    <span v-if="canShowPaymentDetails(booking) && booking.payment_code" class="text-xs text-slate-500">
                                         Платеж № {{ booking.payment_code }}
                                     </span>
-                                    <span v-if="resolvePaymentAmount(booking)" class="text-xs text-slate-500">
+                                    <span v-if="canShowPaymentDetails(booking) && resolvePaymentAmount(booking)" class="text-xs text-slate-500">
                                         К оплате: {{ formatAmount(resolvePaymentAmount(booking)) }}
                                     </span>
-                                    <span v-if="booking.status === 'awaiting_payment'" class="text-xs text-slate-500">
+                                    <span v-if="canShowPaymentDetails(booking) && booking.status === 'awaiting_payment'" class="text-xs text-slate-500">
                                         Оплатить до:
                                         {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'бессрочно' }}
                                     </span>
                                     <div
-                                        v-if="booking.payment_confirm_status || booking.payment_confirmation"
+                                        v-if="canShowPaymentDetails(booking) && isPaymentConfirmationRequested(booking)"
                                         class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
                                     >
                                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -766,22 +767,13 @@ watch(
                                     </div>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <button
-                                            v-if="booking.can_await_payment"
+                                            v-if="booking.can_await_payment || canShowPaymentDetails(booking)"
                                             class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-300"
                                             type="button"
                                             :disabled="awaitPaymentForm.processing"
-                                            @click="openAwaitPayment(booking)"
+                                            @click="openBookingView(booking)"
                                         >
                                             Просмотр заявки
-                                        </button>
-                                        <button
-                                            v-if="booking.can_mark_paid"
-                                            class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 transition hover:-translate-y-0.5 hover:border-sky-300"
-                                            type="button"
-                                            :disabled="paidForm.processing"
-                                            @click="openPaid(booking)"
-                                        >
-                                            Оплачено
                                         </button>
                                         <button
                                             v-if="booking.can_confirm"
@@ -997,64 +989,60 @@ watch(
                             type="submit"
                             :disabled="awaitPaymentForm.processing"
                         >
-                            Принять
+                            В оплату
                         </button>
                     </div>
                 </form>
             </div>
         </div>
 
-    <div v-if="paidOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+    <div v-if="infoOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
         <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
-            <form :class="{ loading: paidForm.processing }" @submit.prevent="submitPaid">
-                    <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
-                        <h2 class="text-lg font-semibold text-slate-900">Отметить оплату</h2>
-                        <button
-                            class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                            type="button"
-                            aria-label="Закрыть"
-                            @click="closePaid"
-                        >
-                            x
-                        </button>
-                    </div>
-                    <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
-                        <p class="text-sm text-slate-700">
-                            Событие: {{ activeBooking?.event?.title || 'Событие' }}
-                        </p>
-                        <p class="mt-1 text-sm text-slate-600">
-                            {{ formatDateTime(activeBooking?.starts_at) }} – {{ formatDateTime(activeBooking?.ends_at) }}
-                        </p>
-                        <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Комментарий (опционально)
-                            <textarea
-                                v-model="paidForm.comment"
-                                class="min-h-[100px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            ></textarea>
-                        </label>
-                        <div v-if="paidForm.errors.comment" class="text-xs text-rose-700">
-                            {{ paidForm.errors.comment }}
-                        </div>
-                        
-                    </div>
-                    <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
-                        <button
-                            class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
-                            type="button"
-                            :disabled="paidForm.processing"
-                            @click="closePaid"
-                        >
-                            Закрыть
-                        </button>
-                        <button
-                            class="rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
-                            type="submit"
-                            :disabled="paidForm.processing"
-                        >
-                            Отметить
-                        </button>
-                    </div>
-                </form>
+            <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                <h2 class="text-lg font-semibold text-slate-900">Информация о заявке</h2>
+                <button
+                    class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                    type="button"
+                    aria-label="Закрыть"
+                    @click="closeInfo"
+                >
+                    x
+                </button>
+            </div>
+            <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                <p class="text-sm text-slate-700">
+                    Событие: {{ activeBooking?.event?.title || 'Событие' }}
+                </p>
+                <p class="mt-1 text-sm text-slate-600">
+                    {{ formatDateTime(activeBooking?.starts_at) }} – {{ formatDateTime(activeBooking?.ends_at) }}
+                </p>
+                <div class="mt-4 space-y-2 text-sm text-slate-700">
+                    <p v-if="activeBooking?.payment_order">
+                        Порядок оплаты: {{ activeBooking.payment_order }}
+                    </p>
+                    <p v-if="activeBooking?.payment_code">
+                        Платеж № {{ activeBooking.payment_code }}
+                    </p>
+                    <p v-if="resolvePaymentAmount(activeBooking)">
+                        К оплате: {{ formatAmount(resolvePaymentAmount(activeBooking)) }}
+                    </p>
+                    <p v-if="activeBooking?.payment_due_at">
+                        Оплатить до: {{ formatDateTime(activeBooking.payment_due_at) }}
+                    </p>
+                    <p v-if="activeBooking?.moderation_comment">
+                        Комментарий: {{ activeBooking.moderation_comment }}
+                    </p>
+                </div>
+            </div>
+            <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                <button
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                    type="button"
+                    @click="closeInfo"
+                >
+                    Закрыть
+                </button>
+            </div>
         </div>
     </div>
 

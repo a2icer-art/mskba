@@ -1885,9 +1885,15 @@ class VenuesController extends Controller
         $amount = $existingTotalAmount !== null
             ? (int) $existingTotalAmount
             : ($existingAmount !== null ? (int) $existingAmount : (int) ($baseAmount + $commissionAmount));
+        $manualAmount = array_key_exists('partial_amount_minor', $data) && $data['partial_amount_minor']
+            ? (int) $data['partial_amount_minor']
+            : null;
+        if ($manualAmount) {
+            $amount = $manualAmount;
+        }
         $partialAmount = null;
         if ($paymentOrderCode === VenuePaymentOrder::PartialPrepayment->value) {
-            $partialAmount = (int) ($data['partial_amount_minor'] ?? (int) ceil($amount * 0.5));
+            $partialAmount = (int) ceil($amount * 0.5);
             $partialAmount = max(1, min($partialAmount, $amount));
         }
         $snapshot = $paymentOrder

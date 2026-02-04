@@ -1425,6 +1425,12 @@ const isPaymentConfirmDisabled = computed(() => {
                                 class="mt-2 grid gap-1 text-sm text-slate-600"
                             >
                                 <p>
+                                    Сумма к оплате:
+                                    <span class="font-semibold text-slate-900">
+                                        {{ formatAmount(resolvePaymentAmount(paymentConfirmBooking)) }}
+                                    </span>
+                                </p>
+                                <p>
                                     Метод: <span class="font-semibold text-slate-900">СБП</span>
                                 </p>
                                 <button

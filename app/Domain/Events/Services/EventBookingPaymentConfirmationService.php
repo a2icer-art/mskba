@@ -9,6 +9,7 @@ use App\Domain\Events\Models\EventBooking;
 use App\Domain\Events\Models\EventBookingPaymentConfirmation;
 use App\Domain\Media\Services\MediaService;
 use App\Domain\Payments\Enums\PaymentMethodType;
+use App\Domain\Venues\Enums\VenueBookingMode;
 use App\Domain\Venues\Models\VenueSettings;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -122,13 +123,21 @@ class EventBookingPaymentConfirmationService
             ]);
 
             if ($booking) {
-                $booking->update([
+                $updates = [
                     'payment_confirm_status' => $approved
                         ? EventBookingPaymentConfirmStatus::AdminConfirmed
                         : EventBookingPaymentConfirmStatus::UserPaidRejected,
                     'payment_confirmed_at' => $approved ? now() : null,
                     'payment_last_confirmation_id' => $confirmation->id,
-                ]);
+                ];
+                if ($approved && $booking->status === EventBookingStatus::AwaitingPayment) {
+                    $updates['status'] = EventBookingStatus::Paid;
+                    $mode = $booking->venue?->settings?->booking_mode ?? VenueBookingMode::Instant;
+                    if ($mode === VenueBookingMode::Instant) {
+                        $updates['status'] = EventBookingStatus::Approved;
+                    }
+                }
+                $booking->update($updates);
             }
         });
 
