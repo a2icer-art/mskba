@@ -514,7 +514,22 @@ const formatDayLabel = (date) =>
     new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(date));
 const formatWeekdayLabel = (date) =>
     new Intl.DateTimeFormat('ru-RU', { weekday: 'short' }).format(new Date(date));
-const weekdayHeaders = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const normalizeWeekdayLabel = (label) => {
+    if (!label) {
+        return '';
+    }
+    const trimmed = String(label).replace('.', '').trim();
+    if (!trimmed) {
+        return '';
+    }
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+const weekdayHeaders = computed(() => {
+    if (!scheduleDays.value.length) {
+        return ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    }
+    return scheduleDays.value.slice(0, 7).map((day) => normalizeWeekdayLabel(formatWeekdayLabel(day.date)));
+});
 
 const mapRef = ref(null);
 const mapError = ref('');

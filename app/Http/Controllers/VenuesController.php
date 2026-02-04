@@ -700,7 +700,15 @@ class VenuesController extends Controller
           $bookings = EventBooking::query()
               ->where('venue_id', $venue->id)
               ->when($status !== '', fn ($query) => $query->where('status', $status))
-              ->with(['event.type', 'event.organizer', 'creator', 'moderator', 'paymentOrder', 'payment'])
+              ->with([
+                  'event.type',
+                  'event.organizer',
+                  'creator',
+                  'moderator',
+                  'paymentOrder',
+                  'payment',
+                  'lastPaymentConfirmation.evidenceMedia',
+              ])
               ->orderByDesc('id')
               ->paginate(10)
               ->withQueryString()
@@ -715,6 +723,10 @@ class VenuesController extends Controller
                     && $paymentOrderCode === VenuePaymentOrder::Postpayment->value;
                 $canMarkPaidPostpayment = $status === EventBookingStatus::Approved->value
                     && $paymentOrderCode === VenuePaymentOrder::Postpayment->value;
+                $confirmation = $booking->lastPaymentConfirmation;
+                $mediaUrl = $confirmation?->evidenceMedia
+                    ? app(MediaService::class)->toPublicUrl($confirmation->evidenceMedia)
+                    : null;
                 return [
                     'id' => $booking->id,
                     'status' => $status,
@@ -732,6 +744,21 @@ class VenuesController extends Controller
                       'payment_supervisor_fee_amount_minor' => $paymentMeta['supervisor_fee_amount_minor'] ?? null,
                       'payment_supervisor_fee_is_fixed' => $paymentMeta['supervisor_fee_is_fixed'] ?? null,
                       'payment_due_at' => $booking->payment_due_at?->toDateTimeString(),
+                      'payment_confirm_status' => $booking->payment_confirm_status?->value,
+                      'payment_confirmed_at' => $booking->payment_confirmed_at?->toDateTimeString(),
+                      'payment_confirmation' => $confirmation
+                          ? [
+                              'id' => $confirmation->id,
+                              'status' => $confirmation->status?->value,
+                              'evidence_comment' => $confirmation->evidence_comment,
+                              'evidence_media_url' => $mediaUrl,
+                              'requested_by_user_id' => $confirmation->requested_by_user_id,
+                              'decided_by_user_id' => $confirmation->decided_by_user_id,
+                              'decided_at' => $confirmation->decided_at?->toDateTimeString(),
+                              'decision_comment' => $confirmation->decision_comment,
+                              'payment_method_snapshot' => $confirmation->payment_method_snapshot,
+                          ]
+                          : null,
                       'event' => $booking->event
                         ? [
                             'id' => $booking->event->id,

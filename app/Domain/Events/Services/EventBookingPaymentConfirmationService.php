@@ -99,6 +99,13 @@ class EventBookingPaymentConfirmationService
             ]);
         }
 
+        $booking = $confirmation->booking;
+        if ($booking?->payment_due_at && $booking->payment_due_at->isPast()) {
+            throw ValidationException::withMessages([
+                'payment_due_at' => 'Срок оплаты истёк. Подтверждение недоступно.',
+            ]);
+        }
+
         $comment = $comment !== null ? trim($comment) : null;
         if ($comment === '') {
             $comment = null;
@@ -114,7 +121,6 @@ class EventBookingPaymentConfirmationService
                 'decision_comment' => $comment,
             ]);
 
-            $booking = $confirmation->booking;
             if ($booking) {
                 $booking->update([
                     'payment_confirm_status' => $approved

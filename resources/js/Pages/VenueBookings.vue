@@ -132,6 +132,18 @@ const statusLabel = (status) => {
     }
     return 'Ожидает';
 };
+const paymentConfirmStatusLabel = (status) => {
+    if (status === 'user_paid_pending') {
+        return 'Ожидает подтверждения';
+    }
+    if (status === 'user_paid_rejected') {
+        return 'Оплата отклонена';
+    }
+    if (status === 'admin_confirmed') {
+        return 'Оплата подтверждена';
+    }
+    return 'Не запрошено';
+};
 const moderationSourceLabel = (source) => {
     if (source === 'auto') {
         return 'Автоматически';
@@ -140,6 +152,17 @@ const moderationSourceLabel = (source) => {
         return 'Модератор';
     }
     return '';
+};
+
+const isPaymentOverdue = (booking) => {
+    if (!booking?.payment_due_at) {
+        return false;
+    }
+    const due = new Date(booking.payment_due_at);
+    if (Number.isNaN(due.getTime())) {
+        return false;
+    }
+    return due.getTime() <= Date.now();
 };
 
 const resolvePaymentOrder = (id) => paymentOrders.value.find((order) => order.value === id);
@@ -374,6 +397,10 @@ const awaitPaymentForm = useForm({
     partial_amount_minor: null,
 });
 const paidForm = useForm({ comment: '' });
+const paymentDecisionOpen = ref(false);
+const paymentDecisionBooking = ref(null);
+const paymentDecisionMode = ref('approve');
+const paymentDecisionForm = useForm({ comment: '' });
 
 const openConfirm = (booking) => {
     activeBooking.value = booking;
@@ -452,6 +479,25 @@ const closePaid = () => {
     paidForm.clearErrors();
 };
 
+const openPaymentDecision = (booking, mode) => {
+    if (!booking?.payment_confirmation) {
+        return;
+    }
+    paymentDecisionBooking.value = booking;
+    paymentDecisionMode.value = mode;
+    paymentDecisionForm.reset('comment');
+    paymentDecisionForm.clearErrors();
+    paymentDecisionOpen.value = true;
+};
+
+const closePaymentDecision = () => {
+    paymentDecisionOpen.value = false;
+    paymentDecisionBooking.value = null;
+    paymentDecisionMode.value = 'approve';
+    paymentDecisionForm.reset('comment');
+    paymentDecisionForm.clearErrors();
+};
+
 const submitConfirm = () => {
     if (!activeBooking.value?.id || !props.venue?.alias || !props.activeTypeSlug) {
         return;
@@ -496,6 +542,18 @@ const submitPaid = () => {
     paidForm.post(
         `/venues/${props.activeTypeSlug}/${props.venue.alias}/admin/bookings/${activeBooking.value.id}/mark-paid`,
         { preserveScroll: true, onSuccess: closePaid }
+    );
+};
+
+const submitPaymentDecision = () => {
+    const booking = paymentDecisionBooking.value;
+    if (!booking?.payment_confirmation?.id || !booking?.event?.id) {
+        return;
+    }
+    const action = paymentDecisionMode.value === 'approve' ? 'approve' : 'reject';
+    paymentDecisionForm.post(
+        `/events/${booking.event.id}/bookings/${booking.id}/payment-confirmations/${booking.payment_confirmation.id}/${action}`,
+        { preserveScroll: true, onSuccess: closePaymentDecision }
     );
 };
 
@@ -649,6 +707,63 @@ watch(
                                         Оплатить до:
                                         {{ booking.payment_due_at ? formatDateTime(booking.payment_due_at) : 'бессрочно' }}
                                     </span>
+                                    <div
+                                        v-if="booking.payment_confirm_status || booking.payment_confirmation"
+                                        class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                                    >
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">
+                                                Подтверждение оплаты
+                                            </span>
+                                            <span class="font-semibold text-slate-700">
+                                                {{ paymentConfirmStatusLabel(booking.payment_confirm_status) }}
+                                            </span>
+                                        </div>
+                                        <div v-if="booking.payment_confirmation" class="mt-2 text-xs text-slate-500">
+                                            <p v-if="booking.payment_confirmation.payment_method_snapshot?.label" class="mt-1">
+                                                Метод: {{ booking.payment_confirmation.payment_method_snapshot.label }}
+                                            </p>
+                                            <p v-if="booking.payment_confirmation.evidence_comment" class="mt-1">
+                                                Комментарий: {{ booking.payment_confirmation.evidence_comment }}
+                                            </p>
+                                            <a
+                                                v-if="booking.payment_confirmation.evidence_media_url"
+                                                class="mt-1 inline-flex items-center gap-1 font-semibold text-slate-700 underline decoration-dotted hover:text-slate-900"
+                                                :href="booking.payment_confirmation.evidence_media_url"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                Смотреть скриншот
+                                            </a>
+                                            <p v-if="booking.payment_confirmation.decision_comment" class="mt-1">
+                                                Комментарий администратора: {{ booking.payment_confirmation.decision_comment }}
+                                            </p>
+                                        </div>
+                                        <div
+                                            v-if="booking.payment_confirmation?.status === 'pending' && canConfirm"
+                                            class="mt-2 flex flex-wrap items-center gap-2"
+                                        >
+                                            <p v-if="isPaymentOverdue(booking)" class="text-xs text-rose-700">
+                                                Срок оплаты истёк. Подтверждение недоступно.
+                                            </p>
+                                            <template v-else>
+                                                <button
+                                                    class="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                                                    type="button"
+                                                    @click="openPaymentDecision(booking, 'approve')"
+                                                >
+                                                    Подтвердить оплату
+                                                </button>
+                                                <button
+                                                    class="rounded-full border border-rose-500 bg-rose-500 px-3 py-1 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-600"
+                                                    type="button"
+                                                    @click="openPaymentDecision(booking, 'reject')"
+                                                >
+                                                    Отклонить оплату
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <button
                                             v-if="booking.can_await_payment"
@@ -889,9 +1004,9 @@ watch(
             </div>
         </div>
 
-        <div v-if="paidOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
-                <form :class="{ loading: paidForm.processing }" @submit.prevent="submitPaid">
+    <div v-if="paidOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: paidForm.processing }" @submit.prevent="submitPaid">
                     <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <h2 class="text-lg font-semibold text-slate-900">Отметить оплату</h2>
                         <button
@@ -940,12 +1055,65 @@ watch(
                         </button>
                     </div>
                 </form>
-            </div>
         </div>
+    </div>
 
-        <div v-if="cancelOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-            <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
-                <form :class="{ loading: cancelForm.processing }" @submit.prevent="submitCancel">
+    <div v-if="paymentDecisionOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: paymentDecisionForm.processing }" @submit.prevent="submitPaymentDecision">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">
+                        {{ paymentDecisionMode === 'approve' ? 'Подтвердить оплату' : 'Отклонить оплату' }}
+                    </h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        @click="closePaymentDecision"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
+                    <p class="text-sm text-slate-600">
+                        {{ paymentDecisionMode === 'approve'
+                            ? 'Подтвердите, что оплата получена, и при необходимости оставьте комментарий.'
+                            : 'Укажите причину отклонения (необязательно).' }}
+                    </p>
+                    <textarea
+                        v-model="paymentDecisionForm.comment"
+                        class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                        placeholder="Комментарий (необязательно)"
+                    ></textarea>
+                    <div v-if="paymentDecisionForm.errors.comment" class="mt-2 text-xs text-rose-700">
+                        {{ paymentDecisionForm.errors.comment }}
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="paymentDecisionForm.processing"
+                        @click="closePaymentDecision"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        :class="paymentDecisionMode === 'approve' ? 'border-emerald-600 bg-emerald-600 hover:bg-emerald-700' : 'border-rose-500 bg-rose-500 hover:bg-rose-600'"
+                        type="submit"
+                        :disabled="paymentDecisionForm.processing"
+                    >
+                        {{ paymentDecisionMode === 'approve' ? 'Подтвердить' : 'Отклонить' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div v-if="cancelOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: cancelForm.processing }" @submit.prevent="submitCancel">
                     <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
                         <h2 class="text-lg font-semibold text-slate-900">Отменить бронирование</h2>
                         <button
