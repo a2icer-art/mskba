@@ -381,11 +381,20 @@ watch(
                                 <input
                                     v-model="venueQuery"
                                     class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
-                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    :class="[{ 'is-loading': venueSuggestLoading }, venueQuery ? 'pr-20' : '']"
                                     type="text"
                                     placeholder="Название площадки"
                                     @input="scheduleVenueSuggestions($event.target.value)"
                                 />
+                                <button
+                                    v-if="venueQuery && !venueSuggestLoading"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                                    type="button"
+                                    aria-label="Очистить площадку"
+                                    @click="clearVenueSelection"
+                                >
+                                    <i class="pi pi-times"></i>
+                                </button>
                                 <div
                                     v-if="venueSuggestError"
                                     class="text-xs text-rose-700"
@@ -404,16 +413,6 @@ watch(
                                         @click="applyVenueSuggestion(suggestion)"
                                     >
                                         {{ suggestion.label || suggestion.name }}
-                                    </button>
-                                </div>
-                                <div v-if="venueFilterId" class="flex items-center justify-between text-xs text-slate-500">
-                                    <span>Площадка выбрана.</span>
-                                    <button
-                                        class="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
-                                        type="button"
-                                        @click="clearVenueSelection"
-                                    >
-                                        Очистить
                                     </button>
                                 </div>
                             </div>

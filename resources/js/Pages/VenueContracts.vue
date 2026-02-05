@@ -481,6 +481,13 @@ const applyUserSuggestion = (suggestion) => {
     userSuggestError.value = '';
 };
 
+const clearAssignUserSelection = () => {
+    assignForm.login = '';
+    assignForm.user_id = '';
+    userSuggestions.value = [];
+    userSuggestError.value = '';
+};
+
 const revokeContract = (contract) => {
     if (!contract?.id) {
         return;
@@ -1103,16 +1110,25 @@ const formatDate = (value) => {
 
                         <div class="mt-4 grid gap-3">
                             <div class="relative">
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Логин пользователя
                                     <input
                                         v-model="assignForm.login"
                                         class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        :class="{ 'is-loading': userSuggestLoading }"
+                                        :class="[{ 'is-loading': userSuggestLoading }, assignForm.login ? 'pr-20' : '']"
                                         type="text"
                                         placeholder="login"
                                         @input="scheduleUserSuggestions($event.target.value)"
                                     />
+                                    <button
+                                        v-if="assignForm.login && !userSuggestLoading"
+                                        class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                        type="button"
+                                        aria-label="Очистить пользователя"
+                                        @click="clearAssignUserSelection"
+                                    >
+                                        <i class="pi pi-times"></i>
+                                    </button>
                                 </label>
                                 <input v-model="assignForm.user_id" type="hidden" />
                                 <div v-if="assignForm.errors.login" class="text-xs text-rose-700">

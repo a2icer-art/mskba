@@ -530,6 +530,17 @@ const openEdit = () => {
     editOpen.value = true;
 };
 
+const clearEditAddressSelection = () => {
+    editAddressQuery.value = '';
+    editAddressSuggestions.value = [];
+    editAddressSuggestError.value = '';
+    editForm.city = '';
+    editForm.metro_id = '';
+    editForm.street = '';
+    editForm.building = '';
+    editForm.str_address = '';
+};
+
 const closeEdit = () => {
     editOpen.value = false;
     editForm.reset('name', 'venue_type_id', 'metro_id', 'commentary', 'city', 'street', 'building', 'str_address');
@@ -1088,16 +1099,25 @@ const submitModerationRequest = () => {
                             </div>
 
                             <div v-if="addressEditable && !isVenueConfirmed && !isVenueOnModeration" class="relative">
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Адрес
                                     <input
                                         v-model="editAddressQuery"
                                         @input="scheduleEditAddressSuggest($event.target.value)"
                                         class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        :class="{ 'is-loading': editAddressSuggestLoading }"
+                                        :class="[{ 'is-loading': editAddressSuggestLoading }, editAddressQuery ? 'pr-20' : '']"
                                         type="text"
                                         placeholder="Начните вводить адрес"
                                     />
+                                    <button
+                                        v-if="editAddressQuery && !editAddressSuggestLoading"
+                                        class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                        type="button"
+                                        aria-label="Очистить адрес"
+                                        @click="clearEditAddressSelection"
+                                    >
+                                        <i class="pi pi-times"></i>
+                                    </button>
                                 </label>
                                 <input v-model="editForm.city" type="hidden" />
                                 <input v-model="editForm.metro_id" type="hidden" />

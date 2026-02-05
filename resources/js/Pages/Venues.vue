@@ -499,6 +499,17 @@ const submitCreate = () => {
     });
 };
 
+const clearAddressSelection = () => {
+    addressQuery.value = '';
+    addressSuggestions.value = [];
+    addressSuggestError.value = '';
+    createForm.city = '';
+    createForm.metro_id = '';
+    createForm.street = '';
+    createForm.building = '';
+    createForm.str_address = '';
+};
+
 const canSubmitCreate = computed(() => {
     return Boolean(
         createForm.name?.trim()
@@ -620,11 +631,20 @@ const applyAddressSuggestion = (suggestion) => {
                                 <input
                                     v-model="venueQuery"
                                     class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 w-full"
-                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    :class="[{ 'is-loading': venueSuggestLoading }, venueQuery ? 'pr-20' : '']"
                                     placeholder="Поиск площадки"
                                     type="text"
                                     @input="scheduleVenueSuggestions($event.target.value)"
                                 />
+                                <button
+                                    v-if="venueQuery && !venueSuggestLoading"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                                    type="button"
+                                    aria-label="Очистить площадку"
+                                    @click="clearVenueSelection"
+                                >
+                                    <i class="pi pi-times"></i>
+                                </button>
                                 <div v-if="venueSuggestError" class="text-xs text-rose-700">
                                     {{ venueSuggestError }}
                                 </div>
@@ -640,16 +660,6 @@ const applyAddressSuggestion = (suggestion) => {
                                         @click="applyVenueSuggestion(suggestion)"
                                     >
                                         {{ suggestion.label || suggestion.name }}
-                                    </button>
-                                </div>
-                                <div v-if="venueFilterId" class="flex items-center justify-between text-xs text-slate-500">
-                                    <span>Площадка выбрана.</span>
-                                    <button
-                                        class="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
-                                        type="button"
-                                        @click="clearVenueSelection"
-                                    >
-                                        Очистить
                                     </button>
                                 </div>
                             </div>
@@ -971,16 +981,25 @@ const applyAddressSuggestion = (suggestion) => {
                             </div>
 
                             <div class="relative">
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Адрес
                                     <input
                                         v-model="addressQuery"
                                         @input="scheduleAddressSuggest($event.target.value)"
                                         class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                        :class="{ 'is-loading': addressSuggestLoading }"
+                                        :class="[{ 'is-loading': addressSuggestLoading }, addressQuery ? 'pr-20' : '']"
                                         type="text"
                                         placeholder="Начните вводить адрес"
                                     />
+                                    <button
+                                        v-if="addressQuery && !addressSuggestLoading"
+                                        class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                        type="button"
+                                        aria-label="Очистить адрес"
+                                        @click="clearAddressSelection"
+                                    >
+                                        <i class="pi pi-times"></i>
+                                    </button>
                                 </label>
                                 <input v-model="createForm.city" type="hidden" />
                                 <input v-model="createForm.metro_id" type="hidden" />

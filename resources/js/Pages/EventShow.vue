@@ -633,6 +633,13 @@ const applyUserSuggestion = (suggestion) => {
     userSuggestError.value = '';
 };
 
+const clearInviteUserSelection = () => {
+    inviteForm.login = '';
+    inviteForm.user_id = '';
+    userSuggestions.value = [];
+    userSuggestError.value = '';
+};
+
 const openDelete = () => {
     if (isExpired.value) {
         return;
@@ -1613,16 +1620,25 @@ const isPaymentConfirmDisabled = computed(() => {
                 </div>
                         <div class="popup-body max-h-[500px] overflow-y-auto px-6 pt-4">
                             <div class="relative">
-                                <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                     Логин пользователя
                                     <input
                                         v-model="inviteForm.login"
-                                class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                :class="{ 'is-loading': userSuggestLoading }"
-                                type="text"
-                                placeholder="login"
-                                @input="scheduleUserSuggestions($event.target.value)"
-                            />
+                                        class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        :class="[{ 'is-loading': userSuggestLoading }, inviteForm.login ? 'pr-20' : '']"
+                                        type="text"
+                                        placeholder="login"
+                                        @input="scheduleUserSuggestions($event.target.value)"
+                                    />
+                                    <button
+                                        v-if="inviteForm.login && !userSuggestLoading"
+                                        class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                        type="button"
+                                        aria-label="Очистить пользователя"
+                                        @click="clearInviteUserSelection"
+                                    >
+                                        <i class="pi pi-times"></i>
+                                    </button>
                                 </label>
                                 <input v-model="inviteForm.user_id" type="hidden" />
                                 <input v-model="inviteForm.role" type="hidden" />
