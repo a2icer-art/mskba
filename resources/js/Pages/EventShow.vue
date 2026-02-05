@@ -1238,11 +1238,20 @@ const isPaymentConfirmDisabled = computed(() => {
                                 <input
                                     v-model="venueQuery"
                                     class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    :class="[{ 'is-loading': venueSuggestLoading }, venueQuery ? 'pr-20' : '']"
                                     type="text"
                                     placeholder="Начните вводить название, метро или адрес"
                                     @input="scheduleVenueSuggestions($event.target.value)"
                                 />
+                                <button
+                                    v-if="venueQuery && !venueSuggestLoading"
+                                    class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                    type="button"
+                                    aria-label="Очистить площадку"
+                                    @click="clearVenueSelection"
+                                >
+                                    <i class="pi pi-times"></i>
+                                </button>
                             </label>
                             <div
                                 v-if="venueSuggestError"

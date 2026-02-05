@@ -312,16 +312,25 @@ const clearVenueSelection = () => {
 
                 <input v-if="hasPrefilledVenue" v-model="createForm.venue_id" type="hidden" />
                 <div v-else-if="canSelectVenue" class="relative">
-                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                    <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                         Площадка (опционально)
                         <input
                             v-model="venueQuery"
                             class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                            :class="{ 'is-loading': venueSuggestLoading }"
+                            :class="[{ 'is-loading': venueSuggestLoading }, venueQuery ? 'pr-20' : '']"
                             type="text"
                             placeholder="Начните вводить название, метро или адрес"
                             @input="scheduleVenueSuggestions($event.target.value)"
                         />
+                        <button
+                            v-if="venueQuery && !venueSuggestLoading"
+                            class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                            type="button"
+                            aria-label="Очистить площадку"
+                            @click="clearVenueSelection"
+                        >
+                            <i class="pi pi-times"></i>
+                        </button>
                     </label>
                     <div v-if="venueSuggestError" class="text-xs text-rose-700">
                         {{ venueSuggestError }}
@@ -470,16 +479,25 @@ const clearVenueSelection = () => {
 
                         <input v-if="hasPrefilledVenue" v-model="createForm.venue_id" type="hidden" />
                         <div v-else-if="canSelectVenue" class="relative">
-                            <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                            <label class="relative flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
                                 Площадка (опционально)
                                 <input
                                     v-model="venueQuery"
                                     class="input-predictive rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                                    :class="{ 'is-loading': venueSuggestLoading }"
+                                    :class="[{ 'is-loading': venueSuggestLoading }, venueQuery ? 'pr-20' : '']"
                                     type="text"
                                     placeholder="Начните вводить название, метро или адрес"
                                     @input="scheduleVenueSuggestions($event.target.value)"
                                 />
+                                <button
+                                    v-if="venueQuery && !venueSuggestLoading"
+                                    class="absolute right-3 top-[2.05rem] text-slate-400 transition hover:text-slate-600"
+                                    type="button"
+                                    aria-label="Очистить площадку"
+                                    @click="clearVenueSelection"
+                                >
+                                    <i class="pi pi-times"></i>
+                                </button>
                             </label>
                             <div v-if="venueSuggestError" class="text-xs text-rose-700">
                                 {{ venueSuggestError }}
