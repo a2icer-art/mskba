@@ -25,6 +25,14 @@ class NotificationSettingsService
                 'label' => 'Подтверждение оплаты бронирования',
             ],
             [
+                'code' => NotificationCode::EventParticipantInvited->value,
+                'label' => 'Приглашение в событие',
+            ],
+            [
+                'code' => NotificationCode::EventParticipantResponded->value,
+                'label' => 'Ответ на приглашение в событие',
+            ],
+            [
                 'code' => NotificationCode::MessageCreated->value,
                 'label' => 'Новое личное сообщение',
             ],

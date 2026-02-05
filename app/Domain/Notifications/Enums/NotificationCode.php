@@ -7,6 +7,8 @@ enum NotificationCode: string
     case BookingStatus = 'booking.status';
     case BookingPendingWarning = 'booking.pending_warning';
     case BookingPaymentConfirmation = 'booking.payment_confirmation';
+    case EventParticipantInvited = 'event.participant.invited';
+    case EventParticipantResponded = 'event.participant.responded';
     case ContractModerationStatus = 'contract.moderation_status';
     case ContractAssigned = 'contract.assigned';
     case ContractRevoked = 'contract.revoked';

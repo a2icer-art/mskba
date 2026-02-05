@@ -706,13 +706,16 @@ class EventsController extends Controller
             ]);
         }
 
-        $service->invite(
+        $invitedParticipant = $service->invite(
             $event,
             $user,
             $participant,
             EventParticipantRole::from($data['role']),
             $data['reason'] ?? null
         );
+
+        app(\App\Domain\Events\Services\EventParticipantNotificationService::class)
+            ->notifyInvited($invitedParticipant, $user);
 
         return back()->with('notice', 'Приглашение отправлено.');
     }
@@ -777,21 +780,25 @@ class EventsController extends Controller
 
         $currentStatus = $participant->status?->value ?? EventParticipantStatus::Invited->value;
         if (
-            $participant->status_changed_by !== null &&
-            $participant->status_changed_by !== $user->id &&
-            $this->isStatusUpgrade($currentStatus, $data['status'])
+            $currentStatus !== EventParticipantStatus::Invited->value
+            && $participant->status_changed_by !== null
+            && $participant->status_changed_by !== $user->id
+            && $this->isStatusUpgrade($currentStatus, $data['status'])
         ) {
             return back()->withErrors([
                 'status' => 'Нельзя повысить статус без согласования с организатором.',
             ]);
         }
 
-        $service->respond(
+        $participant = $service->respond(
             $participant,
             $user,
             EventParticipantStatus::from($data['status']),
             $data['reason'] ?? null
         );
+
+        app(\App\Domain\Events\Services\EventParticipantNotificationService::class)
+            ->notifyResponse($participant, $user);
 
         return back()->with('notice', 'Ответ сохранен.');
     }
