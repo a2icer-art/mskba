@@ -132,6 +132,36 @@
     .event-filters[open] .event-filters__body {
         padding: 0;
     }
+
+    .app-tooltip {
+        max-width: 280px;
+    }
+
+    .app-tooltip .p-tooltip-text {
+        background-color: #111827;
+        color: #ffffff;
+        font-size: 12px;
+        line-height: 1.4;
+        padding: 8px 10px;
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+    }
+
+    .app-tooltip.p-tooltip-top .p-tooltip-arrow {
+        border-top-color: #111827;
+    }
+
+    .app-tooltip.p-tooltip-right .p-tooltip-arrow {
+        border-right-color: #111827;
+    }
+
+    .app-tooltip.p-tooltip-bottom .p-tooltip-arrow {
+        border-bottom-color: #111827;
+    }
+
+    .app-tooltip.p-tooltip-left .p-tooltip-arrow {
+        border-left-color: #111827;
+    }
 }
 
 @layer utilities {

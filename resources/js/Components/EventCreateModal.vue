@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import { useTooltip } from '../Composables/useTooltip';
 
 const props = defineProps({
     isOpen: {
@@ -50,6 +51,14 @@ const modalError = ref('');
 const eventTypes = ref([]);
 const canBook = ref(false);
 const typeSelectRef = ref(null);
+const { buildTooltip } = useTooltip();
+
+const eventTypeTooltip = buildTooltip(
+    'Игра — официальный матч с результатом.<br>Игровая тренировка — тренировка в игровом формате с частичным счетом.<br>Тренировка — обычное занятие без счета.',
+    {
+        escape: false,
+    }
+);
 
 const gameTypeCodes = new Set(['game', 'training', 'game_training']);
 const selectedType = computed(() => {
@@ -274,7 +283,17 @@ const clearVenueSelection = () => {
             </div>
             <div v-else class="grid gap-3" :class="{ loading: modalLoading }">
                 <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                    Тип события
+                    <span class="inline-flex items-center gap-1">
+                        Тип события
+                        <button
+                            v-tooltip.focus="eventTypeTooltip"
+                            class="text-slate-400 transition hover:text-slate-600"
+                            type="button"
+                            aria-label="Подсказка о типах события"
+                        >
+                            <i class="pi pi-info-circle"></i>
+                        </button>
+                    </span>
                     <select
                         v-model="createForm.event_type_id"
                         ref="typeSelectRef"
@@ -423,7 +442,17 @@ const clearVenueSelection = () => {
                         </div>
 
                         <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
-                            Тип события
+                            <span class="inline-flex items-center gap-1">
+                                Тип события
+                                <button
+                                    v-tooltip.focus="eventTypeTooltip"
+                                    class="text-slate-400 transition hover:text-slate-600"
+                                    type="button"
+                                    aria-label="Подсказка о типах события"
+                                >
+                                    <i class="pi pi-info-circle"></i>
+                                </button>
+                            </span>
                             <select
                                 v-model="createForm.event_type_id"
                                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"

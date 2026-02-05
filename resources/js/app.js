@@ -1,5 +1,6 @@
 import './bootstrap';
 import PrimeVue from 'primevue/config';
+import Tooltip from 'primevue/tooltip';
 import 'primevue/resources/themes/lara-light-blue/theme.css';
 import 'primevue/resources/primevue.min.css';
 import 'primeicons/primeicons.css';
@@ -171,6 +172,7 @@ createInertiaApp({
                     },
                 },
             })
+            .directive('tooltip', Tooltip)
             .mount(el);
 
         applyKeepAlive(resolvePageFromDom());
