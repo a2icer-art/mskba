@@ -110,6 +110,10 @@ Route::middleware('auth')->prefix('account')->group(function () {
 
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenuesController::class, 'index'])->name('venues');
+    Route::get('/schedule-day/{venueId}', [VenuesController::class, 'scheduleDayById'])
+        ->name('venues.schedule.day.by-id');
+    Route::get('/schedule-day-bookings/{venueId}', [VenuesController::class, 'scheduleDayBookingsById'])
+        ->name('venues.schedule.day-bookings.by-id');
     Route::get('/{type}/{venue}', [VenuesController::class, 'show'])->name('venues.show');
     Route::get('/{type}/{venue}/feed', [VenuesController::class, 'feed'])->name('venues.feed');
     Route::post('/', [VenuesController::class, 'store'])

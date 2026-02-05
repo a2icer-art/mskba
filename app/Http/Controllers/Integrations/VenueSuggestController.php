@@ -6,6 +6,7 @@ use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class VenueSuggestController
 {
@@ -33,10 +34,10 @@ class VenueSuggestController
                             });
                     });
             })
-            ->with(['latestAddress.metro', 'settings'])
+            ->with(['latestAddress.metro', 'settings', 'venueType'])
             ->orderBy('name')
             ->limit(10)
-            ->get(['id', 'name', 'str_address']);
+            ->get(['id', 'name', 'alias', 'venue_type_id', 'str_address']);
 
         $suggestions = $venues->map(function (Venue $venue): array {
             $address = $venue->latestAddress?->display_address ?: $venue->str_address;
@@ -56,6 +57,8 @@ class VenueSuggestController
                 'address' => $address,
                 'metro' => $metro,
                 'label' => $label,
+                'alias' => $venue->alias,
+                'type_slug' => $venue->venueType?->alias ? Str::plural($venue->venueType->alias) : null,
                 'booking_lead_time_minutes' => $venue->settings?->booking_lead_time_minutes
                     ?? VenueSettings::DEFAULT_BOOKING_LEAD_MINUTES,
                 'booking_min_interval_minutes' => $venue->settings?->booking_min_interval_minutes

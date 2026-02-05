@@ -3072,15 +3072,22 @@ class VenuesController extends Controller
         return response()->json(['bookings' => $bookings]);
     }
 
+    public function scheduleDayBookingsById(Request $request, int $venueId)
+    {
+        $venue = Venue::query()->whereKey($venueId)->firstOrFail();
+        return $this->scheduleDayBookings($request, '', $venue);
+    }
+
     public function scheduleDay(Request $request, string $type, Venue $venue)
     {
         $date = $request->string('date')->toString();
         if ($date === '') {
             return response()->json([
                 'is_today' => false,
-                'is_closed' => true,
+                'is_closed' => false,
                 'is_closed_by_exception' => false,
                 'intervals' => [],
+                'has_intervals' => false,
                 'bookings' => [],
                 'comment' => null,
             ]);
@@ -3093,9 +3100,10 @@ class VenuesController extends Controller
             ->first();
 
         $intervals = [];
-        $isClosed = true;
+        $isClosed = false;
         $isClosedByException = false;
         $comment = null;
+        $hasIntervals = false;
 
         if ($schedule) {
             $exception = $schedule->exceptions->first(function ($item) use ($targetDate) {
@@ -3115,7 +3123,7 @@ class VenuesController extends Controller
                         ])
                         ->values()
                         ->all();
-                    $isClosed = $intervals === [];
+                    $hasIntervals = $intervals !== [];
                 }
             } else {
                 $dayOfWeek = (int) $targetDate->isoWeekday();
@@ -3128,7 +3136,7 @@ class VenuesController extends Controller
                     ])
                     ->values()
                     ->all();
-                $isClosed = $intervals === [];
+                $hasIntervals = $intervals !== [];
             }
         }
 
@@ -3154,9 +3162,16 @@ class VenuesController extends Controller
             'is_closed' => $isClosed,
             'is_closed_by_exception' => $isClosedByException,
             'intervals' => $intervals,
+            'has_intervals' => $hasIntervals,
             'bookings' => $bookings,
             'comment' => $comment,
         ]);
+    }
+
+    public function scheduleDayById(Request $request, int $venueId)
+    {
+        $venue = Venue::query()->whereKey($venueId)->firstOrFail();
+        return $this->scheduleDay($request, '', $venue);
     }
 
     private function weekDays(): array

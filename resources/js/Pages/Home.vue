@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AuthModal from '../Components/AuthModal.vue';
+import DaySchedulePopup from '../Components/DaySchedulePopup.vue';
 import MainFooter from '../Components/MainFooter.vue';
 import MainHeader from '../Components/MainHeader.vue';
 import MainSidebar from '../Components/MainSidebar.vue';
@@ -31,6 +32,7 @@ const loginLabel = computed(() => page.props.auth?.user?.login || '');
 const showAuthModal = ref(props.showAuthModalOnLoad);
 const authMode = ref(props.initialAuthMode);
 const hasSidebar = computed(() => false);
+const dayPopupOpen = ref(false);
 
 watch(
     () => page.props.errors,
@@ -76,7 +78,11 @@ watch(
                                 Основной контейнер для контента: расписание игр, новости сообщества и быстрые действия.
                             </p>
                         </div>
-                        <button class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-emerald-500">
+                        <button
+                            class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-emerald-500"
+                            type="button"
+                            @click="isAuthenticated ? dayPopupOpen = true : (authMode = 'login', showAuthModal = true)"
+                        >
                             Создать игру
                         </button>
                     </div>
@@ -110,6 +116,14 @@ watch(
             :participant-roles="participantRoles"
             :initial-mode="authMode"
             @close="showAuthModal = false"
+        />
+
+        <DaySchedulePopup
+            v-model="dayPopupOpen"
+            :allow-date-pick="true"
+            :venue-alias="''"
+            :active-type-slug="''"
+            :empty-venue-message="'Выберите площадку для бронирования в каталоге.'"
         />
     </div>
 </template>
