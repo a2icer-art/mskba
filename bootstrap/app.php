@@ -102,7 +102,7 @@ return Application::configure(basePath: dirname(__DIR__))
                         : 0,
                 ]);
 
-                if ($request->isMethod('post') && $request->is('login')) {
+                if ($request->header('X-Inertia') || $request->ajax() || $request->expectsJson() || $request->wantsJson()) {
                     return response()->json([
                         'message' => 'CSRF token mismatch.',
                     ], 419);
@@ -163,6 +163,12 @@ return Application::configure(basePath: dirname(__DIR__))
                     ? strlen((string) $cookies->get('XSRF-TOKEN'))
                     : 0,
             ]);
+
+            if ($request->header('X-Inertia') || $request->ajax() || $request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'message' => 'CSRF token mismatch.',
+                ], 419);
+            }
 
             return null;
         });

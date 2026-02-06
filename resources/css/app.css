@@ -182,6 +182,32 @@
         pointer-events: none;
     }
 
+    .csrf-retry .popup-body::before {
+        content: 'Сессия обновилась, повторяем запрос...';
+        display: block;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        background-color: #f8fafc;
+        color: #475569;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        padding: 0.75rem 1rem 0.75rem 2.25rem;
+        margin-bottom: 0.75rem;
+        background-image: url("../images/loading.gif");
+        background-repeat: no-repeat;
+        background-position: 0.75rem center;
+        background-size: 16px 16px;
+    }
+
+    .csrf-retry .popup-body > * {
+        display: none;
+    }
+
+    .csrf-retry .popup-footer {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
     main {
         min-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px) - 30px);
     }
