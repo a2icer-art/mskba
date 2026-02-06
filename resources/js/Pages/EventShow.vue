@@ -1090,7 +1090,7 @@ const isPaymentConfirmDisabled = computed(() => {
                                         </p>
                                         <div v-if="!isExpired" class="flex flex-wrap items-center gap-2">
                                             <button
-                                                v-if="participant.status !== 'confirmed' && !isOrganizerInvite(participant)"
+                                                v-if="participant.status !== 'confirmed' && participant.status !== 'declined' && !isOrganizerInvite(participant)"
                                                 class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
                                                 type="button"
                                                 :disabled="participantStatusForm.processing"
@@ -1099,7 +1099,7 @@ const isPaymentConfirmDisabled = computed(() => {
                                                 Подтвердить
                                             </button>
                                             <button
-                                                v-if="participant.status !== 'reserve' && !isOrganizerInvite(participant)"
+                                                v-if="participant.status !== 'reserve' && participant.status !== 'declined' && !isOrganizerInvite(participant)"
                                                 class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
                                                 type="button"
                                                 :disabled="participantStatusForm.processing"

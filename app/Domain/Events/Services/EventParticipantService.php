@@ -155,6 +155,13 @@ class EventParticipantService
         EventParticipantStatus $status,
         ?string $reason = null
     ): EventParticipant {
+        if ($participant->status === EventParticipantStatus::Declined
+            && $status !== EventParticipantStatus::Declined) {
+            throw ValidationException::withMessages([
+                'status' => 'Нельзя подтвердить участие после отказа.',
+            ]);
+        }
+
         if ($status === EventParticipantStatus::Confirmed) {
             $this->ensureLimitAvailable($participant->event, $participant->role);
         }

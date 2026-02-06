@@ -198,6 +198,9 @@ const canDeclineParticipation = computed(() => {
     const status = props.userParticipation?.status;
     return !!status && status !== 'declined';
 });
+const canReapply = computed(() => {
+    return props.userParticipation?.status === 'declined';
+});
 
 const syncUserReason = () => {
     respondForm.reason = props.userParticipation?.user_status_reason || '';
@@ -375,6 +378,29 @@ const submitRespond = () => {
                                 >
                                     Отказаться
                                 </button>
+                            </div>
+                            <div v-if="canReapply && !isExpired" class="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50 px-3 py-3">
+                                <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Подать заявку снова</div>
+                                <form class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="submitJoin">
+                                    <label class="flex flex-col gap-1 text-xs uppercase tracking-[0.15em] text-slate-500">
+                                        Роль
+                                        <select
+                                            v-model="joinForm.role"
+                                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                        >
+                                            <option v-for="role in participantRoles" :key="role.value" :value="role.value">
+                                                {{ role.label }}
+                                            </option>
+                                        </select>
+                                    </label>
+                                    <button
+                                        class="h-[42px] self-end rounded-full border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                                        type="submit"
+                                        :disabled="joinForm.processing"
+                                    >
+                                        Подать заявку
+                                    </button>
+                                </form>
                             </div>
                         </div>
                         <form v-else-if="!isExpired" class="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]" @submit.prevent="submitJoin">
