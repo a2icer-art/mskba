@@ -102,6 +102,12 @@ return Application::configure(basePath: dirname(__DIR__))
                         : 0,
                 ]);
 
+                if ($request->isMethod('post') && $request->is('login')) {
+                    return response()->json([
+                        'message' => 'CSRF token mismatch.',
+                    ], 419);
+                }
+
                 $target = $headers->get('referer') ?: url()->previous() ?: '/';
                 $message = 'Сессия обновилась, страница перезагружена.';
                 session()->flash('info', $message);

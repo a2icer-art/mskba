@@ -49,6 +49,13 @@ Route::get('/auth/telegram/complete', [AuthTelegramController::class, 'complete'
 Route::post('/telegram/webhook', TelegramWebhookController::class)
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('telegram.webhook');
+Route::get('/csrf-token', function (Request $request) {
+    $request->session()->regenerateToken();
+
+    return response()->json([
+        'csrfToken' => csrf_token(),
+    ]);
+})->name('csrf.token');
 Route::get('/session/ping', function () {
     return response()->noContent();
 })->middleware('auth')->name('session.ping');

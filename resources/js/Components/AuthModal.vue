@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import loadingGif from '../../images/loading.gif';
 
 const props = defineProps({
     isOpen: {
@@ -51,6 +52,9 @@ const loginError = computed(() => {
 const infoNotice = computed(() => page.props.flash?.info || '');
 const telegramError = ref('');
 const telegramLoading = ref(false);
+const loginRequestActive = ref(false);
+const loginRetryCount = ref(0);
+const loginRetrying = ref(false);
 
 const registerError = computed(() => {
     return (
@@ -64,12 +68,66 @@ const activeFormId = computed(() => (mode.value === 'login' ? 'auth-login-form' 
 const submitLabel = computed(() => (mode.value === 'login' ? 'Войти' : 'Зарегистрироваться'));
 const isProcessing = computed(() => (mode.value === 'login' ? loginForm.processing : registerForm.processing));
 
-const submitLogin = () => {
+const applyCsrfToken = (value) => {
+    if (!value) {
+        return;
+    }
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) {
+        meta.setAttribute('content', value);
+    }
+    if (window.axios) {
+        window.axios.defaults.headers.common['X-CSRF-TOKEN'] = value;
+    }
+};
+
+const refreshCsrfToken = async () => {
+    const response = await fetch('/csrf-token', {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('csrf_refresh_failed');
+    }
+
+    const data = await response.json().catch(() => ({}));
+    const tokenValue = data?.csrfToken || data?.token || '';
+    applyCsrfToken(tokenValue);
+    return tokenValue;
+};
+
+const submitLogin = ({ isRetry } = {}) => {
+    if (loginForm.processing) {
+        return;
+    }
+    if (!isRetry) {
+        loginRetryCount.value = 0;
+        loginRetrying.value = false;
+    }
+    loginRequestActive.value = true;
     loginForm.post('/login', {
         preserveScroll: true,
         onSuccess: () => {
+            loginRetryCount.value = 0;
+            loginRequestActive.value = false;
+            loginRetrying.value = false;
             loginForm.reset('password');
             emit('close');
+        },
+        onError: () => {
+            loginRetryCount.value = 0;
+            loginRequestActive.value = false;
+            loginRetrying.value = false;
+        },
+        onFinish: () => {
+            if (loginRetryCount.value === 0) {
+                loginRequestActive.value = false;
+                loginRetrying.value = false;
+            }
         },
     });
 };
@@ -122,6 +180,60 @@ const requestTelegramLogin = async () => {
         telegramLoading.value = false;
     }
 };
+
+const handleLoginRetry = () => {
+    if (loginRetryCount.value >= 1) {
+        window.location.reload();
+        return;
+    }
+
+    loginRetryCount.value += 1;
+    loginRetrying.value = true;
+
+    refreshCsrfToken()
+        .then(() => {
+            submitLogin({ isRetry: true });
+        })
+        .catch(() => {
+            window.location.reload();
+        });
+};
+
+const handleInertiaException = (event) => {
+    const exception = event?.detail?.exception;
+    const status = exception?.response?.status;
+    const url = exception?.config?.url || '';
+
+    if (!loginRequestActive.value || status !== 419 || !url.endsWith('/login')) {
+        return;
+    }
+
+    event.preventDefault();
+    handleLoginRetry();
+};
+
+const handleInertiaInvalid = (event) => {
+    const response = event?.detail?.response;
+    const status = response?.status;
+    const url = response?.config?.url || '';
+
+    if (!loginRequestActive.value || status !== 419 || !url.endsWith('/login')) {
+        return;
+    }
+
+    event.preventDefault();
+    handleLoginRetry();
+};
+
+onMounted(() => {
+    document.addEventListener('inertia:exception', handleInertiaException);
+    document.addEventListener('inertia:invalid', handleInertiaInvalid);
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('inertia:exception', handleInertiaException);
+    document.removeEventListener('inertia:invalid', handleInertiaInvalid);
+});
 </script>
 
 <template>
@@ -172,6 +284,13 @@ const requestTelegramLogin = async () => {
                     :class="{ loading: loginForm.processing }"
                     @submit.prevent="submitLogin"
                 >
+                    <div
+                        v-if="loginRetrying"
+                        class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                    >
+                        <img :src="loadingGif" class="h-4 w-4" alt="" />
+                        <span>Обновляем сессию, повторяем вход...</span>
+                    </div>
                     <div v-if="infoNotice" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         {{ infoNotice }}
                     </div>
