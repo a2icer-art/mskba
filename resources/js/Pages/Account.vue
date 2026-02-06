@@ -88,6 +88,7 @@ const accountMenuItems = computed(() => {
             title: 'Настройки',
             items: [
                 { key: 'access', label: 'Доступы', href: '/account/access' },
+                { key: 'payment-info', label: 'Платежная информация', href: '/account/settings/payment-info' },
                 { key: 'messages-settings', label: 'Сообщения', href: '/account/settings/messages' },
                 { key: 'notifications-settings', label: 'Уведомления', href: '/account/settings/notifications' },
             ],

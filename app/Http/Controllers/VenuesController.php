@@ -27,10 +27,10 @@ use App\Domain\Events\Services\BookingNotificationService;
 use App\Domain\Venues\Enums\VenueStatus;
 use App\Domain\Payments\Enums\PaymentCurrency;
 use App\Domain\Payments\Enums\PaymentStatus;
-use App\Domain\Payments\Enums\PaymentMethodType;
 use App\Domain\Payments\Models\Payment;
 use App\Domain\Payments\Models\PaymentMethod;
 use App\Domain\Payments\Models\PaymentOrder;
+use App\Domain\Payments\Services\PaymentMethodService;
 use App\Domain\Payments\Services\PaymentRecipientResolver;
 use App\Domain\Venues\Models\Venue;
 use App\Domain\Venues\Models\VenueSettings;
@@ -322,6 +322,7 @@ class VenuesController extends Controller
             : [];
 
         $currentUserId = $user?->id;
+        $paymentMethodService = app(PaymentMethodService::class);
         $contracts = $canViewContracts
             ? Contract::query()
                 ->where('entity_type', $venue->getMorphClass())
@@ -329,7 +330,7 @@ class VenuesController extends Controller
                 ->with(['user:id,login', 'permissions:id,code,label', 'paymentMethods'])
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId): array {
+                ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId, $paymentMethodService): array {
                     $contractUserId = $contract->user?->id;
                     $canManagePaymentMethods = $this->canManageContractPaymentMethods($user, $venue, $contract);
                     $paymentMethods = [];
@@ -339,7 +340,7 @@ class VenuesController extends Controller
                             ->sortBy(function (PaymentMethod $method): array {
                                 return [(int) $method->sort_order, (int) $method->id];
                             })
-                            ->map(fn (PaymentMethod $method) => $this->formatPaymentMethod($method))
+                            ->map(fn (PaymentMethod $method) => $paymentMethodService->format($method))
                             ->values()
                             ->all();
                     }
@@ -1100,11 +1101,12 @@ class VenuesController extends Controller
                 'label' => $order->label,
             ])
             ->all();
+        $paymentMethodService = app(PaymentMethodService::class);
         $venuePaymentMethods = $venue->paymentMethods()
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->map(fn (PaymentMethod $method) => $this->formatPaymentMethod($method))
+            ->map(fn (PaymentMethod $method) => $paymentMethodService->format($method))
             ->all();
         $paymentRecipientSources = array_map(
             static fn (VenuePaymentRecipientSource $source) => [
@@ -1436,7 +1438,7 @@ class VenuesController extends Controller
             abort(403);
         }
 
-        $data = $this->validatePaymentMethod($request);
+        $data = app(PaymentMethodService::class)->validate($request);
         $data['owner_type'] = $venue->getMorphClass();
         $data['owner_id'] = $venue->id;
         $data['created_by'] = $user->id;
@@ -1465,9 +1467,9 @@ class VenuesController extends Controller
             abort(403);
         }
 
-        $this->ensurePaymentMethodOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
+        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
 
-        $data = $this->validatePaymentMethod($request);
+        $data = app(PaymentMethodService::class)->validate($request);
         $data['updated_by'] = $user->id;
 
         $paymentMethod->update($data);
@@ -1493,7 +1495,7 @@ class VenuesController extends Controller
             abort(403);
         }
 
-        $this->ensurePaymentMethodOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
+        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $venue->getMorphClass(), $venue->id);
 
         if ($this->isPaymentMethodUsedInActiveBookings($venue, $paymentMethod->id)) {
             return back()->withErrors([
@@ -1520,7 +1522,7 @@ class VenuesController extends Controller
 
         $this->ensureContractPaymentAccess($user, $venue, $contract);
 
-        $data = $this->validatePaymentMethod($request);
+        $data = app(PaymentMethodService::class)->validate($request);
         $data['owner_type'] = $contract->getMorphClass();
         $data['owner_id'] = $contract->id;
         $data['created_by'] = $user->id;
@@ -1544,9 +1546,9 @@ class VenuesController extends Controller
             ->firstOrFail();
 
         $this->ensureContractPaymentAccess($user, $venue, $contract);
-        $this->ensurePaymentMethodOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
+        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
 
-        $data = $this->validatePaymentMethod($request);
+        $data = app(PaymentMethodService::class)->validate($request);
         $data['updated_by'] = $user->id;
 
         $paymentMethod->update($data);
@@ -1567,7 +1569,7 @@ class VenuesController extends Controller
             ->firstOrFail();
 
         $this->ensureContractPaymentAccess($user, $venue, $contract);
-        $this->ensurePaymentMethodOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
+        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
 
         if ($this->isPaymentMethodUsedInActiveBookings($venue, $paymentMethod->id)) {
             return back()->withErrors([
@@ -1578,60 +1580,6 @@ class VenuesController extends Controller
         $paymentMethod->delete();
 
         return back()->with('notice', 'Метод оплаты удалён.');
-    }
-
-    private function validatePaymentMethod(Request $request): array
-    {
-        $data = $request->validate(
-            [
-                'type' => ['required', 'string', 'in:sbp,balance,acquiring'],
-                'label' => ['required', 'string', 'max:120'],
-                'phone' => ['nullable', 'string', 'max:32'],
-                'display_name' => ['nullable', 'string', 'max:120'],
-                'is_active' => ['required', 'boolean'],
-                'sort_order' => ['nullable', 'integer', 'min:0'],
-            ],
-            [
-                'type.required' => 'Укажите тип метода оплаты.',
-                'type.in' => 'Укажите корректный тип метода оплаты.',
-                'label.required' => 'Укажите название метода оплаты.',
-                'label.max' => 'Название не должно превышать 120 символов.',
-                'phone.max' => 'Телефон не должен превышать 32 символа.',
-                'display_name.max' => 'Имя не должно превышать 120 символов.',
-            ]
-        );
-
-        if ($data['type'] === PaymentMethodType::Sbp->value) {
-            if (empty($data['phone']) || empty($data['display_name'])) {
-                throw ValidationException::withMessages([
-                    'phone' => 'Для СБП укажите телефон и отображаемое имя.',
-                ]);
-            }
-        }
-
-        $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
-
-        return $data;
-    }
-
-    private function formatPaymentMethod(PaymentMethod $method): array
-    {
-        return [
-            'id' => $method->id,
-            'type' => $method->type?->value,
-            'label' => $method->label,
-            'phone' => $method->phone,
-            'display_name' => $method->display_name,
-            'is_active' => (bool) $method->is_active,
-            'sort_order' => (int) $method->sort_order,
-        ];
-    }
-
-    private function ensurePaymentMethodOwner(PaymentMethod $method, string $ownerType, int $ownerId): void
-    {
-        if ($method->owner_type !== $ownerType || (int) $method->owner_id !== $ownerId) {
-            abort(404);
-        }
     }
 
     private function isPaymentMethodUsedInActiveBookings(Venue $venue, int $paymentMethodId): bool

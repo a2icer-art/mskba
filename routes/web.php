@@ -6,6 +6,7 @@ use App\Http\Controllers\AccountContactsController;
 use App\Http\Controllers\AccountModerationController;
 use App\Http\Controllers\AccountMessagesController;
 use App\Http\Controllers\AccountNotificationsController;
+use App\Http\Controllers\AccountPaymentInfoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminBalancesController;
@@ -75,6 +76,14 @@ Route::middleware('auth')->prefix('account')->group(function () {
         ->name('account.settings.notifications');
     Route::patch('/settings/notifications', [AccountNotificationsController::class, 'update'])
         ->name('account.settings.notifications.update');
+    Route::get('/settings/payment-info', [AccountPaymentInfoController::class, 'index'])
+        ->name('account.settings.payment-info');
+    Route::post('/settings/payment-info', [AccountPaymentInfoController::class, 'store'])
+        ->name('account.settings.payment-info.store');
+    Route::patch('/settings/payment-info/{paymentMethod}', [AccountPaymentInfoController::class, 'update'])
+        ->name('account.settings.payment-info.update');
+    Route::delete('/settings/payment-info/{paymentMethod}', [AccountPaymentInfoController::class, 'destroy'])
+        ->name('account.settings.payment-info.destroy');
     Route::get('/roles/{alias}', [AccountController::class, 'role'])->name('account.roles.show');
 
     Route::post('/moderation-request', [AccountModerationController::class, 'store'])->name('account.moderation.store');

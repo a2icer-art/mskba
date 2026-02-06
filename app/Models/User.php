@@ -15,11 +15,13 @@ use App\Domain\Participants\Models\ParticipantRoleAssignment;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Balances\Models\Balance;
 use App\Domain\Events\Models\EventParticipant;
+use App\Domain\Payments\Models\PaymentMethod;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -138,5 +140,10 @@ class User extends Authenticatable
     public function eventParticipations(): HasMany
     {
         return $this->hasMany(EventParticipant::class);
+    }
+
+    public function paymentMethods(): MorphMany
+    {
+        return $this->morphMany(PaymentMethod::class, 'owner');
     }
 }
