@@ -4,6 +4,7 @@ namespace App\Domain\Events\Enums;
 
 enum EventParticipantStatus: string
 {
+    case Pending = 'pending';
     case Invited = 'invited';
     case Confirmed = 'confirmed';
     case Reserve = 'reserve';

@@ -20,6 +20,9 @@ class EventParticipant extends Model
         'user_id',
         'role',
         'status',
+        'requested_status',
+        'request_source',
+        'requested_by',
         'status_change_reason',
         'user_status_reason',
         'status_changed_by',
@@ -34,6 +37,7 @@ class EventParticipant extends Model
         return [
             'role' => EventParticipantRole::class,
             'status' => EventParticipantStatus::class,
+            'requested_status' => EventParticipantStatus::class,
             'joined_at' => 'datetime',
             'status_changed_at' => 'datetime',
         ];
@@ -57,5 +61,10 @@ class EventParticipant extends Model
     public function statusChanger(): BelongsTo
     {
         return $this->belongsTo(User::class, 'status_changed_by');
+    }
+
+    public function requestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
     }
 }

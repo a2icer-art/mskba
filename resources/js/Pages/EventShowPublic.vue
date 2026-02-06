@@ -82,7 +82,7 @@ const participantRoles = computed(() => {
         label: labels[value] || value,
     }));
 });
-const resolveParticipantStatusLabel = (status, statusChangedBy) => {
+const resolveParticipantStatusLabel = (status, statusChangedBy, requestSource) => {
     const currentUserId = page.props.auth?.user?.id;
     const changedByOrganizer = statusChangedBy && statusChangedBy !== currentUserId;
     if (status === 'confirmed') {
@@ -94,16 +94,26 @@ const resolveParticipantStatusLabel = (status, statusChangedBy) => {
     if (status === 'declined') {
         return changedByOrganizer ? 'Организатор отклонил участие' : 'Вы отказались от участия';
     }
+    if (status === 'pending') {
+        if (requestSource === 'organizer_invite') {
+            return 'Ожидает вашего подтверждения';
+        }
+        if (requestSource === 'user_reconfirm') {
+            return 'Запрос на подтверждение отправлен';
+        }
+        return 'Заявка отправлена, ожидает решения организатора';
+    }
     if (status === 'invited') {
         return 'Вас пригласили';
     }
     return 'Статус неизвестен';
 };
-const statusRank = {
-    declined: 0,
-    invited: 1,
-    reserve: 2,
-    confirmed: 3,
+const statusLabels = {
+    confirmed: 'Подтверждено',
+    reserve: 'Резерв',
+    declined: 'Отказ',
+    pending: 'Ожидает подтверждения',
+    invited: 'Приглашен',
 };
 const joinForm = useForm({
     role: props.userAllowedRoles?.[0] || props.allowedRoles?.[0] || 'player',
@@ -112,6 +122,12 @@ const joinForm = useForm({
 const respondForm = useForm({
     status: 'confirmed',
     reason: '',
+});
+const targetStatusLabel = computed(() => {
+    if (respondForm.status === 'confirmed' && props.userParticipation?.status === 'reserve') {
+        return 'Запрос на подтверждение';
+    }
+    return statusLabels[respondForm.status] || respondForm.status;
 });
 const respondOpen = ref(false);
 
@@ -160,16 +176,28 @@ const isLimitReached = computed(() => {
     }
     return Number(props.participantsCount ?? 0) >= limit;
 });
-const isUpgradeBlocked = (targetStatus) => {
-    if (!props.userParticipation?.status_changed_by) {
-        return false;
+const canConfirmParticipation = computed(() => {
+    const status = props.userParticipation?.status;
+    const requestSource = props.userParticipation?.request_source;
+    if (status === 'reserve') {
+        return true;
     }
-    if (props.userParticipation?.status === 'invited') {
-        return false;
+    if (status === 'invited') {
+        return true;
     }
-    const current = props.userParticipation?.status || 'invited';
-    return (statusRank[targetStatus] ?? 0) > (statusRank[current] ?? 0);
-};
+    return status === 'pending' && requestSource === 'organizer_invite';
+});
+const confirmActionLabel = computed(() => {
+    return props.userParticipation?.status === 'reserve' ? 'Запросить подтверждение' : 'Подтвердить';
+});
+const canMoveToReserve = computed(() => {
+    const status = props.userParticipation?.status;
+    return !!status && status !== 'reserve' && status !== 'declined';
+});
+const canDeclineParticipation = computed(() => {
+    const status = props.userParticipation?.status;
+    return !!status && status !== 'declined';
+});
 
 const syncUserReason = () => {
     respondForm.reason = props.userParticipation?.user_status_reason || '';
@@ -305,38 +333,41 @@ const submitRespond = () => {
                         <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Участие</div>
                         <div v-if="userParticipation" class="mt-2 space-y-2">
                             <div class="text-sm text-slate-700">
-                                {{ resolveParticipantStatusLabel(userParticipation.status, userParticipation.status_changed_by) }}
+                                {{ resolveParticipantStatusLabel(userParticipation.status, userParticipation.status_changed_by, userParticipation.request_source) }}
                             </div>
-                            <div v-if="userParticipation.status === 'invited' && userParticipation.status_change_reason" class="text-sm text-slate-600">
+                            <div
+                                v-if="(userParticipation.status === 'invited' || userParticipation.request_source === 'organizer_invite') && userParticipation.status_change_reason"
+                                class="text-sm text-slate-600"
+                            >
                                 Комментарий организатора: {{ userParticipation.status_change_reason }}
                             </div>
                             <p
-                                v-if="userParticipation.status_changed_by && userParticipation.status !== 'invited' && isUpgradeBlocked('confirmed')"
+                                v-if="userParticipation.status === 'pending' && userParticipation.request_source !== 'organizer_invite'"
                                 class="text-xs text-slate-500"
                             >
-                                Статус изменён организатором, изменение недоступно.
+                                Ожидайте решения организатора.
                             </p>
                             <div v-if="!isExpired" class="flex flex-wrap gap-2">
                                 <button
-                                    v-if="userParticipation.status !== 'confirmed' && !(isLimitReached && props.limitRole === userParticipation.role)"
+                                    v-if="canConfirmParticipation"
                                     class="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
                                     type="button"
-                                    :disabled="respondForm.processing || isUpgradeBlocked('confirmed')"
+                                    :disabled="respondForm.processing"
                                     @click="respondInvitation('confirmed')"
                                 >
-                                    Подтвердить
+                                    {{ confirmActionLabel }}
                                 </button>
                                 <button
-                                    v-if="userParticipation.status !== 'reserve'"
+                                    v-if="canMoveToReserve"
                                     class="rounded-full border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
                                     type="button"
-                                    :disabled="respondForm.processing || isUpgradeBlocked('reserve')"
+                                    :disabled="respondForm.processing"
                                     @click="respondInvitation('reserve')"
                                 >
                                     В резерв
                                 </button>
                                 <button
-                                    v-if="userParticipation.status !== 'declined'"
+                                    v-if="canDeclineParticipation"
                                     class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300 disabled:cursor-not-allowed disabled:text-slate-400"
                                     type="button"
                                     :disabled="respondForm.processing"
@@ -370,6 +401,9 @@ const submitRespond = () => {
                             <div v-if="joinForm.errors.role" class="text-xs text-rose-700">
                                 {{ joinForm.errors.role }}
                             </div>
+                            <div v-if="joinForm.errors.status" class="text-xs text-rose-700">
+                                {{ joinForm.errors.status }}
+                            </div>
                         </form>
                     </div>
 
@@ -402,12 +436,12 @@ const submitRespond = () => {
                     <p class="text-sm text-slate-600">
                         Укажите причину изменения статуса (необязательно).
                     </p>
-                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Новый статус</span>
-                            <span>{{ resolveParticipantStatusLabel(respondForm.status, page.props.auth?.user?.id) }}</span>
-                        </div>
-                    </div>
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Новый статус</span>
+                                    <span>{{ targetStatusLabel }}</span>
+                                </div>
+                            </div>
                     <textarea
                         v-model="respondForm.reason"
                         class="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"

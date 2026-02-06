@@ -106,9 +106,15 @@ const participantRoles = computed(() => {
 });
 const participantStatusLabels = {
     invited: 'Приглашен',
+    pending: 'На рассмотрении',
     confirmed: 'Подтвержден',
     reserve: 'Резерв',
     declined: 'Отказался',
+};
+const requestSourceLabels = {
+    user_request: 'Ожидает решения организатора',
+    organizer_invite: 'Ожидает ответа участника',
+    user_reconfirm: 'Повторный запрос участника',
 };
 const participantsByRole = computed(() => {
     return participantRoles.value.map((role) => ({
@@ -1039,11 +1045,18 @@ const isPaymentConfirmDisabled = computed(() => {
                                                     'border-amber-200 bg-amber-50 text-amber-700': participant.status === 'reserve',
                                                     'border-rose-200 bg-rose-50 text-rose-700': participant.status === 'declined',
                                                     'border-slate-200 bg-slate-100 text-slate-600': participant.status === 'invited',
+                                                    'border-blue-200 bg-blue-50 text-blue-700': participant.status === 'pending',
                                                 }"
                                             >
                                                 {{ participantStatusLabels[participant.status] || participant.status }}
                                             </span>
                                         </div>
+                                        <p v-if="participant.status === 'pending'" class="text-xs text-slate-500">
+                                            {{ requestSourceLabels[participant.request_source] || 'Заявка на рассмотрении' }}
+                                            <span v-if="participant.requested_status">
+                                                · Запрос: {{ participantStatusLabels[participant.requested_status] || participant.requested_status }}
+                                            </span>
+                                        </p>
                                         <div v-if="!isExpired" class="flex flex-wrap items-center gap-2">
                                             <button
                                                 v-if="participant.status !== 'confirmed'"

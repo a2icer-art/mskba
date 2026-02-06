@@ -12,6 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class EventParticipantService
 {
+    public const REQUEST_SOURCE_USER = 'user_request';
+    public const REQUEST_SOURCE_INVITE = 'organizer_invite';
+    public const REQUEST_SOURCE_RECONFIRM = 'user_reconfirm';
+
     public function invite(
         Event $event,
         User $inviter,
@@ -29,7 +33,10 @@ class EventParticipantService
                 'role' => $role->value,
             ],
             [
-                'status' => EventParticipantStatus::Invited->value,
+                'status' => EventParticipantStatus::Pending->value,
+                'requested_status' => EventParticipantStatus::Confirmed->value,
+                'request_source' => self::REQUEST_SOURCE_INVITE,
+                'requested_by' => $inviter->id,
                 'invited_by' => $inviter->id,
                 'created_by' => $inviter->id,
                 'joined_at' => null,
@@ -48,10 +55,20 @@ class EventParticipantService
     ): EventParticipant {
         $this->ensureRoleAllowed($event, $role);
 
-        $status = $desiredStatus ?? EventParticipantStatus::Confirmed;
-        if ($status === EventParticipantStatus::Confirmed && $this->isLimitRole($event, $role) && $this->isLimitReached($event)) {
-            $status = EventParticipantStatus::Reserve;
+        $desired = $desiredStatus ?? EventParticipantStatus::Confirmed;
+        if (
+            $desired === EventParticipantStatus::Confirmed
+            && $this->isLimitRole($event, $role)
+            && $this->isLimitReached($event)
+        ) {
+            throw ValidationException::withMessages([
+                'status' => 'Достигнут лимит участников. Выберите резерв.',
+            ]);
         }
+
+        $finalStatus = $desired === EventParticipantStatus::Reserve
+            ? EventParticipantStatus::Reserve
+            : EventParticipantStatus::Pending;
 
         return EventParticipant::updateOrCreate(
             [
@@ -60,10 +77,13 @@ class EventParticipantService
                 'role' => $role->value,
             ],
             [
-                'status' => $status->value,
+                'status' => $finalStatus->value,
+                'requested_status' => $desired->value,
+                'request_source' => self::REQUEST_SOURCE_USER,
+                'requested_by' => $participant->id,
                 'invited_by' => null,
                 'created_by' => $participant->id,
-                'joined_at' => $status === EventParticipantStatus::Confirmed ? Carbon::now() : null,
+                'joined_at' => $finalStatus === EventParticipantStatus::Confirmed ? Carbon::now() : null,
                 'status_change_reason' => null,
                 'status_changed_by' => $participant->id,
                 'status_changed_at' => Carbon::now(),
@@ -83,17 +103,44 @@ class EventParticipantService
             ]);
         }
 
-        $finalStatus = $status;
-        if (
-            $status === EventParticipantStatus::Confirmed
-            && $this->isLimitRole($participant->event, $participant->role)
-            && $this->isLimitReached($participant->event)
-        ) {
-            $finalStatus = EventParticipantStatus::Reserve;
+        $currentStatus = $participant->status ?? EventParticipantStatus::Invited;
+
+        if ($status === EventParticipantStatus::Confirmed) {
+            if (
+                $currentStatus === EventParticipantStatus::Pending
+                && $participant->request_source !== self::REQUEST_SOURCE_INVITE
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => 'Ожидайте решения организатора.',
+                ]);
+            }
+
+            if ($currentStatus === EventParticipantStatus::Reserve) {
+                $this->ensureLimitAvailable($participant->event, $participant->role);
+
+                $participant->status = EventParticipantStatus::Pending;
+                $participant->requested_status = EventParticipantStatus::Confirmed->value;
+                $participant->request_source = self::REQUEST_SOURCE_RECONFIRM;
+                $participant->requested_by = $user->id;
+                $participant->joined_at = null;
+                $participant->user_status_reason = $reason;
+                $participant->status_changed_by = $user->id;
+                $participant->status_changed_at = Carbon::now();
+                $participant->save();
+
+                return $participant;
+            }
+
+            if (
+                $currentStatus === EventParticipantStatus::Pending
+                || $currentStatus === EventParticipantStatus::Invited
+            ) {
+                $this->ensureLimitAvailable($participant->event, $participant->role);
+            }
         }
 
-        $participant->status = $finalStatus;
-        $participant->joined_at = $finalStatus === EventParticipantStatus::Confirmed ? Carbon::now() : null;
+        $participant->status = $status;
+        $participant->joined_at = $status === EventParticipantStatus::Confirmed ? Carbon::now() : null;
         $participant->user_status_reason = $reason;
         $participant->status_changed_by = $user->id;
         $participant->status_changed_at = Carbon::now();
@@ -108,17 +155,12 @@ class EventParticipantService
         EventParticipantStatus $status,
         ?string $reason = null
     ): EventParticipant {
-        $finalStatus = $status;
-        if (
-            $status === EventParticipantStatus::Confirmed
-            && $this->isLimitRole($participant->event, $participant->role)
-            && $this->isLimitReached($participant->event)
-        ) {
-            $finalStatus = EventParticipantStatus::Reserve;
+        if ($status === EventParticipantStatus::Confirmed) {
+            $this->ensureLimitAvailable($participant->event, $participant->role);
         }
 
-        $participant->status = $finalStatus;
-        $participant->joined_at = $finalStatus === EventParticipantStatus::Confirmed ? Carbon::now() : null;
+        $participant->status = $status;
+        $participant->joined_at = $status === EventParticipantStatus::Confirmed ? Carbon::now() : null;
         $participant->status_change_reason = $reason;
         $participant->status_changed_by = $actor->id;
         $participant->status_changed_at = Carbon::now();
@@ -141,6 +183,15 @@ class EventParticipantService
             ->count();
 
         return $confirmedCount >= $limit;
+    }
+
+    private function ensureLimitAvailable(Event $event, ?EventParticipantRole $role): void
+    {
+        if ($this->isLimitRole($event, $role) && $this->isLimitReached($event)) {
+            throw ValidationException::withMessages([
+                'status' => 'Достигнут лимит участников.',
+            ]);
+        }
     }
 
     private function ensureRoleAllowed(Event $event, EventParticipantRole $role): void

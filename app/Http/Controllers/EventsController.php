@@ -396,6 +396,9 @@ class EventsController extends Controller
                         'id' => $userParticipation->id,
                         'role' => $userParticipation->role?->value,
                         'status' => $userParticipation->status?->value,
+                        'requested_status' => $userParticipation->requested_status?->value,
+                        'request_source' => $userParticipation->request_source,
+                        'requested_by' => $userParticipation->requested_by,
                         'user_status_reason' => $userParticipation->user_status_reason,
                         'status_changed_by' => $userParticipation->status_changed_by,
                         'status_change_reason' => $userParticipation->status_change_reason,
@@ -500,6 +503,9 @@ class EventsController extends Controller
                     'status_change_reason' => $participant->status_change_reason,
                     'status_changed_at' => $participant->status_changed_at?->toDateTimeString(),
                     'user_status_reason' => $participant->user_status_reason,
+                    'requested_status' => $participant->requested_status?->value,
+                    'request_source' => $participant->request_source,
+                    'requested_by' => $participant->requested_by,
                     'user' => $participant->user
                         ? [
                             'id' => $participant->user->id,
@@ -739,7 +745,10 @@ class EventsController extends Controller
 
         $data = $request->validate([
             'role' => ['required', Rule::in(EventParticipantRole::values())],
-            'status' => ['nullable', Rule::in([EventParticipantStatus::Confirmed->value, EventParticipantStatus::Reserve->value])],
+            'status' => ['nullable', Rule::in([
+                EventParticipantStatus::Confirmed->value,
+                EventParticipantStatus::Reserve->value,
+            ])],
         ]);
 
         $roleAlias = $data['role'];
@@ -759,9 +768,11 @@ class EventsController extends Controller
         $desiredStatus = !empty($data['status']) ? EventParticipantStatus::from($data['status']) : null;
         $participant = $service->join($event, $user, EventParticipantRole::from($data['role']), $desiredStatus);
 
-        $notice = $participant->status === EventParticipantStatus::Reserve
-            ? 'Вы добавлены в резерв.'
-            : 'Вы участвуете в событии.';
+        $notice = match ($participant->status) {
+            EventParticipantStatus::Pending => 'Заявка отправлена на рассмотрение.',
+            EventParticipantStatus::Reserve => 'Вы добавлены в резерв.',
+            default => 'Вы участвуете в событии.',
+        };
 
         return back()->with('notice', $notice);
     }
@@ -787,18 +798,6 @@ class EventsController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $currentStatus = $participant->status?->value ?? EventParticipantStatus::Invited->value;
-        if (
-            $currentStatus !== EventParticipantStatus::Invited->value
-            && $participant->status_changed_by !== null
-            && $participant->status_changed_by !== $user->id
-            && $this->isStatusUpgrade($currentStatus, $data['status'])
-        ) {
-            return back()->withErrors([
-                'status' => 'Нельзя повысить статус без согласования с организатором.',
-            ]);
-        }
-
         $participant = $service->respond(
             $participant,
             $user,
@@ -809,19 +808,11 @@ class EventsController extends Controller
         app(\App\Domain\Events\Services\EventParticipantNotificationService::class)
             ->notifyResponse($participant, $user);
 
-        return back()->with('notice', 'Ответ сохранен.');
-    }
+        $notice = $participant->status === EventParticipantStatus::Pending
+            ? 'Запрос на подтверждение отправлен.'
+            : 'Ответ сохранен.';
 
-    private function isStatusUpgrade(string $current, string $next): bool
-    {
-        $ranks = [
-            EventParticipantStatus::Declined->value => 0,
-            EventParticipantStatus::Invited->value => 1,
-            EventParticipantStatus::Reserve->value => 2,
-            EventParticipantStatus::Confirmed->value => 3,
-        ];
-
-        return ($ranks[$next] ?? 0) > ($ranks[$current] ?? 0);
+        return back()->with('notice', $notice);
     }
 
     private function getEventAllowedRoles(Event $event): array
@@ -864,7 +855,6 @@ class EventsController extends Controller
                 EventParticipantStatus::Confirmed->value,
                 EventParticipantStatus::Reserve->value,
                 EventParticipantStatus::Declined->value,
-                EventParticipantStatus::Invited->value,
             ])],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);

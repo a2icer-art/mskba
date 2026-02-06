@@ -151,6 +151,7 @@ class EventParticipantNotificationService
             EventParticipantStatus::Reserve->value => 'Резерв',
             EventParticipantStatus::Declined->value => 'Отказ',
             EventParticipantStatus::Invited->value => 'Приглашен',
+            EventParticipantStatus::Pending->value => 'На рассмотрении',
             default => $status?->value ?? 'Статус',
         };
     }
