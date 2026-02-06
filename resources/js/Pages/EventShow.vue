@@ -125,12 +125,22 @@ const resolvedPriceAmount = computed(() => {
     if (approvedCost > 0) {
         return approvedCost;
     }
+    const lastBookingCost = Number(props.event?.last_booking_cost_minor ?? 0);
+    if (lastBookingCost > 0) {
+        return lastBookingCost;
+    }
     return 0;
 });
 const isPriceFromApprovedBooking = computed(() => {
     const stored = Number(props.event?.price_amount_minor ?? 0);
     const approved = Number(props.event?.approved_booking_cost_minor ?? 0);
     return stored === 0 && approved > 0;
+});
+const isPriceFromLastBooking = computed(() => {
+    const stored = Number(props.event?.price_amount_minor ?? 0);
+    const approved = Number(props.event?.approved_booking_cost_minor ?? 0);
+    const lastBooking = Number(props.event?.last_booking_cost_minor ?? 0);
+    return stored === 0 && approved === 0 && lastBooking > 0;
 });
 const perParticipantCost = computed(() => {
     const total = Number(eventForm.price_amount_minor ?? 0);
@@ -935,12 +945,6 @@ const isPaymentConfirmDisabled = computed(() => {
                                     />
                                 </label>
                                 <p class="mt-1 text-xs text-slate-500">0 — без ограничений.</p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Участники: {{ participantsConfirmedCount }}/{{ participantsLimitLabel }}
-                                </p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    В резерве: {{ participantsReserveCount }}
-                                </p>
                                 <div v-if="eventForm.errors.participants_limit" class="text-xs text-rose-700">
                                     {{ eventForm.errors.participants_limit }}
                                 </div>
@@ -960,9 +964,17 @@ const isPaymentConfirmDisabled = computed(() => {
                                 <p v-if="isPriceFromApprovedBooking" class="mt-1 text-xs text-slate-500">
                                     По умолчанию подтянута стоимость подтвержденной брони площадки.
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Стоимость для одного участника: {{ perParticipantCost ? `${perParticipantCost} ₽` : '—' }}
+                                <p v-if="isPriceFromLastBooking" class="mt-1 text-xs text-slate-500">
+                                    По умолчанию указана стоимость последней брони площадки.
                                 </p>
+                                <div class="mt-3 text-sm text-slate-500">
+                                    <p><span class="font-semibold">Участники:</span> {{ participantsConfirmedCount }}/{{ participantsLimitLabel }}</p>
+                                    <p><span class="font-semibold">В резерве:</span> {{ participantsReserveCount }}</p>
+                                    <p>
+                                        <span class="font-semibold">Стоимость для одного участника:</span>
+                                        {{ perParticipantCost ? `${perParticipantCost} ₽` : '—' }}
+                                    </p>
+                                </div>
                                 <div v-if="eventForm.errors.price_amount_minor" class="text-xs text-rose-700">
                                     {{ eventForm.errors.price_amount_minor }}
                                 </div>

@@ -416,6 +416,15 @@ class EventsController extends Controller
             $approvedBookingCost = $paymentMeta['total_amount_minor'] ?? $approvedBooking->payment->amount_minor ?? null;
         }
         $eventPayload['approved_booking_cost_minor'] = $approvedBookingCost;
+        $lastBooking = $event->bookings
+            ->sortByDesc('created_at')
+            ->first(static fn ($booking) => $booking->status !== EventBookingStatus::Cancelled);
+        $lastBookingCost = null;
+        if ($lastBooking?->payment) {
+            $paymentMeta = is_array($lastBooking->payment->meta) ? $lastBooking->payment->meta : [];
+            $lastBookingCost = $paymentMeta['total_amount_minor'] ?? $lastBooking->payment->amount_minor ?? null;
+        }
+        $eventPayload['last_booking_cost_minor'] = $lastBookingCost;
 
         $bookings = $event->bookings
             ->map(function ($booking) use ($user, $checker, $isAdmin, $event): array {
