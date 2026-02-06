@@ -23,6 +23,7 @@ class PaymentMethod extends Model
         'phone',
         'display_name',
         'is_active',
+        'is_default',
         'sort_order',
         'meta',
         'created_by',
@@ -34,6 +35,7 @@ class PaymentMethod extends Model
         return [
             'type' => PaymentMethodType::class,
             'is_active' => 'boolean',
+            'is_default' => 'boolean',
             'sort_order' => 'integer',
             'meta' => 'array',
         ];

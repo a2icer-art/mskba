@@ -69,8 +69,8 @@ class PaymentRecipientResolver
             return $this->emptyResult();
         }
 
-        $methods = $this->getActiveMethods(Contract::class, $contract->id);
-        if ($methods === []) {
+        $method = $this->resolveContractMethod($contract);
+        if (!$method) {
             return $this->emptyResult();
         }
 
@@ -78,7 +78,7 @@ class PaymentRecipientResolver
             'recipient_type' => Contract::class,
             'recipient_id' => $contract->id,
             'recipient_label' => $this->buildContractLabel($contract, $type),
-            'methods' => $methods,
+            'methods' => [$this->formatMethod($method)],
         ];
     }
 
@@ -123,7 +123,7 @@ class PaymentRecipientResolver
                 $query->whereNull('ends_at')
                     ->orWhere('ends_at', '>=', $now);
             })
-            ->with('user:id,login')
+            ->with(['user:id,login', 'paymentMethod'])
             ->orderByDesc('starts_at')
             ->first();
     }
@@ -136,17 +136,48 @@ class PaymentRecipientResolver
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'type', 'label', 'phone', 'display_name', 'is_active', 'sort_order'])
-            ->map(fn (PaymentMethod $method) => [
-                'id' => $method->id,
-                'type' => $method->type?->value,
-                'label' => $method->label,
-                'phone' => $method->phone,
-                'display_name' => $method->display_name,
-                'is_active' => $method->is_active,
-                'sort_order' => $method->sort_order,
-            ])
+            ->get(['id', 'type', 'label', 'phone', 'display_name', 'is_active', 'sort_order', 'is_default'])
+            ->map(fn (PaymentMethod $method) => $this->formatMethod($method))
             ->all();
+    }
+
+    private function resolveContractMethod(Contract $contract): ?PaymentMethod
+    {
+        $user = $contract->user;
+        $method = $contract->paymentMethod;
+
+        if ($method && $method->is_active) {
+            if ($user && $method->owner_type === $user->getMorphClass() && (int) $method->owner_id === (int) $user->id) {
+                return $method;
+            }
+        }
+
+        if (!$user) {
+            return null;
+        }
+
+        return PaymentMethod::query()
+            ->where('owner_type', $user->getMorphClass())
+            ->where('owner_id', $user->id)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function formatMethod(PaymentMethod $method): array
+    {
+        return [
+            'id' => $method->id,
+            'type' => $method->type?->value,
+            'label' => $method->label,
+            'phone' => $method->phone,
+            'display_name' => $method->display_name,
+            'is_active' => (bool) $method->is_active,
+            'is_default' => (bool) $method->is_default,
+            'sort_order' => (int) $method->sort_order,
+        ];
     }
 
     private function emptyResult(): array

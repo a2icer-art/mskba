@@ -10,6 +10,7 @@ use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Enums\PermissionScope;
 use App\Domain\Permissions\Models\Permission;
 use App\Domain\Permissions\Services\PermissionChecker;
+use App\Domain\Payments\Models\PaymentMethod;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -53,6 +54,7 @@ class ContractManager
 
         $permissionCodes = $this->filterAssignablePermissionCodes($actor, $entity, $permissionCodes, $type);
         $permissionIds = $this->resolvePermissionIds($permissionCodes, $entity);
+        $paymentMethodId = $this->resolveDefaultPaymentMethodId($target);
 
         $contract = Contract::query()->create([
             'user_id' => $target->id,
@@ -65,6 +67,7 @@ class ContractManager
             'ends_at' => $endsAt,
             'status' => ContractStatus::Active,
             'comment' => $comment,
+            'payment_method_id' => $paymentMethodId,
         ]);
 
         if ($permissionIds !== []) {
@@ -349,6 +352,18 @@ class ContractManager
             ->where('target_model', $entity::class)
             ->pluck('id')
             ->all();
+    }
+
+    private function resolveDefaultPaymentMethodId(User $user): ?int
+    {
+        return PaymentMethod::query()
+            ->where('owner_type', $user->getMorphClass())
+            ->where('owner_id', $user->id)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
     }
 
     private function resolveActorContractType(User $actor, Model $entity): ?ContractType

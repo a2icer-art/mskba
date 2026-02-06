@@ -5,12 +5,12 @@ namespace App\Domain\Contracts\Models;
 use App\Domain\Contracts\Enums\ContractStatus;
 use App\Domain\Contracts\Enums\ContractType;
 use App\Domain\Audit\Traits\Auditable;
+use App\Domain\Payments\Models\PaymentMethod;
 use App\Domain\Permissions\Models\Permission;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Contract extends Model
@@ -28,6 +28,7 @@ class Contract extends Model
         'ends_at',
         'status',
         'comment',
+        'payment_method_id',
     ];
 
     protected $casts = [
@@ -54,8 +55,8 @@ class Contract extends Model
         return $this->morphTo();
     }
 
-    public function paymentMethods(): MorphMany
+    public function paymentMethod(): BelongsTo
     {
-        return $this->morphMany(\App\Domain\Payments\Models\PaymentMethod::class, 'owner');
+        return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
     }
 }

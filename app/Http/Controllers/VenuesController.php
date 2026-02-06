@@ -327,18 +327,23 @@ class VenuesController extends Controller
             ? Contract::query()
                 ->where('entity_type', $venue->getMorphClass())
                 ->where('entity_id', $venue->getKey())
-                ->with(['user:id,login', 'permissions:id,code,label', 'paymentMethods'])
+                ->with([
+                    'user:id,login',
+                    'user.paymentMethods',
+                    'permissions:id,code,label',
+                    'paymentMethod',
+                ])
                 ->orderByDesc('created_at')
                 ->get()
                 ->map(function (Contract $contract) use ($manager, $user, $venue, $currentUserId, $paymentMethodService): array {
                     $contractUserId = $contract->user?->id;
                     $canManagePaymentMethods = $this->canManageContractPaymentMethods($user, $venue, $contract);
-                    $paymentMethods = [];
+                    $userPaymentMethods = [];
 
                     if (in_array($contract->contract_type?->value, [ContractType::Owner->value, ContractType::Supervisor->value], true)) {
-                        $paymentMethods = $contract->paymentMethods
+                        $userPaymentMethods = ($contract->user?->paymentMethods ?? collect())
                             ->sortBy(function (PaymentMethod $method): array {
-                                return [(int) $method->sort_order, (int) $method->id];
+                                return [(int) $method->is_default ? 0 : 1, (int) $method->sort_order, (int) $method->id];
                             })
                             ->map(fn (PaymentMethod $method) => $paymentMethodService->format($method))
                             ->values()
@@ -360,7 +365,11 @@ class VenuesController extends Controller
                         'can_revoke' => $manager->canRevoke($user, $contract, $venue),
                         'can_update_permissions' => $manager->canUpdatePermissions($user, $contract, $venue),
                         'can_manage_payment_methods' => $canManagePaymentMethods,
-                        'payment_methods' => $paymentMethods,
+                        'payment_method_id' => $contract->payment_method_id,
+                        'payment_method' => $contract->paymentMethod
+                            ? $paymentMethodService->format($contract->paymentMethod)
+                            : null,
+                        'user_payment_methods' => $userPaymentMethods,
                         'user' => $contract->user
                             ? [
                                 'id' => $contract->user->id,
@@ -1508,7 +1517,7 @@ class VenuesController extends Controller
         return back()->with('notice', 'Метод оплаты удалён.');
     }
 
-    public function storeContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract)
+    public function updateContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract)
     {
         $user = $request->user();
         if (!$user) {
@@ -1522,64 +1531,43 @@ class VenuesController extends Controller
 
         $this->ensureContractPaymentAccess($user, $venue, $contract);
 
-        $data = app(PaymentMethodService::class)->validate($request);
-        $data['owner_type'] = $contract->getMorphClass();
-        $data['owner_id'] = $contract->id;
-        $data['created_by'] = $user->id;
-        $data['updated_by'] = $user->id;
+        $data = $request->validate([
+            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+        ]);
 
-        PaymentMethod::query()->create($data);
+        $paymentMethodId = $data['payment_method_id'] ?? null;
+        if ($paymentMethodId) {
+            $contractUser = $contract->user;
+            if (!$contractUser) {
+                return back()->withErrors([
+                    'payment_method' => 'Для контракта не задан пользователь.',
+                ]);
+            }
 
-        return back()->with('notice', 'Метод оплаты добавлен.');
-    }
+            $method = PaymentMethod::query()
+                ->whereKey($paymentMethodId)
+                ->where('owner_type', $contractUser->getMorphClass())
+                ->where('owner_id', $contractUser->id)
+                ->first();
 
-    public function updateContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract, PaymentMethod $paymentMethod)
-    {
-        $user = $request->user();
-        if (!$user) {
-            abort(403);
+            if (!$method) {
+                return back()->withErrors([
+                    'payment_method' => 'Метод оплаты не принадлежит пользователю контракта.',
+                ]);
+            }
+
+            if (!$method->is_active) {
+                return back()->withErrors([
+                    'payment_method' => 'Метод оплаты недоступен для выбора.',
+                ]);
+            }
+
+            $contract->update(['payment_method_id' => $method->id]);
+        } else {
+            $contract->update(['payment_method_id' => null]);
         }
 
-        $venue = Venue::query()
-            ->visibleFor($user)
-            ->whereKey($venue->id)
-            ->firstOrFail();
-
-        $this->ensureContractPaymentAccess($user, $venue, $contract);
-        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
-
-        $data = app(PaymentMethodService::class)->validate($request);
-        $data['updated_by'] = $user->id;
-
-        $paymentMethod->update($data);
-
-        return back()->with('notice', 'Метод оплаты обновлён.');
-    }
-
-    public function destroyContractPaymentMethod(Request $request, string $type, Venue $venue, Contract $contract, PaymentMethod $paymentMethod)
-    {
-        $user = $request->user();
-        if (!$user) {
-            abort(403);
-        }
-
-        $venue = Venue::query()
-            ->visibleFor($user)
-            ->whereKey($venue->id)
-            ->firstOrFail();
-
-        $this->ensureContractPaymentAccess($user, $venue, $contract);
-        app(PaymentMethodService::class)->ensureOwner($paymentMethod, $contract->getMorphClass(), $contract->id);
-
-        if ($this->isPaymentMethodUsedInActiveBookings($venue, $paymentMethod->id)) {
-            return back()->withErrors([
-                'payment_method' => 'Метод используется в текущих бронированиях.',
-            ]);
-        }
-
-        $paymentMethod->delete();
-
-        return back()->with('notice', 'Метод оплаты удалён.');
+        return back()->with('notice', 'Метод оплаты для контракта обновлён.');
     }
 
     private function isPaymentMethodUsedInActiveBookings(Venue $venue, int $paymentMethodId): bool

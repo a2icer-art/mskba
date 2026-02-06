@@ -52,6 +52,7 @@ class PaymentMethodService
             'phone' => $method->phone,
             'display_name' => $method->display_name,
             'is_active' => (bool) $method->is_active,
+            'is_default' => (bool) $method->is_default,
             'sort_order' => (int) $method->sort_order,
         ];
     }

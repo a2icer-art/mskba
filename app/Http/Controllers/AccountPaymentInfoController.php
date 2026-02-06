@@ -20,6 +20,7 @@ class AccountPaymentInfoController extends Controller
 
         $paymentMethods = $user->paymentMethods()
             ->orderByDesc('is_active')
+            ->orderByDesc('is_default')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
@@ -60,8 +61,10 @@ class AccountPaymentInfoController extends Controller
         }
 
         $data = $paymentMethodService->validate($request);
+        $hasDefault = $user->paymentMethods()->where('is_default', true)->exists();
         $data['owner_type'] = $user->getMorphClass();
         $data['owner_id'] = $user->id;
+        $data['is_default'] = !$hasDefault;
         $data['created_by'] = $user->id;
         $data['updated_by'] = $user->id;
 
@@ -96,7 +99,30 @@ class AccountPaymentInfoController extends Controller
 
         $paymentMethodService->ensureOwner($paymentMethod, $user->getMorphClass(), $user->id);
 
+        $wasDefault = (bool) $paymentMethod->is_default;
         $paymentMethod->delete();
+
+        if ($wasDefault) {
+            $replacement = $user->paymentMethods()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->first();
+
+            if (!$replacement) {
+                $replacement = $user->paymentMethods()
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            if ($replacement) {
+                $replacement->update([
+                    'is_default' => true,
+                    'updated_by' => $user->id,
+                ]);
+            }
+        }
 
         return back()->with('notice', 'Метод оплаты удалён.');
     }

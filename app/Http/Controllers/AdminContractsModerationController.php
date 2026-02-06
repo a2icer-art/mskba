@@ -12,6 +12,7 @@ use App\Domain\Moderation\Models\ModerationRequest;
 use App\Domain\Permissions\Enums\PermissionScope;
 use App\Domain\Permissions\Enums\PermissionCode;
 use App\Domain\Permissions\Models\Permission;
+use App\Domain\Payments\Models\PaymentMethod;
 use App\Domain\Venues\Models\Venue;
 use App\Presentation\Breadcrumbs\AdminBreadcrumbsPresenter;
 use App\Presentation\Navigation\AdminNavigationPresenter;
@@ -229,6 +230,7 @@ class AdminContractsModerationController extends Controller
             'ends_at' => $data['ends_at'] ?? null,
             'status' => ContractStatus::Active,
             'comment' => $data['comment'] ?? null,
+            'payment_method_id' => $this->resolveDefaultPaymentMethodId($submitter),
         ]);
 
         if ($permissionIds !== []) {
@@ -658,5 +660,17 @@ class AdminContractsModerationController extends Controller
                     ->orWhere('ends_at', '>=', $now);
             })
             ->exists();
+    }
+
+    private function resolveDefaultPaymentMethodId(\App\Models\User $user): ?int
+    {
+        return PaymentMethod::query()
+            ->where('owner_type', $user->getMorphClass())
+            ->where('owner_id', $user->id)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
     }
 }
