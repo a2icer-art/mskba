@@ -169,6 +169,18 @@ class EventParticipantService
         return $participant;
     }
 
+    public function cancelInvite(EventParticipant $participant): void
+    {
+        if ($participant->request_source !== self::REQUEST_SOURCE_INVITE
+            || $participant->status !== EventParticipantStatus::Pending) {
+            throw ValidationException::withMessages([
+                'participant' => 'Отменить можно только ожидающее приглашение.',
+            ]);
+        }
+
+        $participant->delete();
+    }
+
     private function isLimitReached(Event $event): bool
     {
         $limit = (int) ($event->participants_limit ?? 0);

@@ -873,6 +873,23 @@ class EventsController extends Controller
         return back()->with('notice', $notice);
     }
 
+    public function cancelParticipantInvite(
+        Request $request,
+        Event $event,
+        EventParticipant $participant,
+        EventParticipantService $service
+    ) {
+        $user = $request->user();
+        if (!$user || !$this->canEditEvent($user, $event) || $participant->event_id !== $event->id) {
+            abort(403);
+        }
+        $this->ensureEventNotExpired($event);
+
+        $service->cancelInvite($participant);
+
+        return back()->with('notice', 'Приглашение отменено.');
+    }
+
     public function storeBooking(Request $request, Event $event, EventBookingService $service)
     {
         $user = $request->user();

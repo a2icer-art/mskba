@@ -172,6 +172,10 @@ const bookingStatusLabel = (status) => {
     return 'Ожидает';
 };
 
+const isOrganizerInvite = (participant) => {
+    return participant?.status === 'pending' && participant?.request_source === 'organizer_invite';
+};
+
 const shouldShowPaymentDetails = (booking) => {
     if (!booking) {
         return false;
@@ -386,8 +390,11 @@ const participantStatusForm = useForm({
     status: '',
     reason: '',
 });
+const cancelInviteForm = useForm({});
 const statusChangeOpen = ref(false);
 const statusChangeTarget = ref(null);
+const cancelInviteOpen = ref(false);
+const cancelInviteTarget = ref(null);
 const userSuggestLoading = ref(false);
 const userSuggestError = ref('');
 const userSuggestions = ref([]);
@@ -581,6 +588,30 @@ const submitStatusChange = () => {
             },
         }
     );
+};
+
+const openCancelInvite = (participant) => {
+    if (!participant?.id) {
+        return;
+    }
+    cancelInviteTarget.value = participant;
+    cancelInviteOpen.value = true;
+};
+
+const closeCancelInvite = () => {
+    cancelInviteOpen.value = false;
+    cancelInviteTarget.value = null;
+    cancelInviteForm.clearErrors();
+};
+
+const submitCancelInvite = () => {
+    if (!cancelInviteTarget.value?.id) {
+        return;
+    }
+    cancelInviteForm.post(`/events/${props.event?.id}/participants/${cancelInviteTarget.value.id}/cancel-invite`, {
+        preserveScroll: true,
+        onSuccess: closeCancelInvite,
+    });
 };
 
 watch(
@@ -1059,7 +1090,7 @@ const isPaymentConfirmDisabled = computed(() => {
                                         </p>
                                         <div v-if="!isExpired" class="flex flex-wrap items-center gap-2">
                                             <button
-                                                v-if="participant.status !== 'confirmed'"
+                                                v-if="participant.status !== 'confirmed' && !isOrganizerInvite(participant)"
                                                 class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-400"
                                                 type="button"
                                                 :disabled="participantStatusForm.processing"
@@ -1068,7 +1099,7 @@ const isPaymentConfirmDisabled = computed(() => {
                                                 Подтвердить
                                             </button>
                                             <button
-                                                v-if="participant.status !== 'reserve'"
+                                                v-if="participant.status !== 'reserve' && !isOrganizerInvite(participant)"
                                                 class="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-400"
                                                 type="button"
                                                 :disabled="participantStatusForm.processing"
@@ -1080,10 +1111,10 @@ const isPaymentConfirmDisabled = computed(() => {
                                                 v-if="participant.status !== 'declined'"
                                                 class="rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-800 transition hover:-translate-y-0.5 hover:border-rose-400"
                                                 type="button"
-                                                :disabled="participantStatusForm.processing"
-                                                @click="openStatusChange(participant, 'declined')"
+                                                :disabled="participantStatusForm.processing || (isOrganizerInvite(participant) && cancelInviteForm.processing)"
+                                                @click="isOrganizerInvite(participant) ? openCancelInvite(participant) : openStatusChange(participant, 'declined')"
                                             >
-                                                Отклонить
+                                                {{ isOrganizerInvite(participant) ? 'Отменить приглашение' : 'Отклонить' }}
                                             </button>
                                         </div>
                                     </li>
@@ -1562,6 +1593,56 @@ const isPaymentConfirmDisabled = computed(() => {
                         :disabled="isPaymentConfirmDisabled"
                     >
                         Оплатить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div v-if="cancelInviteOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-xl">
+            <form :class="{ loading: cancelInviteForm.processing }" @submit.prevent="submitCancelInvite">
+                <div class="popup-header flex items-center justify-between border-b border-slate-200/80 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Отменить приглашение</h2>
+                    <button
+                        class="rounded-full border border-slate-200 px-2.5 py-1 text-sm text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        type="button"
+                        aria-label="Закрыть"
+                        :disabled="cancelInviteForm.processing"
+                        @click="closeCancelInvite"
+                    >
+                        x
+                    </button>
+                </div>
+                <div class="popup-body max-h-[360px] overflow-y-auto px-6 pt-4">
+                    <p class="text-sm text-slate-600">
+                        Вы уверены, что хотите отменить приглашение? Запись участника будет удалена.
+                    </p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs uppercase tracking-[0.15em] text-slate-500">Пользователь</span>
+                            <span class="font-semibold">{{ cancelInviteTarget?.user?.login || '—' }}</span>
+                        </div>
+                    </div>
+                    <div v-if="cancelInviteForm.errors.participant" class="mt-3 text-xs text-rose-700">
+                        {{ cancelInviteForm.errors.participant }}
+                    </div>
+                </div>
+                <div class="popup-footer flex flex-wrap justify-end gap-3 border-t border-slate-200/80 px-6 py-4">
+                    <button
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300"
+                        type="button"
+                        :disabled="cancelInviteForm.processing"
+                        @click="closeCancelInvite"
+                    >
+                        Закрыть
+                    </button>
+                    <button
+                        class="rounded-full border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:translate-y-0"
+                        type="submit"
+                        :disabled="cancelInviteForm.processing"
+                    >
+                        Отменить приглашение
                     </button>
                 </div>
             </form>

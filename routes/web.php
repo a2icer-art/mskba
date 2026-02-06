@@ -301,6 +301,9 @@ Route::post('/events/{event}/participants/{participant}/respond', [EventsControl
 Route::post('/events/{event}/participants/{participant}/status', [EventsController::class, 'updateParticipantStatus'])
     ->middleware('auth')
     ->name('events.participants.status');
+Route::post('/events/{event}/participants/{participant}/cancel-invite', [EventsController::class, 'cancelParticipantInvite'])
+    ->middleware('auth')
+    ->name('events.participants.cancel-invite');
 
 Route::middleware(['auth', 'can:seo.manage', 'confirmed.role:10'])->prefix('admin')->group(function () {
     Route::get('/seo', [AdminSeoController::class, 'index'])->name('admin.seo');
