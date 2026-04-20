@@ -22,6 +22,7 @@ use App\Domain\Users\Models\UserRole;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class TestEventParticipationSeeder extends Seeder
 {
@@ -98,7 +99,7 @@ class TestEventParticipationSeeder extends Seeder
             if (!$user) {
                 $user = User::query()->create([
                     'login' => $login,
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make(env('SEED_TEST_USER_PASSWORD') ?: Str::random(32)),
                     'status' => UserStatus::Confirmed,
                     'confirmed_at' => now(),
                     'confirmed_by' => UserConfirmedBy::Other,

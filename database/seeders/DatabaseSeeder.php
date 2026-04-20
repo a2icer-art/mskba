@@ -23,6 +23,7 @@ use Database\Seeders\AmenitySeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -34,17 +35,17 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $admin = $this->getOrCreateUser('admin', null, [
-            'password' => Hash::make('Ghjcnjgfhjkm26'),
+            'password' => Hash::make(env('SEED_ADMIN_PASSWORD') ?: Str::random(32)),
             'status' => UserStatus::Confirmed,
             'confirmed_at' => now(),
             'confirmed_by' => UserConfirmedBy::Other,
         ]);
         $moderator = $this->getOrCreateUser('moderator', $admin->id, [
-            'password' => Hash::make('Ghjcnjgfhjkm26m0d3r'),
+            'password' => Hash::make(env('SEED_MODERATOR_PASSWORD') ?: Str::random(32)),
             'status' => UserStatus::Unconfirmed,
         ]);
         $editor = $this->getOrCreateUser('editor', $admin->id, [
-            'password' => Hash::make('Ghjcnjgfhjkm263d!t'),
+            'password' => Hash::make(env('SEED_EDITOR_PASSWORD') ?: Str::random(32)),
             'status' => UserStatus::Unconfirmed,
         ]);
 

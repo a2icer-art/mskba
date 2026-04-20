@@ -19,6 +19,7 @@ use App\Domain\Users\Models\UserRole;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class MariqV1oSeeder extends Seeder
 {
@@ -36,7 +37,7 @@ class MariqV1oSeeder extends Seeder
         if (!$user) {
             $user = User::query()->create([
                 'login' => 'mariq_v1o',
-                'password' => Hash::make('123'),
+                'password' => Hash::make(env('SEED_MARIQ_V1O_PASSWORD') ?: Str::random(32)),
                 'status' => UserStatus::Unconfirmed,
                 'registered_via' => UserRegisteredVia::Site,
                 'registration_details' => null,
