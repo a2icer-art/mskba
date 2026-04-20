@@ -1,285 +1,172 @@
-# MSKBA — Repo ↔ Server Sync / Deploy Guide (for Claude Code AI Agent)
+# MSKBA — Deploy Guide
 
-> Цель: этот документ описывает, как сейчас устроена синхронизация репозитория и серверов, какие ветки и куда деплоятся, что уже сделано, и как правильно вносить изменения дальше.
+> Описание того, как устроена синхронизация репозитория и серверов,
+> какие ветки в какие окружения деплоятся и как вносить изменения.
+
+> **Примечание:** конкретные серверные пути, имена systemd-юнитов,
+> имена GitHub Secrets и прочая инфраструктурная специфика хранятся
+> в приватном `myconfigs/deploy.md` (не коммитится в репозиторий).
 
 ---
 
-## 1) Архитектура деплоя: что куда попадает
+## 1. Архитектура деплоя
 
 ### Ветки и окружения
-- `dev` → dev-окружение: сайт https://dev.mskba.ru, код на сервере в /var/www/mskba-dev
-- `main` → prod-окружение: сайт https://mskba.ru, код на сервере в /var/www/mskba-prod
+- `dev` → dev-окружение: https://dev.mskba.ru
+- `main` → prod-окружение: https://mskba.ru
 
-### Где живёт деплой-логика
-1) GitHub Actions workflow:
-   - файл: .github/workflows/deploy.yml
-   - три ключевых job’а:
-     - Build frontend: собирает Vite (`npm ci` + npm run build`), запаковывает `public/build в public-build.tgz и публикует как artifact
-     - Deploy to dev: триггерится на push в dev, качает artifact, копирует его на сервер, запускает деплой-скрипт dev, распаковывает public/build
-     - Deploy to prod: триггерится на push в main, требует manual approval через GitHub Environment production, затем делает то же самое, что dev, но для prod
-
-2) Серверные deploy-скрипты (запускаются GitHub Actions по SSH):
-   - /usr/local/bin/deploy-mskba-dev
-   - /usr/local/bin/deploy-mskba-prod
-
-Эти скрипты:
-- переходят в каталог проекта (`/var/www/mskba-dev` или `/var/www/mskba-prod`)
-- git fetch origin + git reset --hard origin/<branch>
-- composer install ...
-- php artisan migrate --force (на dev и prod)
-- php artisan optimize:clear
-- Vite build НЕ выполняется на сервере, он приходит готовым artifact’ом из Actions
-- права/группы на нужные директории корректируются (важно для storage, `bootstrap/cache`)
+### Поток деплоя
+1. GitHub Actions workflow — `.github/workflows/deploy.yml`:
+   - **Build frontend** — собирает Vite (`npm ci` + `npm run build`), публикует `public/build` как artifact.
+   - **Deploy to dev** — триггерится на push в `dev`. Качает artifact, копирует на сервер, запускает deploy-скрипт dev, распаковывает `public/build`.
+   - **Deploy to prod** — триггерится на push в `main`, требует manual approval через GitHub Environment `production`, затем деплоит prod.
+2. Серверные deploy-скрипты (запускаются Actions по SSH):
+   - `git fetch` + `git reset --hard origin/<branch>`
+   - `composer install`
+   - `php artisan migrate --force`
+   - `php artisan optimize:clear`
+   - Корректировка прав/группы на `storage`, `bootstrap/cache`
+   - Vite build **не выполняется на сервере** — приходит готовым artifact'ом из Actions.
 
 ---
 
-## 2) Что уже исправлено/настроено (важно знать)
+## 2. Production protection
 
-### 2.1. Права на storage/bootstrap/cache
-- На dev ранее была ошибка 500 из-за невозможности писать в storage/logs/laravel.log
-- Исправлено через корректные права/владельца и проверку writable
-- На текущий момент dev и prod возвращают HTTP 200 и деплой проходит
-
-### 2.2. Production protection (approve)
-- Для prod создан GitHub Environment: `production`
-- Для него настроено правило Required reviewers (сам себе reviewer допустим)
-- Поэтому любой push в main создаёт deploy, который переходит в статус Waiting до manual approve
-
-### 2.3. SSH host verification / known_hosts
-- При запуске деплоя через Actions возникала ошибка Host key verification failed
-- На сервере для пользователя deploy добавлен github.com в ~/.ssh/known_hosts
-- Проверка sudo -u deploy ssh -T git@github.com проходит успешно
-
-### 2.4. Sudo без пароля для deploy-юзера
-- GitHub Actions выполняет команды non-interactive, поэтому sudo должен работать без запроса пароля
-- Исправлено: deploy-скрипты и/или команды Actions используют sudo -n ...
-- В результате прод-деплой перестал падать с sudo: a password is required
+- Для prod настроен GitHub Environment `production` с правилом **Required reviewers**.
+- Любой push в `main` создаёт deploy, который переходит в статус **Waiting** до manual approve.
 
 ---
 
-## 3) Правильный рабочий процесс разработчика (как вносить изменения)
+## 3. Рабочий процесс разработчика
 
 ### Локальная разработка
-- Локально можно работать с hot-reload через:
-  - composer run dev (или аналогичная команда), чтобы видеть изменения без сборки
-- Важно: локальный hot-reload ≠ то, что будет на сервере.
-  На сервер попадает только результат `npm run build`, который делает GitHub Actions.
+```
+composer run dev
+```
+Запускает параллельно `php artisan serve`, `queue:listen` и `npm run dev` (Vite с hot-reload).
 
-### Как отправить изменения на dev.mskba.ru
-1) Убедиться, что изменения в коде готовы
-2) Создать коммит
-3) git push origin dev
-4) Открыть GitHub → Actions → workflow Build and Deploy
-5) Убедиться, что прошли:
-   - Build frontend ✅
-   - Deploy to dev ✅
-6) Проверить https://dev.mskba.ru
+> Локальный hot-reload ≠ то, что будет на сервере: на сервер попадает результат `npm run build`, который делает GitHub Actions.
 
-> НЕ нужно делать npm run build локально для dev-деплоя — сборка делается в Actions.
+### Отправка на dev
+1. Коммит и `git push origin dev`
+2. GitHub → Actions → workflow **Build and Deploy**
+3. Убедиться, что прошли: **Build frontend** ✅, **Deploy to dev** ✅
+4. Проверить https://dev.mskba.ru
 
-### Как отправить изменения на prod (mskba.ru)
-1) Сначала изменения должны попасть в dev и быть проверены там
-2) Затем выпускаем релиз:
-- мерджим dev → main (через PR или merge)
-3) Push/merge в main запускает workflow
-4) GitHub попросит Approve pending deployments для environment production
-5) После approve выполняется Deploy to prod
-6) Проверить https://mskba.ru
+> `npm run build` локально для dev-деплоя делать **не нужно** — сборка идёт в Actions.
+
+### Релиз на prod
+1. Изменения должны быть проверены на dev.
+2. Merge `dev` → `main` (через PR или прямой merge).
+3. Push/merge в `main` запускает workflow, который попросит **Approve pending deployments** для environment `production`.
+4. После approve выполняется Deploy to prod.
+5. Проверить https://mskba.ru
 
 ---
 
-## 4) Рекомендации по стратегии веток (чтобы не сломать прод)
+## 4. Стратегия веток
 
 ### Основное правило
-- `main` — только для релизов (production-ready)
-- Разработка ведётся через `dev`
+- `main` — только для релизов (production-ready).
+- Разработка ведётся через `dev`.
 
 ### Рекомендуемая схема
-- Feature-ветки создавать только от `dev`:
-  - feature/<ticket-or-short-name>
-  - fix/<ticket-or-short-name>
-- После завершения задачи:
-  - PR → dev
-  - тест на dev окружении
-- Релиз:
-  - PR/merge dev → main
-  - prod deploy требует approve
+- Feature-ветки ответвляются от `dev`:
+  - `feature/<ticket-or-short-name>`
+  - `fix/<ticket-or-short-name>`
+- После завершения — PR в `dev`, тест на dev-окружении.
+- Релиз — PR/merge `dev` → `main` (prod-деплой требует approve).
 
-### Почему так лучше
-- main всегда остаётся стабильной веткой
-- dev окружение — место для проверки интеграции изменений
-- prod защищён manual approve и не обновится “случайно”
+### Почему так
+- `main` всегда остаётся стабильной.
+- Dev-окружение — площадка для проверки интеграции.
+- Prod защищён manual approve, не обновится случайно.
 
 ---
 
-## 5) Важные места и “точки правды”
+## 5. Секреты
 
-### На GitHub
-- Actions: https://github.com/a2icer-art/mskba/actions
-- Workflow: .github/workflows/deploy.yml
-- Secrets (в Settings → Secrets and variables → Actions):
-  - VDS_HOST
-  - VDS_USER
-  - VDS_SSH_KEY
-  - VDS_PORT
-- Environment:
-  - production с required reviewers
-
-### На сервере
-- Dev проект: /var/www/mskba-dev
-- Prod проект: /var/www/mskba-prod
-- Скрипты:
-  - /usr/local/bin/deploy-mskba-dev
-  - /usr/local/bin/deploy-mskba-prod
-- Frontend build лежит в:
-  - /var/www/mskba-*/public/build
+В GitHub → Settings → Secrets and variables → Actions настроены секреты для SSH-доступа к серверу и отдельных интеграций. Конкретные имена и значения — в `myconfigs/deploy.md`.
 
 ---
 
-## 6) Частые проблемы и быстрые проверки
+## 6. Частые проблемы и быстрые проверки
 
-### 6.0. SMTP / email-доставка (dev vs prod)
-- В dev окружении допустимо временно использовать SMTP без шифрования (порт 25, None).
-- В prod обязательно использовать TLS/SSL (587/465) и валидный сертификат, соответствующий SMTP‑хосту.
-- Если сертификат не совпадает с хостом — отправка будет падать (STARTTLS/SSL).
+### 6.1. SMTP / email-доставка (dev vs prod)
+- В **dev** допустимо временно использовать SMTP без шифрования (порт 25, None).
+- В **prod** обязательно TLS/SSL (587/465) с валидным сертификатом, соответствующим SMTP-хосту.
 
-### 6.1. “Actions использует старый workflow”
-- GitHub Actions выполняет workflow из того коммита, который запустил run
-- Если вы поправили .github/workflows/deploy.yml, нужно:
-  - чтобы правка реально попала в нужную ветку (dev или main)
-  - сделать новый push/commit, чтобы запустился новый run
-- Re-run jobs запускает старую версию workflow (из того же коммита)
+### 6.2. Actions использует "старый" workflow
+- GitHub Actions выполняет workflow из того коммита, который запустил run.
+- После правки `deploy.yml` нужен **новый push**, чтобы запустился новый run.
+- **Re-run jobs запускает старую версию workflow** (из того же коммита).
 
-### 6.2. 500 на dev
-Почти всегда это:
-- storage / bootstrap/cache не writable
-- Проверка на сервере:
-  - sudo -u www-data test -w /var/www/mskba-dev/storage && echo OK || echo FAIL
-  - смотреть nginx и laravel logs
+### 6.3. 500 на dev
+Почти всегда — `storage` / `bootstrap/cache` не writable:
+- Проверить права (должен писать `www-data`).
+- Смотреть nginx и laravel logs.
 
-### 6.3. “sudo: a password is required” в Actions
-- Значит, какая-то команда в deploy-цепочке вызвала sudo без -n
-- Нужно:
-  - либо использовать sudo -n везде в workflow/скриптах
-  - либо настроить sudoers для нужных команд без пароля
+### 6.4. "sudo: a password is required" в Actions
+- Значит, какая-то команда в deploy-цепочке вызвала `sudo` без `-n`.
+- Решение: либо использовать `sudo -n` везде, либо настроить sudoers для нужных команд без пароля.
 
-### 6.4. SSH / host verification
-- Если “Host key verification failed”:
-  - значит нет нужных ключей в known_hosts или включена строгая проверка
-  - корректный путь — добавить ключи github.com в ~deploy/.ssh/known_hosts
+### 6.5. SSH / host verification
+- "Host key verification failed" — отсутствуют нужные ключи в `known_hosts` или включена строгая проверка.
 
 ---
 
-## 7) Работа с .env на dev (как безопасно редактировать)
+## 7. Работа с .env на сервере
 
-> .env хранится только на сервере (не коммитится в репозиторий).
+> `.env` хранится **только на сервере**, не коммитится в репо.
 
-Открыть и добавить строку:
-- sudo nano /var/www/mskba-dev/.env
-- добавить нужную строку
-- затем выполнить очистку кешей:
-  - cd /var/www/mskba-dev && php artisan optimize:clear
-
-(аналогично для prod, но изменения в prod .env делать крайне аккуратно)
+После правки `.env`:
+1. Очистить кеши: `php artisan optimize:clear`
+2. Перезапустить Reverb (systemd-юнит, имя см. `myconfigs/deploy.md`).
 
 ---
 
-## 8) Seeders и factories на dev (можно ли и как)
+## 8. Seeders и factories на dev
 
-Да, на dev запускать можно, но важно понимать:
-- сидеры/фабрики меняют данные в БД
-- перед запуском желательно:
-  - убедиться, что это dev база
-  - понимать, не затрёт ли это ручные тестовые данные
+На dev запускать можно, но с осторожностью — меняется БД:
+- Убедиться, что `.env` указывает на dev-базу.
+- Оценить, не затрёт ли это ручные тестовые данные.
 
 Типовой запуск:
-- cd /var/www/mskba-dev
-- php artisan db:seed  
-или конкретный сидер:
-- php artisan db:seed --class=SomeSeeder
+```
+php artisan db:seed
+php artisan db:seed --class=SomeSeeder
+```
 
-Factories обычно используют через tinker или сидеры.
-
----
-
-## 9) Ключевое правило для агента
-
-При любых изменениях, связанных с деплоем:
-1) Считать источником истины .github/workflows/deploy.yml
-2) Учитывать, что dev и prod — разные директории на сервере
-3) Любые изменения деплоя сначала тестировать через push в dev
-4) В main попадать только после подтверждения работоспособности на dev
+Factories — через tinker или сидеры.
 
 ---
 
-## 10) Ожидаемое поведение после каждого пуша
+## 9. WebSocket / Reverb
 
-- Push в dev:
-  - должен автоматически собрать фронт, задеплоить dev, и обновить public/build
-- Push в main:
-  - должен потребовать approve (environment `production`)
-  - после approve — задеплоить prod
+Reverb — WebSocket-сервер Laravel; держит соединение для realtime-обновлений (сообщения, статусы, счётчики).
 
----
+### В норме
+Reverb работает постоянно как systemd-юнит. Отключать имеет смысл только для краткой отладки или при изменениях `.env`, требующих перезапуска.
 
-## 11) WebSocket / Reverb — рекомендации и проверка
+### После изменений `.env`
+1. `php artisan optimize:clear`
+2. Перезапуск Reverb systemd-юнита (имя — в `myconfigs/deploy.md`).
 
-### Что это
-WebSocket — это постоянное соединение между браузером и сервером для realtime‑обновлений без перезагрузки страницы.
-Reverb — сервер веб-сокетов Laravel. Он держит это соединение и доставляет события (сообщения, статусы, счётчики).
-
-### Нужно ли выключать
-Нет. В норме Reverb должен быть включён постоянно. Отключать стоит только:
-- для краткой отладки;
-- при изменениях в `.env`, когда требуется перезапуск.
-
-### Что делать после изменений в `.env`
-1) Очистить кэши:
-   - `php artisan optimize:clear`
-2) Перезапустить Reverb:
-   - `sudo systemctl restart mskba-dev-reverb`
-   - `sudo systemctl restart mskba-prod-reverb`
-
-### Быстрые проверки
-- Статус сервиса:
-  - `sudo systemctl status mskba-dev-reverb`
-  - `sudo systemctl status mskba-prod-reverb`
-- Логи:
-  - `sudo journalctl -u mskba-dev-reverb -n 100 --no-pager`
-  - `sudo journalctl -u mskba-prod-reverb -n 100 --no-pager`
-
-### Типовые причины «не работает»
-- В `.env` не совпадают ключи `REVERB_*` и `VITE_REVERB_*`.
+### Типовые причины "не работает"
+- В `.env` не совпадают `REVERB_*` и `VITE_REVERB_*`.
 - Фронт не пересобран после изменения `VITE_REVERB_*` (build должен пройти в Actions).
 - Nginx не проксирует `/app` на Reverb.
 
 ---
 
-## 12) Отдельная инструкция по разворачиванию prod (чеклист)
+## 10. Ожидаемое поведение после push
 
-### Перед релизом
-1) Убедиться, что dev актуален и проверен.
-2) Проверить миграции (нет ли опасных/разрушающих изменений).
-3) Убедиться, что `.env` на prod содержит новые переменные.
-4) Проверить, что workflow для `main` требует manual approval.
+- **Push в `dev`:**
+  - Автоматически собрать фронт → задеплоить dev → обновить `public/build`.
+- **Push в `main`:**
+  - Потребовать approve (environment `production`).
+  - После approve — задеплоить prod.
 
-### Деплой
-1) Мержим `dev` → `main`.
-2) Делаем approve в GitHub Environment `production`.
-3) Дожидаемся успешного Deploy to prod.
+---
 
-### После деплоя
-1) Проверить основные страницы https://mskba.ru.
-2) Проверить логи:
-   - `/var/www/mskba-prod/storage/logs/laravel.log`
-3) Если есть проблемы — откат:
-   - revert в `main` или
-   - `git reset --hard <commit>` на сервере (только если понимаешь последствия).
-
-### Telegram webhook (prod)
-Если используется подтверждение Telegram, webhook у бота один и должен указывать на prod.
-После деплоя на prod выполните:
-- `curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" -d "url=https://mskba.ru/telegram/webhook" -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"`
-
-Проверить текущий webhook:
-- `curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"`
+> Детали путей, имён юнитов, имён секретов и прочая инфраструктурная специфика — в приватном `myconfigs/deploy.md` (не в репозитории).
