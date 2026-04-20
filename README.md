@@ -1,59 +1,97 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# MSKBA
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Цифровой портал для баскетбольного сообщества: поиск площадок, организация игр и тренировок, коммуникация между игроками, тренерами, судьями и администраторами площадок.
 
-## About Laravel
+**Демо:**
+- [mskba.ru](https://mskba.ru) — прод. Ветка `main`, релизы после ручного approve в GitHub Actions.
+- [dev.mskba.ru](https://dev.mskba.ru) — dev-стенд. Ветка `dev`, автодеплой на каждый push. Именно сюда сначала попадают новые фичи и исправления; после проверки изменения мёржатся в `main` и уезжают на прод.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**Тестовый доступ** (аккаунты с разными ролями для ознакомления с функционалом): [admean@mskba.ru](mailto:admean@mskba.ru)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Скриншоты
 
-## Learning Laravel
+### Каталог площадок
+![Каталог площадок](docs/images/venues.png)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Карточка площадки
+![Карточка площадки](docs/images/venue.png)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Создание события
+![Создание события](docs/images/event.png)
 
-## Laravel Sponsors
+### Модерация пользователей
+![Модерация пользователей](docs/images/moderation.png)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Возможности
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- **Площадки** — каталог с фильтрами по удобствам, галерея, карта, адрес с автоматическим определением ближайшего метро.
+- **События** — создание игр и тренировок, фильтры по типу и дате, автоматическое истечение.
+- **Роли участников** — игрок, тренер, судья, администратор площадки, медиа, продавец, персонал.
+- **Контракты площадки** — создатель / владелец / супервайзер / сотрудник с процессом модерации назначений владельца и супервайзера.
+- **Модерация** — централизованный модерационный центр: пользователи, площадки, контракты, медиа. Статусы, комментарии, уведомления.
+- **Авторизация** — логин + пароль, подтверждение контактов через email и Telegram-бота.
+- **Realtime** — обновление счётчиков уведомлений и непрочитанных сообщений через WebSocket (Laravel Reverb).
+- **Фоновые задачи** — автоматическое истечение бронирований, заявок на бронирование, контрактов и событий через Laravel Scheduler + очередь (`everyMinute`, `withoutOverlapping`). Каждая задача доступна и как отдельная artisan-команда для ручного запуска.
+- **Адреса** — интеграция с Yandex (suggest + geocode), справочники городов и станций метро.
+- **Админ-панель** — управление пользователями, площадками, настройками, SEO-метатегами, просмотр системных логов.
+- **Аудит** — журналирование изменений ключевых сущностей.
+- **Сообщения** — внутренние системные и пользовательские сообщения с шаблонами.
 
-## Contributing
+## Стек
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Backend**
+- PHP 8.2+
+- Laravel 12
+- Laravel Reverb (WebSocket-сервер)
+- Pusher / Laravel Echo (клиент realtime)
+- Queue (database driver) + Laravel Scheduler — для фоновых задач и воркеров
 
-## Code of Conduct
+**Frontend**
+- Vue 3 + Inertia.js
+- Tailwind CSS 4
+- PrimeVue (UI-компоненты)
+- Vite 7
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+**Инфраструктура**
+- Ubuntu VDS + Nginx + systemd
+- GitHub Actions: сборка фронтенда → деплой на dev и prod (prod с обязательным ручным approve)
+- SQLite по умолчанию для локальной разработки, любая SQL-БД для прод
 
-## Security Vulnerabilities
+## Архитектура
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Доменно-ориентированная структура под `app/Domain/`:
 
-## License
+Addresses · Audit · Balances · Cities · Contracts · Events · Integrations · Media · Messages · Metros · Moderation · Notifications · Participants · Payments · Permissions · Seo · Users · Venues
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Каждый домен содержит модели, enums, репозитории и сервисы. Контроллеры и Inertia-страницы — в `app/Http` и `resources/js/Pages`.
+
+## Локальный запуск
+
+```bash
+git clone git@github.com:a2icer-art/mskba.git
+cd mskba
+
+composer install
+cp .env.example .env
+php artisan key:generate
+
+touch database/database.sqlite
+php artisan migrate --seed
+
+npm install
+composer run dev
+```
+
+После запуска сайт доступен на http://localhost:8000. Фронтенд (Vite) и очередь стартуют параллельно через `composer run dev`.
+
+## Лицензия
+
+[MIT](LICENSE)
+
+---
+
+Developed by **A2ice Dev**
